@@ -28174,7 +28174,7 @@ function v4Gestures(P, dt) {   // P: karakter uzayında yumuşatılmış noktala
    Harita verisi oyun açıkken internetten indirilir (© OpenStreetMap katkıcıları). claude.ai bağlantısında internet kapalıdır — GitHub sitesinde çalışır.
    ===================================================================== */
 AREAS.ankara = { cx: 20000, cz: -20000, r: 2600, bg: 0xbfd6ea, fog: [260, 2400], sky: 0xdfeaf6, gnd: 0x8c8a80, sunC: 0xfff2dd, sunI: 2.5, sunVis: 0xfff3d6 };
-const ANK = { g: null, reg: null, bld: [], chunks: [], obs: [], obsIn: false, busy: false, dead: 0, data: {}, spawn: null };
+const ANK = { ldT: 0, g: null, reg: null, bld: [], chunks: [], obs: [], obsIn: false, busy: false, dead: 0, data: {}, spawn: null };
 const ANK_REG = {
   kizilay: { n: 'Kızılay', lat: 39.9208, lon: 32.8541 }, ulus: { n: 'Ulus', lat: 39.9419, lon: 32.8543 },
   anitkabir: { n: 'Anıtkabir', lat: 39.9250, lon: 32.8369 }, cankaya: { n: 'Çankaya · Atakule', lat: 39.8856, lon: 32.8558 }
@@ -28184,14 +28184,25 @@ function ankWinTex() {
   g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#5d7385'; g.fillRect(14, 16, 36, 30); g.fillStyle = '#93abbd'; g.fillRect(16, 18, 15, 12); g.fillStyle = '#d9d4ca'; g.fillRect(0, 56, 64, 8);
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
+function ankLoad(on, txt) {   // indirme göstergesi (süre sayar)
+  let el = $('ankLd'); if (!el) { document.body.insertAdjacentHTML('beforeend', '<div id="ankLd" style="position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:70;display:none;background:rgba(14,20,34,.92);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:14px;padding:12px 18px;font:600 14px system-ui;text-align:center;max-width:80vw"></div>'); el = $('ankLd'); }
+  clearInterval(ANK.ldT); if (!on) { el.style.display = 'none'; return; }
+  const t0 = performance.now(); el.style.display = 'block'; const draw = () => { el.innerHTML = txt + `<br><small style="opacity:.75">⏳ ${Math.round((performance.now() - t0) / 1000)} sn · © OpenStreetMap</small>`; }; draw(); ANK.ldT = setInterval(draw, 500);
+}
 async function ankFetch(R) {
-  const dl = .0065, dn = .0085, S = (R.lat - dl).toFixed(5), N = (R.lat + dl).toFixed(5), W = (R.lon - dn).toFixed(5), E = (R.lon + dn).toFixed(5);
-  const q = `[out:json][timeout:50];(way["building"](${S},${W},${N},${E});way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|pedestrian|service|primary_link|secondary_link)$"](${S},${W},${N},${E}););out geom;`;
-  let last;
-  for (const u of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter']) {
-    try { const r = await fetch(u, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }); if (r.ok) { const j = await r.json(); if (j && j.elements) return j; } last = new Error('HTTP ' + r.status); } catch (e) { last = e; }
+  const dl = .0045, dn = .0059, S = (R.lat - dl).toFixed(5), N = (R.lat + dl).toFixed(5), W = (R.lon - dn).toFixed(5), E = (R.lon + dn).toFixed(5);   // ~1 km × 1 km
+  const q = `[out:json][timeout:45];(way["building"](${S},${W},${N},${E});way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|pedestrian|service|primary_link|secondary_link)$"](${S},${W},${N},${E}););out geom;`;
+  const SV = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'], errs = [];
+  for (let i = 0; i < SV.length; i++) {
+    ankLoad(true, `🗺️ ${adT('Ankara haritası indiriliyor')} — ${R.n}<br><small>${adT('sunucu')} ${i + 1}/${SV.length}</small>`);
+    const ac = typeof AbortController !== 'undefined' ? new AbortController() : null, to = setTimeout(() => { try { ac && ac.abort(); } catch (x) {} }, 35000);
+    try {
+      const r = i % 2 ? await fetch(SV[i] + '?data=' + encodeURIComponent(q), { signal: ac && ac.signal }) : await fetch(SV[i], { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ac && ac.signal });
+      if (r.ok) { const j = await r.json(); if (j && j.elements && j.elements.length) { clearTimeout(to); return j; } errs.push('boş'); } else errs.push('HTTP ' + r.status);
+    } catch (e) { errs.push(e && e.name === 'AbortError' ? adT('zaman aşımı') : (e && e.message) || 'hata'); }
+    clearTimeout(to);
   }
-  throw last || new Error('harita');
+  const err = new Error(errs.join(', ')); err.list = errs; throw err;
 }
 function ankHash(n) { n = (n ^ 61) ^ (n >>> 16); n = n + (n << 3); n = n ^ (n >>> 4); n = Math.imul(n, 0x27d4eb2d); n = n ^ (n >>> 15); return ((n >>> 0) % 1000) / 1000; }
 function ankHeight(t, id) {
@@ -28264,16 +28275,16 @@ async function ankGo(key) {
   const R = ANK_REG[key] || ANK_REG.kizilay; if (ANK.busy) return; ANK.busy = true;
   try {
     if (ANK.reg !== R || !ANK.g) {
-      showMsg(`🗺️ ${adT('Ankara haritası indiriliyor')} (${R.n})… · © OpenStreetMap`, 6);
       const data = ANK.data[key] || (ANK.data[key] = await ankFetch(R));
-      const n = ankBuild(data, R); showMsg(`🏙️ ${R.n}: ${n} ${adT('gerçek bina kuruldu')}`, 2.4);
+      ankLoad(true, `🏗️ ${R.n}: ${adT('binalar kuruluyor')}…`); await new Promise(r => setTimeout(r, 60));
+      const n = ankBuild(data, R); ankLoad(false); showMsg(`🏙️ ${R.n}: ${n} ${adT('gerçek bina kuruldu')}`, 2.4);
     }
     if (RIDE.on) { try { rideExit(); } catch (e) {} }
     const A = AREAS.ankara, sp = ANK.spawn || [0, 0];
     teleportTo('ankara', A.cx + sp[0], A.cz + sp[1], Math.PI, `🗺️ ${adT('Ankara')} · ${R.n} — ${adT('gez, dev ol (B) ve yık!')}`, () => { ankObs(true); ankUI(); });
   } catch (e) {
-    console.warn('ANK', e); const fr = (() => { try { return window.self !== window.top; } catch (x) { return true; } })();
-    showMsg(fr ? adT('🗺️ Gerçek harita bu bağlantıda indirilemiyor (claude.ai interneti kapatıyor) — oyunun GitHub sitesinden aç') : adT('🗺️ Harita indirilemedi — internetini kontrol edip biraz sonra tekrar dene'), 6);
+    console.warn('ANK', e); ankLoad(false); const fr = (() => { try { return window.self !== window.top; } catch (x) { return true; } })(), why = e && e.message ? ' (' + e.message + ')' : '';
+    showMsg(fr ? adT('🗺️ Gerçek harita bu bağlantıda indirilemiyor (claude.ai interneti kapatıyor) — oyunun GitHub sitesinden aç') : /429|504|503|zaman/.test(why) ? adT('🗺️ Harita sunucuları şu an meşgul — 1 dakika sonra tekrar dene') + why : adT('🗺️ Harita indirilemedi — internetini kontrol edip tekrar dene') + why, 8);
   } finally { ANK.busy = false; }
 }
 function ankCollapse(b) {
