@@ -15440,6 +15440,7 @@ ground.material.customProgramCacheKey = () => 'groundVar2';
 ground.material.needsUpdate = true;
 
 function renderFrame() {
+  if (typeof SVR !== 'undefined' && SVR.on) { svrRender(); return; }   // 👓 tam VR: iki göz
   if (GFX.composer) { updateGfx(); GFX.composer.render(); } else renderer.render(scene, camera);
   if (SUN.on) { renderer.autoClear = false; renderer.render(flareScene, flareCam); renderer.autoClear = true; }
 }
@@ -27728,7 +27729,7 @@ async function htStart() {
   HT.on = true; HT.st = 'cam'; htUI(); htMsg(adT('📷 Kamera açılıyor…'));
   try {
     if (V4.on) v4Stop(true);
-    const st = await camOpen();   // en geniş görüş açısı
+    const st = await camOpen(HT.cam);   // en geniş görüş açısı
     if (!HT.on) { st.getTracks().forEach(t => t.stop()); return; }
     HT.stream = st; const v = $('htVid'); v.srcObject = st; await v.play();
   } catch (e) { htFail('cam', e); return; }
@@ -27812,12 +27813,13 @@ function htTick(dt) {
   const eye = camera.position.clone(), seen = [];
   (res.landmarks || []).forEach((lm, i) => {
     const lab = res.handedness && res.handedness[i] && res.handedness[i][0] ? res.handedness[i][0].categoryName : (lm[0].x < .5 ? 'Left' : 'Right');
-    const two = (res.landmarks || []).length > 1, side = two ? ((1 - lm[0].x) >= (1 - res.landmarks[1 - i][0].x) ? 'R' : 'L') : (lab === 'Left' ? 'L' : 'R'); if (seen.includes(side)) return; seen.push(side);   // iki el: ekranın sağındaki sağ el
+    const fx = q => HT.cam === 'environment' ? q : 1 - q, two = (res.landmarks || []).length > 1, side = two ? (fx(lm[0].x) >= fx(res.landmarks[1 - i][0].x) ? 'R' : 'L') : (lab === 'Left' ? 'L' : 'R'); if (seen.includes(side)) return; seen.push(side);   // iki el: ekranın sağındaki sağ el
     const r = htRead(lm), H = HT.hands[side] || (HT.hands[side] = { c: { ...r.c }, size: r.size, curl: r.curl.slice(), seen: 0, fist: false, P: null, vel: new THREE.Vector3(), sqT: 0, cd: 0, hist: [] });
     const k = .55; H.c.x += (r.c.x - H.c.x) * k; H.c.y += (r.c.y - H.c.y) * k; H.size += (r.size - H.size) * k; H.curl = H.curl.map((c0, j) => c0 + (r.curl[j] - c0) * .6); H.seen = elapsed;
     HT.s0[side] = HT.s0[side] ? HT.s0[side] + (H.size - HT.s0[side]) * .01 : H.size;   // ortalama el boyu (derinlik referansı)
-    const mx = 1 - H.c.x, lat = (mx - .5) * 2, ver = (.5 - H.c.y) * 2, dep = THREE.MathUtils.clamp(.5 + (H.size / HT.s0[side] - 1) * 1.6, 0, 1);
-    const T = eye.clone().addScaledVector(rt, lat * .8 * L).addScaledVector(up, ver * .6 * L - .2 * L).addScaledVector(cf, (.35 + .75 * dep) * L);
+    const back = HT.cam === 'environment', mx = fx(H.c.x), lat = (mx - .5) * 2, ver = (.5 - H.c.y) * 2, rr = H.size / HT.s0[side] - 1, dep = THREE.MathUtils.clamp(back ? .5 - rr * 1.6 : .5 + rr * 1.6, 0, 1);
+    let T; if (back) { const rc = HT.rc3 || (HT.rc3 = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(lat * .78, ver * .78), camera); T = rc.ray.origin.clone().addScaledVector(rc.ray.direction, (.35 + .75 * dep) * L); }   // arka kamera: el ekranda gerçekte durduğu yerde
+    else T = eye.clone().addScaledVector(rt, lat * .8 * L).addScaledVector(up, ver * .6 * L - .2 * L).addScaledVector(cf, (.35 + .75 * dep) * L);
     if (H.P) { const vv = T.clone().sub(H.P).divideScalar(Math.max(.03, (now - (H.tP || now)) / 1000)); H.vel.lerp(vv, .5); } H.P = T.clone(); H.tP = now; HT.T[side].copy(T);
     // hareketler
     const avg = (H.curl[1] + H.curl[2] + H.curl[3] + H.curl[4]) / 4; H.cd = Math.max(0, H.cd - .045);
@@ -27831,7 +27833,7 @@ function htTick(dt) {
     if (giant && H.fist && !holding && downV > 3.4 * giantS && H.cd <= 0) { H.cd = .9; htSlam(side); }
     // önizlemede iskelet (aynalı)
     g.strokeStyle = side === 'R' ? '#69f0ae' : '#ffd166'; g.lineWidth = 2; g.beginPath();
-    for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [0, 17], [17, 18], [18, 19], [19, 20]]) { g.moveTo((1 - lm[a].x) * cv.width, lm[a].y * cv.height); g.lineTo((1 - lm[b].x) * cv.width, lm[b].y * cv.height); }
+    for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [0, 17], [17, 18], [18, 19], [19, 20]]) { g.moveTo(fx(lm[a].x) * cv.width, lm[a].y * cv.height); g.lineTo(fx(lm[b].x) * cv.width, lm[b].y * cv.height); }
     g.stroke();
   });
   if (!seen.length) htMsg(adT('✋ Ellerini kameraya göster'));
@@ -27884,14 +27886,14 @@ document.body.insertAdjacentHTML('beforeend', `<div id="v3Bar"><button data-v3="
 }
 
 /* ---------- 📷 ortak ön kamera: en geniş açı (4:3 tam sensör, yakınlaştırma en az, varsa geniş açılı ön kamera) ---------- */
-async function camOpen() {
+async function camOpen(facing = 'user') {
   const md = navigator.mediaDevices; if (!md || !md.getUserMedia) throw Object.assign(new Error('nomd'), { name: 'NoMediaDevices' });
-  const base = { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1440 }, aspectRatio: { ideal: 4 / 3 } };
+  const base = { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1440 }, aspectRatio: { ideal: 4 / 3 } };
   let st; try { st = await md.getUserMedia({ video: base, audio: false }); }
   catch (e1) { if (e1 && (e1.name === 'OverconstrainedError' || e1.name === 'NotFoundError' || e1.name === 'NotReadableError')) st = await md.getUserMedia({ video: true, audio: false }); else throw e1; }
   try {   // birden çok ön kamera varsa geniş açılı olanı seç
     const ds = (await md.enumerateDevices()).filter(d => d.kind === 'videoinput'), cur = st.getVideoTracks()[0].getSettings().deviceId;
-    const wide = ds.find(d => d.deviceId !== cur && /ultra|wide|geniş/i.test(d.label) && /front|user|ön|facing front/i.test(d.label));
+    const wide = ds.find(d => d.deviceId !== cur && /ultra|wide|geniş/i.test(d.label) && (facing === 'user' ? /front|user|ön|facing front/i : /back|rear|environment|arka|facing back/i).test(d.label));
     if (wide) { const s2 = await md.getUserMedia({ video: { ...base, facingMode: undefined, deviceId: { exact: wide.deviceId } }, audio: false }); st.getTracks().forEach(t => t.stop()); st = s2; }
   } catch (x) {}
   const tr = st.getVideoTracks()[0];
@@ -27995,6 +27997,46 @@ document.head.insertAdjacentHTML('beforeend', '<style>#htBox.v4{width:190px}#htB
   $('pVR4').addEventListener('click', () => { resumeGame(); setTimeout(() => v4Start(), 50); });
   document.addEventListener('click', e => { const b = e.target.closest('[data-v4]'); if (!b) return; if (V4.on) v4Stop(); else v4Start(); });
   v4UI();
+}
+
+/* ---------- 🔄 VR 3 kamerası: ön ya da arka (arka kamerayla telefon VR gözlüğündeyken önündeki ellerini görür, el ekranda gerçekte durduğu yerde)
+   👓 Tam VR: ekran iki göze bölünür (VR gözlüğü / Cardboard), telefon hareketiyle bakılır, arka kamerayla eller izlenir ---------- */
+HT.cam = 'user';
+async function htSwitchCam(to) {
+  HT.cam = to || (HT.cam === 'user' ? 'environment' : 'user'); htCamUI();
+  if (!HT.on || !HT.stream) return;
+  try { HT.stream.getTracks().forEach(t => t.stop()); const st = await camOpen(HT.cam); if (!HT.on) { st.getTracks().forEach(t => t.stop()); return; } HT.stream = st; const v = $('htVid'); v.srcObject = st; await v.play(); HT.s0.R = HT.s0.L = 0; HT.hands = {}; }
+  catch (e) { htFail('cam', e); }
+}
+function htCamUI() { const b = $('htBox'); if (b) b.classList.toggle('back', HT.cam === 'environment'); document.querySelectorAll('[data-htc]').forEach(x => x.textContent = HT.cam === 'environment' ? '🔄 ' + adT('Arka kamera') : '🔄 ' + adT('Ön kamera')); }
+const SVR = { on: false, st: new THREE.StereoCamera() };
+function svrSet(on) {
+  SVR.on = on; document.body.classList.toggle('svr', on);
+  if (on) {
+    try { const de = document.documentElement; if (!document.fullscreenElement && de.requestFullscreen) de.requestFullscreen().then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (x) {} }).catch(() => {}); } catch (x) {}
+    if (!GV3.on) gv3Set(true);
+    const fr = (() => { try { return window.self !== window.top; } catch (x) { return true; } })();
+    if (!fr && window.isSecureContext && navigator.mediaDevices) { if (HT.on) { if (HT.cam !== 'environment') htSwitchCam('environment'); } else { HT.cam = 'environment'; htCamUI(); setTimeout(() => htStart(), 300); } }
+    showMsg(adT('👓 Tam VR: telefonu gözlüğe tak · başını çevirerek bak · arka kamera ellerini görür'), 3);
+  }
+  document.querySelectorAll('[data-svr]').forEach(b => b.classList.toggle('on', on));
+}
+function svrRender() {   // iki göz: yan yana
+  const w = innerWidth, h = innerHeight, S = SVR.st; camera.updateMatrixWorld(); S.aspect = .5; S.eyeSep = .064 * Math.max(1, giantS); S.update(camera);
+  renderer.setScissorTest(true);
+  renderer.setScissor(0, 0, w / 2, h); renderer.setViewport(0, 0, w / 2, h); renderer.render(scene, S.cameraL);
+  renderer.setScissor(w / 2, 0, w / 2, h); renderer.setViewport(w / 2, 0, w / 2, h); renderer.render(scene, S.cameraR);
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h);
+}
+document.head.insertAdjacentHTML('beforeend', '<style>#htBox.back video{transform:none}body.svr>:not(canvas):not(#svrX):not(script):not(style){visibility:hidden!important}#svrX{display:none;position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:99;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:10px;padding:3px 10px;font:12px system-ui}body.svr #svrX{display:block}</style>');
+document.body.insertAdjacentHTML('beforeend', `<button id="svrX">✕ 👓 ${adT('Tam VR')}</button>`);
+{
+  $('svrX').addEventListener('click', e => { e.stopPropagation(); svrSet(false); try { if (document.fullscreenElement) document.exitFullscreen(); } catch (x) {} });
+  $('htBox').querySelector('[data-hts]').insertAdjacentHTML('beforebegin', `<button data-htc="1"></button>`);
+  $('v3Bar').insertAdjacentHTML('beforeend', `<button data-svr="1">👓 ${adT('Tam VR')}</button>`);
+  $('gvPanel').querySelector('.gvbody .gvr').insertAdjacentHTML('beforeend', `<button data-svr="1">👓 ${adT('Tam VR')}</button><button data-htc="1"></button>`);
+  document.addEventListener('click', e => { const c = e.target.closest('[data-htc]'); if (c) { e.stopPropagation(); htSwitchCam(); return; } const s = e.target.closest('[data-svr]'); if (s) svrSet(!SVR.on); });
+  htCamUI();
 }
 
 /* ---------- Ana menü (yükleme ekranından sonra): BRK GAMES · ▶ Oyna · ⌨️ Tuşlar (kılavuz) · ⚙️ Ayarlar · 🌐 Dil ---------- */
