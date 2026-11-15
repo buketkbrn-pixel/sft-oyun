@@ -27793,6 +27793,7 @@ async function htStart() {
 }
 function htStop(quiet) {
   HT.on = false; HT.st = 'off'; HT.hands = {};
+  HT.torch = false; document.querySelectorAll('[data-htt]').forEach(b => b.classList.remove('on'));
   if (HT.stream) { HT.stream.getTracks().forEach(t => t.stop()); HT.stream = null; }
   const v = $('htVid'); if (v) v.srcObject = null; htUI();
   if (!quiet) showMsg(adT('📷 El takibi kapandı'), 1.2);
@@ -28056,7 +28057,7 @@ HT.cam = 'user';
 async function htSwitchCam(to) {
   HT.cam = to || (HT.cam === 'user' ? 'environment' : 'user'); htCamUI();
   if (!HT.on || !HT.stream) return;
-  try { HT.stream.getTracks().forEach(t => t.stop()); const st = await camOpen(HT.cam); if (!HT.on) { st.getTracks().forEach(t => t.stop()); return; } HT.stream = st; const v = $('htVid'); v.srcObject = st; await v.play(); HT.s0.R = HT.s0.L = 0; HT.hands = {}; }
+  try { HT.stream.getTracks().forEach(t => t.stop()); const st = await camOpen(HT.cam); if (!HT.on) { st.getTracks().forEach(t => t.stop()); return; } HT.stream = st; const v = $('htVid'); v.srcObject = st; await v.play(); HT.s0.R = HT.s0.L = 0; HT.hands = {}; HT.torch = false; document.querySelectorAll('[data-htt]').forEach(b => b.classList.remove('on')); }
   catch (e) { htFail('cam', e); }
 }
 function htCamUI() { const b = $('htBox'); if (b) b.classList.toggle('back', HT.cam === 'environment'); document.querySelectorAll('[data-htc]').forEach(x => x.textContent = HT.cam === 'environment' ? '🔄 ' + adT('Arka kamera') : '🔄 ' + adT('Ön kamera')); }
@@ -28494,14 +28495,16 @@ function ankPedAt(x, y, z) {   // pencere olayı: yakındaki bir Ankaralı odaya
 }
 function ankBoxes() { return ANK.bld.filter(b => b.alive).map(b => b.obs); }
 /* ---------- 🔦 VR 3 flaşı: kameranın feneri (varsa) ya da ön kamerada ekran kenarı ışığı ---------- */
-async function htTorch() {
-  const st = HT.stream || (typeof V4 !== 'undefined' && V4.stream), tr = st && st.getVideoTracks()[0], cap = tr && tr.getCapabilities ? tr.getCapabilities() : {};
-  HT.torch = !HT.torch;
-  if (cap.torch) { try { await tr.applyConstraints({ advanced: [{ torch: HT.torch }] }); } catch (e) { HT.torch = false; showMsg(adT('🔦 Flaş açılamadı'), 1.4); } }
-  else { document.body.classList.toggle('htLight', HT.torch); if (HT.torch) showMsg(st ? adT('🔦 Bu kamerada flaş yok — ekran kenarı ışığı açıldı') : adT('🔦 Ekran ışığı açıldı'), 1.8); }
-  document.querySelectorAll('[data-htt]').forEach(b => b.classList.toggle('on', HT.torch));
+async function htTorch() {   // kameranın kendi flaşı (ön kamerada flaş varsa o da); flaşı olmayan kamerada hiçbir şey yapmaz
+  const st = HT.stream || (typeof V4 !== 'undefined' && V4.stream), tr = st && st.getVideoTracks()[0];
+  if (!tr) { showMsg(adT('🔦 Önce kamerayı aç (📷 Elimle oyna)'), 1.6); return; }
+  const want = !HT.torch;
+  try { await tr.applyConstraints({ advanced: [{ torch: want }] }); } catch (e) {}
+  let ok = false; try { const se = tr.getSettings ? tr.getSettings() : {}; ok = se.torch === want; } catch (e) {}
+  if (!ok && want) { try { await tr.applyConstraints({ torch: want }); const se = tr.getSettings(); ok = se.torch === want; } catch (e) {} }
+  if (ok || !want) HT.torch = want; else showMsg(adT('🔦 Bu kamerada flaş yok'), 1.6);
+  document.querySelectorAll('[data-htt]').forEach(b => b.classList.toggle('on', !!HT.torch));
 }
-document.head.insertAdjacentHTML('beforeend', '<style>body.htLight::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99998;box-shadow:inset 0 0 0 26px #fff,inset 0 0 60px 40px rgba(255,255,255,.85)}</style>');
 {
   $('htBox').querySelector('[data-hts]').insertAdjacentHTML('beforebegin', '<button data-htt="1">🔦 ' + adT('Flaş') + '</button>');
   $('v3Bar').insertAdjacentHTML('beforeend', '<button data-htt="1">🔦</button>');
