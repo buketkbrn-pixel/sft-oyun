@@ -1,0 +1,19 @@
+name: ankara-verisi
+on:
+  push:
+    paths: ['tools/ankara.py', '.github/workflows/ankara.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  indir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/ankara.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git commit -m "Ankara OpenStreetMap verisi" || echo "değişiklik yok"
+          git push
