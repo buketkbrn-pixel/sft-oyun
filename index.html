@@ -54,6 +54,7 @@
   #boot{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 42%,#1d2c4f 0%,#0a0f1d 55%,#03050a 100%);color:#fff;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;transition:opacity .8s ease}
   #boot.hide{opacity:0;pointer-events:none}
   #boot .bw{text-align:center;animation:bIn 1s cubic-bezier(.2,1.4,.4,1) both}
+  #boot #dinoCv{display:block;width:min(440px,86vw);height:auto;margin:14px auto 0;border-radius:12px;background:rgba(255,255,255,.06);touch-action:none;cursor:pointer}#boot .dtip{font-size:12px;opacity:.7;margin-top:6px}
   #boot .bl{display:flex;justify-content:center;gap:.22em;font-weight:900;font-size:clamp(46px,12vw,118px);letter-spacing:.05em;line-height:1;filter:drop-shadow(0 0 26px rgba(255,140,40,.45))}
   #boot .bb{background:linear-gradient(100deg,#ff7a1a 0%,#ffd36b 40%,#fff6d8 50%,#ffd36b 60%,#c2410c 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:bShine 2.4s linear infinite}
   #boot .bg{color:#e9eefc;text-shadow:0 0 18px rgba(120,170,255,.5)}
@@ -4468,7 +4469,45 @@ three/build/three.module.js:
   <div class="bt">S.F.T</div>
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
+  <canvas id="dinoCv" width="600" height="150"></canvas>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-c</div>
 </div></div>
+<script>
+window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
+  var g = cv.getContext('2d'), W = cv.width, H = cv.height, GY = H - 22, run = true, st, best = 0, last = performance.now();
+  try { best = +localStorage.getItem('sftDinoBest') || 0; } catch (e) {}
+  function reset() { st = { y: 0, vy: 0, obs: [], t: 0, sp: 6, score: 0, dead: false, nx: 80 }; }
+  reset();
+  function jump() { if (st.dead) { if (st.t - st.dt0 > 25) reset(); return; } if (st.y === 0) st.vy = 11.5; }
+  function key(e) { if (e.code === 'Space' || e.code === 'ArrowUp') { jump(); e.preventDefault(); } }
+  cv.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); jump(); });
+  addEventListener('keydown', key);
+  function step(dt) {
+    st.t += dt; if (st.dead) return; st.sp = 6 + st.t * .004; st.score += dt * .25;
+    st.vy -= .62 * dt; st.y = Math.max(0, st.y + st.vy * dt); if (st.y === 0 && st.vy < 0) st.vy = 0;
+    st.nx -= st.sp * dt;
+    if (st.nx < 0) { var big = Math.random() < .35, bird = st.t > 500 && Math.random() < .25; st.obs.push(bird ? { x: W + 10, w: 22, h: 10, y: 30 + Math.random() * 20, b: 1 } : { x: W + 10, w: big ? 18 : 11, h: big ? 34 : 24, y: 0 }); st.nx = 80 + Math.random() * 150 + st.sp * 6; }
+    for (var i = st.obs.length - 1; i >= 0; i--) { var o = st.obs[i]; o.x -= st.sp * dt * (o.b ? 1.15 : 1); if (o.x < -40) { st.obs.splice(i, 1); continue; }
+      if (o.x < 60 && o.x + o.w > 46 && st.y < o.y + o.h && st.y + 24 > o.y) { st.dead = true; st.dt0 = st.t; if (st.score > best) { best = Math.floor(st.score); try { localStorage.setItem('sftDinoBest', best); } catch (e) {} } } }
+  }
+  function draw() {
+    g.clearRect(0, 0, W, H); g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(0, GY + 1, W, 2);
+    for (var k = 0; k < 6; k++) g.fillRect(((k * 113 - st.t * st.sp) % W + W) % W, GY + 7, 18, 2);
+    var dy = GY - st.y, leg = st.y === 0 && Math.floor(st.t / 4) % 2;
+    g.fillStyle = '#f4f4f4'; g.fillRect(44, dy - 24, 14, 18); g.fillRect(52, dy - 33, 18, 12); g.fillRect(38, dy - 20, 7, 5); g.fillRect(58, dy - 18, 5, 3);
+    g.fillRect(46, dy - 6, 4, leg ? 6 : 3); g.fillRect(53, dy - 6, 4, leg ? 3 : 6); g.fillStyle = '#111'; g.fillRect(64, dy - 30, 3, 3);
+    for (var i = 0; i < st.obs.length; i++) { var o = st.obs[i];
+      if (o.b) { g.fillStyle = '#ffd166'; var wy = GY - o.y - o.h, f = Math.floor(st.t / 6) % 2; g.fillRect(o.x, wy, o.w, 6); g.fillRect(o.x + 6, f ? wy - 6 : wy + 6, 9, 5); g.fillRect(o.x - 4, wy + 1, 5, 3); }
+      else { g.fillStyle = '#7bd389'; g.fillRect(o.x, GY - o.h, o.w, o.h); g.fillRect(o.x - 5, GY - o.h * .72, 5, 4); g.fillRect(o.x - 5, GY - o.h * .72 - 6, 3, 6); g.fillRect(o.x + o.w, GY - o.h * .55, 5, 4); g.fillRect(o.x + o.w + 2, GY - o.h * .55 - 6, 3, 6); } }
+    g.fillStyle = '#fff'; g.font = 'bold 15px system-ui,sans-serif'; g.textAlign = 'right'; g.fillText(Math.floor(st.score) + '   🏆 ' + best, W - 10, 20);
+    if (st.dead) { g.textAlign = 'center'; g.fillText('💥 Tekrar için dokun', W / 2, H / 2 - 8); }
+  }
+  function frame(now) { if (!run) return; var dt = Math.min(2.5, (now - last) / 16.67); last = now; step(dt); draw(); requestAnimationFrame(frame); }
+  requestAnimationFrame(frame);
+  return function stop() { run = false; removeEventListener('keydown', key); };
+};
+(function () { var cv = document.getElementById('dinoCv'); if (!cv) return; var stop = SFT_DINO(cv), iv = setInterval(function () { var b = document.getElementById('boot'); if (!b || b.classList.contains('hide')) { stop(); clearInterval(iv); } }, 400); })();
+</script>
 <script>
 (function () {
   var shown = {};
@@ -13432,6 +13471,7 @@ function npcLineOk(L, ax, az, bx, bz) {
 }
 function pickTarget(n) {
   if (n.city) return cityPick(n);
+  if (n.ank) return ankPick(n);
   const L = npcLocal(n), P = n.holder.position, onPath = pathDist(P.x, P.z) < .6;
   for (let i = 0; i < 14; i++) {
     let x, z;
@@ -26805,8 +26845,8 @@ function gvCast(o, d) {   // ışın: bina, zemin, insan / araba
   const S = giantS; let t = 1e9, surf = 'air', hb = null;
   const tmin = Math.max(0, player.position.clone().add(new THREE.Vector3(0, 1.5 * S, 0)).sub(o).dot(d) - 1.6 * S);
   if (d.y < -1e-3) { const gy = inCity ? 0 : terrH(o.x + d.x * (o.y / -d.y), o.z + d.z * (o.y / -d.y)); const tg = (gy - o.y) / d.y; if (tg > tmin) { t = tg; surf = 'ground'; } }
-  if (inCity) { const R = GV.ray.set(o, d), box = GV.box || (GV.box = new THREE.Box3()), hp = new THREE.Vector3();
-    for (const b of CITY.obs) { if (!b.box || b.top < 1.2 || (o.x > b.x - b.hx && o.x < b.x + b.hx && o.z > b.z - b.hz && o.z < b.z + b.hz && o.y < b.top + 1)) continue; box.min.set(b.x - b.hx, 0, b.z - b.hz); box.max.set(b.x + b.hx, b.top, b.z + b.hz);
+  if (inCity || curKey === 'ankara') { const R = GV.ray.set(o, d), box = GV.box || (GV.box = new THREE.Box3()), hp = new THREE.Vector3();
+    for (const b of (inCity ? CITY.obs : ankBoxes())) { if (!b.box || b.top < 1.2 || (o.x > b.x - b.hx && o.x < b.x + b.hx && o.z > b.z - b.hz && o.z < b.z + b.hz && o.y < b.top + 1)) continue; box.min.set(b.x - b.hx, 0, b.z - b.hz); box.max.set(b.x + b.hx, b.top, b.z + b.hz);
       if (R.intersectBox(box, hp)) { const tt = hp.distanceTo(o); if (tt < t && tt > tmin) { t = tt; surf = hp.y > b.top - .05 ? 'roof' : 'wall'; hb = b; } } } }
   const e = gvEntAt(o, d, t, tmin); if (e) { t = e.t; surf = 'ent'; }
   return { H: o.clone().addScaledVector(d, Math.min(t, 400)), t, surf, ent: e, b: hb, o: o.clone(), d: d.clone() };
@@ -26896,7 +26936,7 @@ function gvAct(o, d) {
     const Sh = gvArm('R').sh.getWorldPosition(new THREE.Vector3()), ok = GV.v3 || c.H.distanceTo(Sh) <= gvArmLen('R') * 1.6; if (GV.v3 && c.H.distanceTo(Sh) > gvArmLen('R') * 1.6) gv3Pull('R', c.H);
     if (ok && c.surf === 'roof' && !gvHolding('R')) { const ch = cyRipFloor(k, c.H); if (ch) { gvGrab('R', { type: 'obj', ref: ch }); return; } }   // 🧱 çatıya dokun: en üst katı sök
     if (ok && c.surf === 'wall') { cyBldDamage(k, 70 + giantS * 6, c.H); play('punch', { gain: 1 }); shake = Math.max(shake, .35); return; } } }   // ✊ yumrukla binaya vur
-  if (c.surf === 'wall' && c.b && inCity) { const s = sides[0], Sh = gvArm(s).sh.getWorldPosition(new THREE.Vector3()); if (GV.v3 || c.H.distanceTo(Sh) <= gvArmLen(s) * 1.6) { gvWindow(c, s); return; } if (Math.hypot(c.H.x - player.position.x, c.H.z - player.position.z) < 7 * giantS) { GV.goWin = { c, side: s, t: 0 }; return; } }
+  if (c.surf === 'wall' && c.b && (inCity || curKey === 'ankara')) { const s = sides[0], Sh = gvArm(s).sh.getWorldPosition(new THREE.Vector3()); if (GV.v3 || c.H.distanceTo(Sh) <= gvArmLen(s) * 1.6) { gvWindow(c, s); return; } if (Math.hypot(c.H.x - player.position.x, c.H.z - player.position.z) < 7 * giantS) { GV.goWin = { c, side: s, t: 0 }; return; } }
   for (const s of sides) GV.anc[s] = GV.anc[s] || c.surf === 'air' ? null : { p: c.H.clone() };   // yüzeye dokun: el orada kalır · tekrar: serbest
   if (c.surf === 'ground' || c.surf === 'roof') { for (let i = 0; i < 10; i++) spawnDust(c.H.x, c.H.y, c.H.z, .15 * giantS, .6, 0, 0, groundDust()); play('land', { k: .3 }); }
 }
@@ -26951,7 +26991,7 @@ function gvCineTick(dt) {
   else if (C.t < 1.6) C.ht.copy(w).addScaledVector(n, -.3 * S);
   else C.ht.copy(w).addScaledVector(n, 1.1 * S).add(new THREE.Vector3(0, .2 * S, 0));
   if (C.t > .9 && !C.broke) { C.broke = true; try { roomBreak(); } catch (e) {} const F = admFxInit(); for (let i = 0; i < 70; i++) admEmit(F.sp, w.x + (Math.random() - .5) * 2, w.y + (Math.random() - .5) * 1.4, w.z + (Math.random() - .5) * 2, n.x * (2 + Math.random() * 5) + (Math.random() - .5) * 3, Math.random() * 3, n.z * (2 + Math.random() * 5) + (Math.random() - .5) * 3, 1.7, 2.3, 2.7, 1.4, 14, .3); play('hit', { gain: 1 }); play('squash', { gain: .5 }); shake = Math.max(shake, .3); }
-  if (C.t > 1.15 && !C.n) { const p = w.clone().addScaledVector(n, -1.1); C.n = cyPedAt(p.x, C.fl * 3.4, p.z); if (C.n && ROOM.on) { ROOM.real = C.n; ROOM.scene.add(C.n.holder); } if (C.n) { C.n.state = 'held'; cyEnsure(C.n); C.n.fear = 1.2; C.n.holder.position.set(p.x, C.fl * 3.4, p.z); cySay(C.n, cyPick([adT('AAAA! Pencereden el girdi!'), adT('İmdaaat! Evimden çıkar elini!'), adT('Kahvaltı yapıyordum!!')]), 2.2); } }
+  if (C.t > 1.15 && !C.n) { const p = w.clone().addScaledVector(n, -1.1); C.n = curKey === 'ankara' ? ankPedAt(p.x, C.fl * 3.4, p.z) : cyPedAt(p.x, C.fl * 3.4, p.z); if (C.n && ROOM.on) { ROOM.real = C.n; ROOM.scene.add(C.n.holder); } if (C.n) { C.n.state = 'held'; cyEnsure(C.n); C.n.fear = 1.2; C.n.holder.position.set(p.x, C.fl * 3.4, p.z); cySay(C.n, cyPick([adT('AAAA! Pencereden el girdi!'), adT('İmdaaat! Evimden çıkar elini!'), adT('Kahvaltı yapıyordum!!')]), 2.2); } }
   if (C.t > 1.45 && C.n && !C.grabbed) { C.grabbed = true; if (ROOM.real === C.n) { scene.add(C.n.holder); ROOM.real = null; } gvGrab(C.side, { type: 'npc', ref: C.n }); if (inCity) { cyCrime(1, adT('Dev bir yaratık pencereden uzanıp birini aldı!')); const k = cyWitness(w.x, w.z, 60); if (k) cySay(k, adT('Komşumu pencereden aldı!!'), 2.2); } }
   if (C.t > 2.8) GV.cine = null;
 }
@@ -27771,7 +27811,7 @@ function htRay(side) {   // ekrandaki el noktasından sahneye ışın
 function htHeld(side) { return side === 'R' ? (carried ? carried : null) : (GPL.list[0] ? { type: 'npc', ref: GPL.list[0] } : null); }
 function htGrab(side) {
   const c = htRay(side); if (!c) return;
-  if (c.b && inCity && c.surf === 'wall' && GV.on && !GV.cine && !htHeld(side)) { gvWindow(c, side); return; }
+  if (c.b && (inCity || curKey === 'ankara') && c.surf === 'wall' && GV.on && !GV.cine && !htHeld(side)) { gvWindow(c, side); return; }
   if (c.ent) { if (side === 'R' && carried) return; gv3Pull(side, gvEntPos(c.ent, new THREE.Vector3())); gvGrab(side, c.ent); htMsg((side === 'R' ? adT('Sağ el') : adT('Sol el')) + ': ' + adT('tuttu ✊')); return; }
   if (c.b && inCity && c.surf === 'roof' && side === 'R' && !carried) { const k = CITY.obs.indexOf(c.b); if (k >= 0 && k < CITY.bld.length && !CITY.bld[k][5]) { const ch = cyRipFloor(k, c.H); if (ch) { gv3Pull('R', c.H); gvGrab('R', { type: 'obj', ref: ch }); } } }
 }
@@ -28124,7 +28164,7 @@ function roomClose() {
 }
 function roomTick(dt) {
   if (!ROOM.on) return; ROOM.t += dt;
-  const P = player.position; if (ROOM.c && Math.hypot(P.x - ROOM.c.x, P.z - ROOM.c.z) > 400 || ROOM.t > 40 || !inCity) { roomClose(); return; }
+  const P = player.position; if (ROOM.c && Math.hypot(P.x - ROOM.c.x, P.z - ROOM.c.z) > 400 || ROOM.t > 40 || !(inCity || curKey === 'ankara')) { roomClose(); return; }
   if (ROOM.kind === 'party' && ROOM.lamp) ROOM.lamp.color.setHSL((elapsed * .4) % 1, .8, .6);
   for (const p of ROOM.ppl) {
     const r = p.r, t = elapsed * 6 + p.ph;
@@ -28186,8 +28226,10 @@ function ankWinTex() {
 }
 function ankLoad(on, txt) {   // indirme göstergesi (süre sayar)
   let el = $('ankLd'); if (!el) { document.body.insertAdjacentHTML('beforeend', '<div id="ankLd" style="position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:70;display:none;background:rgba(14,20,34,.92);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:14px;padding:12px 18px;font:600 14px system-ui;text-align:center;max-width:80vw"></div>'); el = $('ankLd'); }
-  clearInterval(ANK.ldT); if (!on) { el.style.display = 'none'; return; }
-  const t0 = performance.now(); el.style.display = 'block'; const draw = () => { el.innerHTML = txt + `<br><small style="opacity:.75">⏳ ${Math.round((performance.now() - t0) / 1000)} sn · © OpenStreetMap</small>`; }; draw(); ANK.ldT = setInterval(draw, 500);
+  clearInterval(ANK.ldT); if (!on) { el.style.display = 'none'; if (ANK.dStop) { ANK.dStop(); ANK.dStop = null; } return; }
+  if (!el.querySelector('canvas')) { el.innerHTML = '<div class="ankTx"></div><canvas width="600" height="150" style="display:block;width:min(420px,78vw);margin-top:10px;border-radius:10px;background:rgba(255,255,255,.06);touch-action:none"></canvas><small style="opacity:.6">🦖 ' + adT('beklerken oyna: dokun = zıpla') + '</small>'; }
+  if (!ANK.dStop && window.SFT_DINO) ANK.dStop = SFT_DINO(el.querySelector('canvas'));
+  const t0 = performance.now(), tx = el.querySelector('.ankTx'); el.style.display = 'block'; const draw = () => { tx.innerHTML = txt + `<br><small style="opacity:.75">⏳ ${Math.round((performance.now() - t0) / 1000)} sn · © OpenStreetMap</small>`; }; draw(); ANK.ldT = setInterval(draw, 500);
 }
 async function ankFetch(R) {
   const dl = .0045, dn = .0059, S = (R.lat - dl).toFixed(5), N = (R.lat + dl).toFixed(5), W = (R.lon - dn).toFixed(5), E = (R.lon + dn).toFixed(5);   // ~1 km × 1 km
@@ -28254,7 +28296,7 @@ function ankBuild(data, R) {
     if (!C.bl.length) continue;
     const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(C.wp, 3)); wg.setAttribute('normal', new THREE.Float32BufferAttribute(C.wn, 3)); wg.setAttribute('uv', new THREE.Float32BufferAttribute(C.wu, 2)); wg.setAttribute('color', new THREE.Float32BufferAttribute(C.wc, 3));
     const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(C.rp, 3)); rg.setAttribute('normal', new THREE.Float32BufferAttribute(C.rn, 3)); rg.setAttribute('color', new THREE.Float32BufferAttribute(C.rc, 3));
-    C.wy = Float32Array.from(C.wp.filter((_, i) => i % 3 === 1)); C.ry = Float32Array.from(C.rp.filter((_, i) => i % 3 === 1));
+    C.w0 = Float32Array.from(C.wp); C.r0 = Float32Array.from(C.rp);
     C.wm = new THREE.Mesh(wg, wallMat); C.rm = new THREE.Mesh(rg, roofMat); C.wm.receiveShadow = C.rm.receiveShadow = true; g.add(C.wm, C.rm);
     C.wp = C.wn = C.wu = C.wc = C.rp = C.rn = C.rc = null;
   }
@@ -28277,37 +28319,63 @@ async function ankGo(key) {
     if (ANK.reg !== R || !ANK.g) {
       const data = ANK.data[key] || (ANK.data[key] = await ankFetch(R));
       ankLoad(true, `🏗️ ${R.n}: ${adT('binalar kuruluyor')}…`); await new Promise(r => setTimeout(r, 60));
-      const n = ankBuild(data, R); ankLoad(false); showMsg(`🏙️ ${R.n}: ${n} ${adT('gerçek bina kuruldu')}`, 2.4);
+      const n = ankBuild(data, R); ankGraph(data, R); ankLoad(false); showMsg(`🏙️ ${R.n}: ${n} ${adT('gerçek bina kuruldu')}`, 2.4);
+      const A = AREAS.ankara; for (const p of ANK.ppl || []) { const nd = ANK.walkNodes[(Math.random() * ANK.walkNodes.length) | 0]; if (nd) { p.holder.position.set(A.cx + nd.x + (Math.random() - .5) * 2, 0, A.cz + nd.z + (Math.random() - .5) * 2); p.an = nd; p.state = 'idle'; } } for (const c of ANK.cars || []) { const nd = ANK.carNodes[(Math.random() * ANK.carNodes.length) | 0]; if (nd) { c.a = nd; c.b = nd.car[0].n; c.t = 0; c.wreck = false; } }
     }
     if (RIDE.on) { try { rideExit(); } catch (e) {} }
     const A = AREAS.ankara, sp = ANK.spawn || [0, 0];
-    teleportTo('ankara', A.cx + sp[0], A.cz + sp[1], Math.PI, `🗺️ ${adT('Ankara')} · ${R.n} — ${adT('gez, dev ol (B) ve yık!')}`, () => { ankObs(true); ankUI(); });
+    teleportTo('ankara', A.cx + sp[0] + 4.3, A.cz + sp[1] + .7, Math.PI, `🗺️ ${adT('Ankara')} · ${R.n} — ${adT('gez, dev ol (B) ve yık!')}`, () => { ankObs(true); ankUI(); });
   } catch (e) {
     console.warn('ANK', e); ankLoad(false); const fr = (() => { try { return window.self !== window.top; } catch (x) { return true; } })(), why = e && e.message ? ' (' + e.message + ')' : '';
     showMsg(fr ? adT('🗺️ Gerçek harita bu bağlantıda indirilemiyor (claude.ai interneti kapatıyor) — oyunun GitHub sitesinden aç') : /429|504|503|zaman/.test(why) ? adT('🗺️ Harita sunucuları şu an meşgul — 1 dakika sonra tekrar dene') + why : adT('🗺️ Harita indirilemedi — internetini kontrol edip tekrar dene') + why, 8);
   } finally { ANK.busy = false; }
 }
-function ankCollapse(b) {
+function ankDebris() {   // savrulan bina parçaları (tek çizim)
+  if (ANK.db) return ANK.db; const N = 360, m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: .9 }), N); m.count = 0; m.frustumCulled = false; m.castShadow = true; scene.add(m);
+  return ANK.db = { m, N, list: [], i: 0, M: new THREE.Matrix4(), Q: new THREE.Quaternion(), E: new THREE.Euler(), S: new THREE.Vector3() };
+}
+function ankCollapse(b, bx, bz) {
   if (!b.alive) return; b.alive = false; ANK.dead++;
   const i = obstacles.indexOf(b.obs); if (i >= 0) obstacles.splice(i, 1);
-  const A = AREAS.ankara, x = A.cx + (b.minx + b.maxx) / 2, z = A.cz + (b.minz + b.maxz) / 2, t0 = elapsed, C = b.c, wa = C.wm.geometry.attributes.position, ra = C.rm.geometry.attributes.position, floor = Math.min(.6, b.h * .1);
-  play('boom', { at: new THREE.Vector3(x, 0, z), gain: .9 }); shake = Math.max(shake, Math.min(.5, b.h * .01));
-  for (let k = 0; k < 26; k++) spawnDust(x + (Math.random() - .5) * (b.maxx - b.minx), Math.random() * b.h * .5, z + (Math.random() - .5) * (b.maxz - b.minz), 2 + b.h * .08, 2.5, (Math.random() - .5) * 6, (Math.random() - .5) * 6, 0xb8ad98);
-  const upd = (attr, y0, s, n, f) => { for (let j = s; j < s + n; j++) attr.setY(j, Math.max(Math.min(floor, y0[j]), y0[j] * f)); attr.needsUpdate = true; };
-  fx6({ u() { const u = Math.min(1, (elapsed - t0) / 1.4), f = 1 - u * u; upd(wa, C.wy, b.w0, b.wn, f); upd(ra, C.ry, b.r0, b.rn, f); return u < 1; } });
+  const A = AREAS.ankara, cx = (b.minx + b.maxx) / 2, cz = (b.minz + b.maxz) / 2, x = A.cx + cx, z = A.cz + cz, t0 = elapsed, C = b.c, wa = C.wm.geometry.attributes.position, ra = C.rm.geometry.attributes.position, floor = Math.min(.8, b.h * .08);
+  let dx = cx - ((bx ?? x) - A.cx), dz = cz - ((bz ?? z) - A.cz); const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;   // vurulduğu yönün tersine yatar
+  const tilt = .18 + Math.random() * .2, delay = Math.min(.5, b.h * .006);
+  play('boom', { at: new THREE.Vector3(x, 0, z), gain: .9 }); setTimeout(() => play('squash', { at: new THREE.Vector3(x, 0, z), gain: .7 }), 450); shake = Math.max(shake, Math.min(.55, b.h * .012));
+  for (let k = 0; k < 30; k++) spawnDust(x + (Math.random() - .5) * (b.maxx - b.minx), Math.random() * b.h * .6, z + (Math.random() - .5) * (b.maxz - b.minz), 2 + b.h * .09, 3, (Math.random() - .5) * 6 + dx * 3, (Math.random() - .5) * 6 + dz * 3, 0xb8ad98);
+  const D = ankDebris(), wc = new THREE.Color(ANK_WALL[(Math.random() * ANK_WALL.length) | 0]), nD = Math.min(34, 8 + (b.h * .8) | 0), sz = THREE.MathUtils.clamp(b.h * .09, 1, 4);
+  for (let k = 0; k < nD; k++) { const j = D.i++ % D.N; D.list[j] = { p: new THREE.Vector3(x + (Math.random() - .5) * (b.maxx - b.minx), b.h * (.3 + Math.random() * .7), z + (Math.random() - .5) * (b.maxz - b.minz)), v: new THREE.Vector3((Math.random() - .5) * 9 + dx * 7, 2 + Math.random() * 7, (Math.random() - .5) * 9 + dz * 7), r: new THREE.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6), rv: new THREE.Vector3((Math.random() - .5) * 8, (Math.random() - .5) * 8, (Math.random() - .5) * 8), s: new THREE.Vector3(sz * (.5 + Math.random()), sz * (.4 + Math.random() * .6), sz * (.5 + Math.random())), t: 0 }; D.m.setColorAt(j, k % 3 ? wc : new THREE.Color(0x8a857c)); D.m.count = Math.max(D.m.count, j + 1); }
+  if (D.m.instanceColor) D.m.instanceColor.needsUpdate = true;
+  const upd = (attr, o0, s0, n, u) => {   // katlar yukarıdan aşağı çöker, üst kısım devrilir
+    const f = 1 - u * u, k = Math.min(1, u * 1.6) * tilt;
+    for (let j = s0; j < s0 + n; j++) { const ox = o0[j * 3], oy = o0[j * 3 + 1], oz = o0[j * 3 + 2], hr = oy / Math.max(1, b.h); attr.setXYZ(j, ox + dx * hr * b.h * k, Math.max(Math.min(floor, oy), oy * f), oz + dz * hr * b.h * k); }
+    attr.needsUpdate = true;
+  };
+  fx6({ u() { const u = THREE.MathUtils.clamp((elapsed - t0 - delay) / 1.5, 0, 1); upd(wa, C.w0, b.w0, b.wn, u); upd(ra, C.r0, b.r0, b.rn, u); return u < 1; } });
   if (ANK.dead % 10 === 0) showMsg(`🏚️ ${ANK.dead} ${adT('bina yıkıldı')}`, 1.2);
+  const P = player.position; for (const n of ANK.ppl || []) { if (npcSolid(n) && Math.hypot(n.holder.position.x - x, n.holder.position.z - z) < Math.max(b.maxx - b.minx, b.maxz - b.minz) * .7 + 6) { n.state = 'flee'; n.timer = 3; } }
+}
+function ankDebrisTick(dt) {
+  const D = ANK.db; if (!D || !D.m.count) return;
+  for (let j = 0; j < D.m.count; j++) { const q = D.list[j]; if (!q) continue; q.t += dt;
+    if (q.p.y > q.s.y / 2 || q.v.y > 0) { q.v.y -= 22 * dt; q.p.addScaledVector(q.v, dt); q.r.addScaledVector(q.rv, dt); if (q.p.y < q.s.y / 2) { q.p.y = q.s.y / 2; q.v.multiplyScalar(.3); q.v.y = Math.abs(q.v.y) * .3; q.rv.multiplyScalar(.4); } }
+    const fade = q.t > 16 ? Math.max(0, 1 - (q.t - 16) / 2) : 1;
+    D.M.compose(q.p, D.Q.setFromEuler(D.E.set(q.r.x, q.r.y, q.r.z)), D.S.copy(q.s).multiplyScalar(fade)); D.m.setMatrixAt(j, D.M); }
+  D.m.instanceMatrix.needsUpdate = true;
 }
 function ankBlast(wx, wz, r) {
   if (!ANK.g || curKey !== 'ankara') return 0; const A = AREAS.ankara, x = wx - A.cx, z = wz - A.cz; let n = 0;
-  for (const b of ANK.bld) { if (!b.alive || x < b.minx - r || x > b.maxx + r || z < b.minz - r || z > b.maxz + r) continue; ankCollapse(b); n++; }
+  for (const b of ANK.bld) { if (!b.alive || x < b.minx - r || x > b.maxx + r || z < b.minz - r || z > b.maxz + r) continue; ankCollapse(b, wx, wz); n++; }
+  for (const c of ANK.cars || []) { if (c.g.visible && !(carried && carried.ref === c.g) && Math.hypot(c.g.position.x - wx, c.g.position.z - wz) < r + 2.2) { try { cyDeformCar(c, new THREE.Vector3(wx, 0, wz), Math.max(1.4, r * .6)); } catch (e) {} c.wreck = true; } }
   return n;
 }
 function ankTick(dt) {
   if (curKey !== 'ankara') { if (ANK.obsIn) ankObs(false); const u = $('ankUI'); if (u && u.style.display !== 'none') u.style.display = 'none'; return; }
   if (!ANK.obsIn && ANK.g) ankObs(true);
+  try { ankLifeTick(dt); ankDebrisTick(dt); } catch (e) { sftErr(e); }
+  for (const n of ANK.ppl || []) if (n.photo > 0 && n.state === 'idle') { n.photo -= dt; n.rig.armR.sh.rotation.set(-1.7, 0, -.2); n.rig.armL.sh.rotation.set(-1.6, 0, .3); n.rig.armR.el.rotation.x = n.rig.armL.el.rotation.x = -1.3; }
   if (giant && ANK.g) {   // dev binalara çarparak yürür: kendinden alçak binalar yıkılır
     const A = AREAS.ankara, P = player.position, x = P.x - A.cx, z = P.z - A.cz, rr = .45 * giantS, tall = 1.9 * giantS * 1.3;
-    for (const b of ANK.bld) if (b.alive && b.h < tall && x > b.minx - rr && x < b.maxx + rr && z > b.minz - rr && z < b.maxz + rr) ankCollapse(b);
+    for (const b of ANK.bld) if (b.alive && b.h < tall && x > b.minx - rr && x < b.maxx + rr && z > b.minz - rr && z < b.maxz + rr) ankCollapse(b, P.x, P.z);
   }
 }
 function ankUI() {
@@ -28323,6 +28391,121 @@ function ankUI() {
 {
   $('pVR4').insertAdjacentHTML('afterend', `<button id="pAnk">🗺️ Ankara (${adT('gerçek harita — gez ve yık')})</button>`);
   $('pAnk').addEventListener('click', () => { resumeGame(); setTimeout(() => ankGo('kizilay'), 60); });
+}
+
+/* =====================================================================
+   🚗🚶 ANKARA'DA HAYAT (abartısız): yollarda trafik (sarı Ankara taksileri, otobüs rengi minibüsler, özel arabalar — sağdan, yavaş,
+   önündekini görünce durur); kaldırımlarda insanlar: turistler (fotoğraf çeker), memurlar, inşaat işçileri, kuryeler, simitçi,
+   öğrenciler, teyzeler-amcalar, gotik giyimli kızlar, kaslı adamlar. Hepsiyle her şey çalışır: tut, vur (ragdoll), fırlat, konuş.
+   🏚️ Detaylı yıkım: bina vurulan yönün tersine yatarak çöker, parçalar savrulur, toz kalkar. 🪟 Ankara binalarında da pencere olayı.
+   ===================================================================== */
+function ankGraph(data, R) {
+  const lat0 = R.lat, lon0 = R.lon, kx = 111320 * Math.cos(lat0 * Math.PI / 180), kz = 110540, N = new Map(), CAR = /^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|primary_link|secondary_link)$/;
+  const node = (id, p) => { let n = N.get(id); if (!n) { n = { id, x: (p.lon - lon0) * kx, z: -(p.lat - lat0) * kz, car: [], walk: [] }; N.set(id, n); } return n; };
+  for (const el of data.elements) {
+    const t = el.tags || {}; if (el.type !== 'way' || !t.highway || !el.nodes || !el.geometry || el.nodes.length !== el.geometry.length) continue;
+    const car = CAR.test(t.highway), one = t.oneway === 'yes' || t.junction === 'roundabout', w = { motorway: 18, trunk: 16, primary: 14, secondary: 11, tertiary: 9, residential: 7 }[t.highway] || 6;
+    for (let i = 0; i < el.nodes.length - 1; i++) {
+      const a = node(el.nodes[i], el.geometry[i]), b = node(el.nodes[i + 1], el.geometry[i + 1]);
+      a.walk.push({ n: b, w }); b.walk.push({ n: a, w });
+      if (car) { a.car.push({ n: b, w }); if (!one) b.car.push({ n: a, w }); }
+    }
+  }
+  ANK.nodes = [...N.values()]; ANK.carNodes = ANK.nodes.filter(n => n.car.length); ANK.walkNodes = ANK.nodes.filter(n => n.walk.length);
+}
+const ANK_PPL = {   // [ad, gövde rengi, aksesuar, hız]
+  tourist: ['Turist', 0xff8a65, 'tourist', .8], office: ['Memur', 0x37474f, 'office', 1], worker: ['İnşaat işçisi', 0xff8f00, 'worker', .95], courier: ['Kurye', 0xd32f2f, 'courier', 1.25],
+  simit: ['Simitçi', 0xf5f5f5, 'simit', .85], student: ['Öğrenci', 0x5c6bc0, 'student', 1.05], elder: ['Teyze / amca', 0x8d6e63, 'elder', .6], goth: ['Gotik giyimli kız', 0x151515, 'goth', .95],
+  muscle: ['Kaslı adam', 0x00897b, 'muscle', 1], police: ['Polis', 0x1a237e, 'police', .9], walker: ['Yaya', 0x26a69a, '', 1]
+};
+const ANK_MIX = ['walker', 'walker', 'walker', 'office', 'office', 'office', 'tourist', 'tourist', 'tourist', 'student', 'student', 'worker', 'worker', 'courier', 'simit', 'elder', 'elder', 'goth', 'goth', 'muscle', 'muscle', 'police', 'walker', 'office'];
+function ankDress(n, k) {
+  const P = ANK_PPL[k] || ANK_PPL.walker, r = n.rig, head = r.head, mk = (geo, c, par, x, y, z) => { const m = new THREE.Mesh(geo, M(c, { roughness: .7 })); m.position.set(x, y, z); par.add(m); (n.accs ||= []).push(m); return m; };   // n.acc NPC güncelleme sayacıdır, karıştırma
+  for (const m of n.accs || []) m.parent && m.parent.remove(m); n.accs = [];
+  n.ankK = k; n.role = 'walker'; n.name = n.name || cyPick(CY_NAMES); n.job = P[0]; n.spd = P[3] * (.9 + Math.random() * .2);
+  const col = k === 'walker' ? NPC_COLORS[(Math.random() * NPC_COLORS.length) | 0] : P[1]; r.bodyMat.color.setHex(col); n.color = col;
+  r.stick.scale.set(1, 1, 1); for (const o of [r.armL.sh, r.armR.sh, r.legL.hip, r.legR.hip]) o.scale.set(1, 1, 1);
+  if (k === 'tourist') { mk(new THREE.CylinderGeometry(.24, .24, .02, 14), 0xf3e5ab, head, 0, .14, 0); mk(new THREE.CylinderGeometry(.13, .14, .1, 12), 0xf3e5ab, head, 0, .2, 0); mk(new THREE.BoxGeometry(.26, .32, .12), 0x3949ab, r.torso, 0, .32, -.12); mk(new THREE.BoxGeometry(.12, .08, .06), 0x212121, r.torso, 0, .4, .1); }
+  else if (k === 'office') { mk(new THREE.BoxGeometry(.05, .3, .02), 0xb71c1c, r.torso, 0, .36, .075); mk(new THREE.BoxGeometry(.3, .22, .06), 0x4e342e, r.armR.el, 0, -.4, 0); }
+  else if (k === 'worker') { mk(new THREE.SphereGeometry(.19, 12, 8, 0, 6.283, 0, 1.6), 0xffd600, head, 0, .05, 0); mk(new THREE.BoxGeometry(.17, .3, .17), 0xfff176, r.torso, 0, .34, 0).scale.set(1.05, 1, 1.05); }
+  else if (k === 'courier') { mk(new THREE.BoxGeometry(.34, .32, .3), 0xd32f2f, r.torso, 0, .38, -.2); mk(new THREE.SphereGeometry(.2, 12, 8, 0, 6.283, 0, 1.7), 0x212121, head, 0, .03, 0); }
+  else if (k === 'simit') { const tr = mk(new THREE.CylinderGeometry(.32, .32, .03, 16), 0x8d6e63, head, 0, .2, 0); for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283; mk(new THREE.TorusGeometry(.07, .025, 6, 12).rotateX(Math.PI / 2), 0xc77d2e, tr, Math.cos(a) * .2, .03, Math.sin(a) * .2); } }
+  else if (k === 'student') { mk(new THREE.BoxGeometry(.26, .3, .12), [0xe91e63, 0x00bcd4, 0x8bc34a][(Math.random() * 3) | 0], r.torso, 0, .32, -.12); }
+  else if (k === 'elder') { mk(new THREE.CylinderGeometry(.015, .015, .9, 6), 0x5d4037, r.armR.el, 0, -.5, .05); n.spd *= .9; r.torso.rotation.x = .15; }
+  else if (k === 'goth') { mk(new THREE.SphereGeometry(.185, 14, 10, 0, 6.283, 0, 1.9), 0x1b0f24, head, 0, .02, -.015); mk(new THREE.BoxGeometry(.3, .42, .08), 0x1b0f24, head, 0, -.16, -.12); mk(new THREE.TorusGeometry(.065, .012, 6, 16).rotateX(Math.PI / 2), 0x6a1b9a, r.neck, 0, .06, 0); mk(new THREE.CylinderGeometry(.11, .17, .26, 12), 0x2a1036, r.hips, 0, -.12, 0); for (const l of [r.legL, r.legR]) mk(new THREE.BoxGeometry(.13, .18, .2), 0x111111, l.kn, 0, -.43, .03); }
+  else if (k === 'muscle') { r.stick.scale.set(1.12, 1.04, 1.12); for (const o of [r.armL.sh, r.armR.sh]) o.scale.set(1.9, 1, 1.9); for (const o of [r.legL.hip, r.legR.hip]) o.scale.set(1.5, 1, 1.5); mk(new THREE.BoxGeometry(.42, .34, .24), col, r.torso, 0, .4, 0); }
+  else if (k === 'police') { const h = mk(new THREE.CylinderGeometry(.19, .19, .1, 14), 0x0d1b4c, head, 0, .16, 0); mk(new THREE.BoxGeometry(.3, .03, .16), 0x0d1b4c, h, 0, -.05, .14); }
+}
+function ankWalkTarget(n) {
+  const nd = n.an; if (!nd || !nd.walk.length) return false;
+  let e = nd.walk[(Math.random() * nd.walk.length) | 0]; if (nd.walk.length > 1 && e.n === n.prevN) e = nd.walk.find(q => q.n !== n.prevN) || e;
+  const A = AREAS.ankara, dx = e.n.x - nd.x, dz = e.n.z - nd.z, L = Math.hypot(dx, dz) || 1, side = n.side || (n.side = Math.random() < .5 ? -1 : 1), off = e.w / 2 + 1.6;
+  n.prevN = nd; n.an = e.n; n.target.set(A.cx + e.n.x - dz / L * off * side, 0, A.cz + e.n.z + dx / L * off * side); return true;
+}
+function ankPick(n) {   // pickTarget yerine: kaldırımda bir sonraki köşeye yürür · turistler arada durup fotoğraf çeker
+  if (n.ankK === 'tourist' && Math.random() < .22) { n.photo = 2.5; return false; }
+  return ankWalkTarget(n);
+}
+function ankPeople() {
+  if (ANK.ppl && ANK.ppl.length) return;
+  ANK.ppl = []; const A = AREAS.ankara, nodes = ANK.walkNodes || []; if (!nodes.length) return;
+  for (let i = 0; i < 46; i++) {
+    const nd = nodes[(Math.random() * nodes.length) | 0], jx = (Math.random() - .5) * 3 + .31, jz = (Math.random() - .5) * 3 + .27; spawnNPC(A.cx + nd.x + jx, A.cz + nd.z + jz, A.cx + nd.x, A.cz + nd.z, 0xffffff);   // aynı noktaya düşmesin (itme hesabı sıfıra bölünmesin)
+    const n = npcs[npcs.length - 1]; n.ank = true; n.an = nd; n.state = 'idle'; n.timer = Math.random() * 2; ankDress(n, ANK_MIX[i % ANK_MIX.length]); ANK.ppl.push(n);
+  }
+}
+function ankCars() {
+  if (ANK.cars && ANK.cars.length) return; ANK.cars = []; slotHolders.ankcar = slotHolders.ankcar || []; if (!GRAB_SLOTS.includes('ankcar')) GRAB_SLOTS.push('ankcar');
+  const nodes = ANK.carNodes || []; if (!nodes.length) return;
+  const cols = [0xf6c400, 0xf6c400, 0xf6c400, 0xffffff, 0x9e9e9e, 0x212121, 0x1565c0, 0xb71c1c, 0xe0e0e0, 0x2e7d32];
+  for (let i = 0; i < 26; i++) {
+    const col = cols[i % cols.length], c = { col, taxi: col === 0xf6c400, ank: true, occ: 0, wreck: false, sp: 7 + Math.random() * 5, t: Math.random() };
+    c.g = cyCarMesh(c); c.g.userData.ankCar = c; scene.add(c.g); slotHolders.ankcar.push(c.g);
+    c.a = nodes[(Math.random() * nodes.length) | 0]; c.b = c.a.car[(Math.random() * c.a.car.length) | 0].n; ANK.cars.push(c);
+  }
+}
+function ankCarTick(c, dt) {
+  const g = c.g, A = AREAS.ankara;
+  if (c.wreck || g.userData.flying || (carried && carried.ref === g) || g.scale.x < .9) { c.wreck = true; return; }
+  const ax = c.a.x, az = c.a.z, dx = c.b.x - ax, dz = c.b.z - az, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L;
+  const pos = new THREE.Vector3(A.cx + ax + dx * c.t + (-uz) * -3.1, 0, A.cz + az + dz * c.t + ux * -3.1);   // sağ şerit
+  let block = false; const P = player.position, chk = q => { const vx = q.x - pos.x, vz = q.z - pos.z, f = vx * ux + vz * uz, s = Math.abs(-vx * uz + vz * ux); return f > 0 && f < 9 && s < 2.2; };
+  if (chk(P) && giantS < 3) block = true;
+  if (!block) for (const n of ANK.ppl) if (npcSolid(n) && chk(n.holder.position)) { block = true; break; }
+  if (!block) for (const o of ANK.cars) if (o !== c && !o.wreck && chk(o.g.position)) { block = true; break; }
+  c.v = (c.v || 0) + ((block ? 0 : c.sp) - (c.v || 0)) * Math.min(1, dt * (block ? 4 : 1.2));
+  c.t += c.v * dt / L;
+  if (c.t >= 1) { c.t -= 1; const prev = c.a; c.a = c.b; const opts = c.a.car.filter(e => e.n !== prev); const e = (opts.length ? opts : c.a.car)[(Math.random() * (opts.length || c.a.car.length)) | 0]; if (!e) { c.t = 0; c.b = prev; } else c.b = e.n; }
+  g.position.copy(pos); g.rotation.set(0, Math.atan2(ux, uz), 0);
+}
+function ankLifeTick(dt) {
+  if (!ANK.g) return;
+  ankPeople(); ankCars();
+  for (const c of ANK.cars) ankCarTick(c, dt);
+  // uzakta kalanlar oyuncunun yakınına (görünmeyen bir köşeye) taşınır: etraf hep canlı kalır
+  ANK.reT = (ANK.reT || 0) - dt; if (ANK.reT > 0) return; ANK.reT = 1.5;
+  const A = AREAS.ankara, P = player.position, near = (list, rmin, rmax) => { for (let k = 0; k < 12; k++) { const nd = list[(Math.random() * list.length) | 0], d = Math.hypot(A.cx + nd.x - P.x, A.cz + nd.z - P.z); if (d > rmin && d < rmax) return nd; } return null; };
+  for (const n of ANK.ppl) { if (n.state === 'held' || n.state === 'thrown' || n.state === 'down') continue; if (Math.hypot(n.holder.position.x - P.x, n.holder.position.z - P.z) > 170) { const nd = near(ANK.walkNodes, 45, 120); if (nd) { n.holder.position.set(A.cx + nd.x + (Math.random() - .5) * 2, 0, A.cz + nd.z + (Math.random() - .5) * 2); n.an = nd; n.state = 'idle'; n.timer = .5; } } }
+  for (const c of ANK.cars) { if ((carried && carried.ref === c.g) || c.g.userData.flying) continue; const far = Math.hypot(c.g.position.x - P.x, c.g.position.z - P.z) > 230; if (far || (c.wreck && Math.random() < .08 && Math.hypot(c.g.position.x - P.x, c.g.position.z - P.z) > 80)) { const nd = near(ANK.carNodes, 60, 160); if (nd) { c.a = nd; c.b = nd.car[0].n; c.t = 0; c.wreck = false; c.g.scale.set(1, 1, 1); c.g.visible = true; if (c.g.userData.dg) { c.g.traverse(m => { if (m.isMesh && m.userData.dg) m.userData.dg = false; }); } } } }
+}
+function ankPedAt(x, y, z) {   // pencere olayı: yakındaki bir Ankaralı odaya taşınır
+  let best = null, bd = 1e9; for (const n of ANK.ppl || []) { if (!npcSolid(n)) continue; const d = Math.hypot(n.holder.position.x - x, n.holder.position.z - z); if (d < bd) { bd = d; best = n; } }
+  if (best) { best.holder.position.set(x, y, z); best.state = 'idle'; } return best;
+}
+function ankBoxes() { return ANK.bld.filter(b => b.alive).map(b => b.obs); }
+/* ---------- 🔦 VR 3 flaşı: kameranın feneri (varsa) ya da ön kamerada ekran kenarı ışığı ---------- */
+async function htTorch() {
+  const st = HT.stream || (typeof V4 !== 'undefined' && V4.stream), tr = st && st.getVideoTracks()[0], cap = tr && tr.getCapabilities ? tr.getCapabilities() : {};
+  HT.torch = !HT.torch;
+  if (cap.torch) { try { await tr.applyConstraints({ advanced: [{ torch: HT.torch }] }); } catch (e) { HT.torch = false; showMsg(adT('🔦 Flaş açılamadı'), 1.4); } }
+  else { document.body.classList.toggle('htLight', HT.torch); if (HT.torch) showMsg(st ? adT('🔦 Bu kamerada flaş yok — ekran kenarı ışığı açıldı') : adT('🔦 Ekran ışığı açıldı'), 1.8); }
+  document.querySelectorAll('[data-htt]').forEach(b => b.classList.toggle('on', HT.torch));
+}
+document.head.insertAdjacentHTML('beforeend', '<style>body.htLight::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99998;box-shadow:inset 0 0 0 26px #fff,inset 0 0 60px 40px rgba(255,255,255,.85)}</style>');
+{
+  $('htBox').querySelector('[data-hts]').insertAdjacentHTML('beforebegin', '<button data-htt="1">🔦 ' + adT('Flaş') + '</button>');
+  $('v3Bar').insertAdjacentHTML('beforeend', '<button data-htt="1">🔦</button>');
+  document.addEventListener('click', e => { const b = e.target.closest('[data-htt]'); if (b) { e.stopPropagation(); htTorch(); } });
 }
 
 /* ---------- Ana menü (yükleme ekranından sonra): BRK GAMES · ▶ Oyna · ⌨️ Tuşlar (kılavuz) · ⚙️ Ayarlar · 🌐 Dil ---------- */
