@@ -4471,7 +4471,7 @@ three/build/three.module.js:
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-j</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-k</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -14108,7 +14108,7 @@ function doStomp() {
   charHolder.updateMatrixWorld(true);
   playerRig.legR.kn.localToWorld(footB.set(0, -.47, 0));
   const fx = footB.x, fz = footB.z, R = slamR() * .75;
-  const n = squashAt(fx, fz, .55 * giantS);
+  const n = squashAt(fx, fz, .55 * giantS); try { shatterAt(footB, .6 * giantS, new THREE.Vector3(Math.random() - .5, 0, Math.random() - .5), 1.4); } catch (e) {}
   shake = Math.max(shake, Math.min(1.2, .5 + giantS * .03)); play('stomp');
   if (BOSS.on) bossBlast(fx, player.position.y, fz, R + 1, 110 + giantS * 5);   // 👹
   shock.position.set(fx, .06, fz); shockT = .55; shock.userData.R = R;
@@ -27876,11 +27876,11 @@ function htTick(dt) {
     const back = HT.cam === 'environment', mx = fx(H.c.x), lat = (mx - .5) * 2, ver = (.5 - H.c.y) * 2, rr = H.size / HT.s0[side] - 1, dep = THREE.MathUtils.clamp(back ? .5 - rr * 1.6 : .5 + rr * 1.6, 0, 1);
     let T; if (back) { const rc = HT.rc3 || (HT.rc3 = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(THREE.MathUtils.clamp(lat * 1.05, -1, 1), THREE.MathUtils.clamp(ver * 1.05, -1, 1)), camera); T = rc.ray.origin.clone().addScaledVector(rc.ray.direction, (.35 + 1.3 * dep) * L); }   // arka kamera: el ekranda gerçekte durduğu yerde
     else T = eye.clone().addScaledVector(rt, lat * 1.25 * L).addScaledVector(up, ver * .9 * L - .2 * L).addScaledVector(cf, (.35 + 1.3 * dep) * L);   // el daha uzağa ve daha geniş sağa-sola uzanır
-    if (HT.ok) T = okTarget(lat, ver, dep, side);   // 🖐️ VR-Ok: karakterin kendi kolu
+    if (HT.ok || curKey === 'school' && typeof SCH !== 'undefined' && SCH.built && !giant) T = okTarget(lat, ver, dep, side);   // 🖐️ okulda: karakterin kendi kolu uzanır (ayrı el yok)
     if (H.P) { const vv = T.clone().sub(H.P).divideScalar(Math.max(.03, (now - (H.tP || now)) / 1000)); H.vel.lerp(vv, .5); } H.P = T.clone(); H.tP = now; HT.T[side].copy(T);
     // hareketler
     const avg = (H.curl[1] + H.curl[2] + H.curl[3] + H.curl[4]) / 4; H.cd = Math.max(0, H.cd - HT.dd);
-    if (curKey === 'school' && typeof SCH !== 'undefined' && SCH.built && !giant) schHand(side, H, lat, ver, dep, avg, htPinch(lm, r, H), HT.ok ? T : null); else {   // 🏫 okulda: dev eli
+    if (curKey === 'school' && typeof SCH !== 'undefined' && SCH.built && !giant) schHand(side, H, lat, ver, dep, avg, htPinch(lm, r, H), T); else {   // 🏫 okulda: dev eli
     if (!giant) { htNormal(side, H, avg); if (VRMA && VRMA.state === 'ready' && VRMA.wrap.visible) gpVrmFingers(side === 'R' ? 'right' : 'left', H.curl, .15); }
     const holding = giant && !!htHeld(side);
     const pin = htPinch(lm, r, H);   // ✌️ iki parmakla (başparmak + işaret) tutmak da tutmadır
@@ -27988,7 +27988,6 @@ async function v4Start() {
   if (dead || RIDE.on) { showMsg(adT('🧍 Önce araçtan in'), 1.4); return; }
   if (HT.on) htStop(true); if (GV3.on) gv3Set(false); if (GV.on) gvToggle(false); if (FM.on) fmToggle(FM.mode); if (window.__v5on) v5Stop(true);
   V4.on = true; V4.st = 'cam'; V4.P = null; v4UI(); htMsg(adT('📷 Kamera açılıyor…'));
-  dist = 4.3; pitch = .12; yaw = facing;   // karakter önden, tüm boy görünür
   try { const st = await camOpen(); if (!V4.on) { st.getTracks().forEach(t => t.stop()); return; } V4.stream = st; const v = $('htVid'); v.srcObject = st; await v.play(); }
   catch (e) { V4.on = false; v4UI(); htFail('cam', e); return; }
   V4.st = 'model'; htMsg(adT('🧠 Vücut tanıma yükleniyor…'));
@@ -27998,9 +27997,10 @@ async function v4Start() {
   } catch (e) { v4Stop(true); htFail('model', e); return; }
   if (!V4.on) return;
   V4.st = 'run'; htMsg(adT('🧍 Telefonu yere / masaya dik koy, tüm bedenin görünecek kadar uzaklaş'));
-  showMsg(adT('🧍 VR 4: karakter senin yaptığını yapar — kollarını, bacaklarını oynat, eğil, dön'), 4);
+  showMsg(adT('🧍 VR 4: karakter senin yaptığını yapar · sol tık basılı = baktığın yöne yürü · tekerlek = sağa / sola dön'), 4);
 }
 function v4Stop(quiet) {
+  if (V4.setW) { keys.KeyW = false; V4.setW = false; } V4.walk = false;
   V4.on = false; V4.st = 'off'; V4.P = null;
   if (V4.stream) { V4.stream.getTracks().forEach(t => t.stop()); V4.stream = null; }
   if (!HT.on) { const v = $('htVid'); if (v) v.srcObject = null; }
@@ -28009,7 +28009,7 @@ function v4Stop(quiet) {
 function v4Save(o) { V4.sv.push([o, o.rotation.x, o.rotation.y, o.rotation.z]); }
 function v4Pre(dt) {   // animasyondan sonra: algıla, iskelete uygula
   if (!V4.on) return; if (dead || RIDE.on) { v4Stop(true); return; }
-  if (dist < 3.2) dist = 3.2;
+  if (V4.walk) { keys.KeyW = true; V4.setW = true; } else if (V4.setW) { keys.KeyW = false; V4.setW = false; }   // sol tık basılı: baktığın yöne yürü
   const v = $('htVid'), now = performance.now();
   if (V4.st === 'run' && v && v.readyState >= 2 && now - V4.last > 40) {
     V4.last = now; let res; try { res = V4.pl.detectForVideo(v, now); } catch (e) { res = null; }
@@ -28205,13 +28205,14 @@ function roomRender() {   // çizimden önce: oda, oyuncunun kamerasıyla ayrı 
 function v4Strike(kind, side, at, dir) {   // ayak / elin önündekilere vur: top, eşya, kişi (ragdoll), araba
   const S = giantS, R = (kind === 'kick' ? 1.3 : 1.1) * Math.max(1, S * .6); let n = 0; dir = dir.clone().setY(0).normalize();
   play(kind === 'kick' ? 'kick' : 'punch', { gain: .9 });
+  let n0 = 0; try { n0 = shatterAt(at, R, dir, kind === 'kick' ? 1.3 : 1); if (curKey !== 'ankara') bossBlast(at.x, Math.max(.5, at.y), at.z, R, 50 + giantS * 10); } catch (e) {}   // 💥 değdiği her şey parçalanır
   if (typeof FIELDS !== 'undefined') for (const f of FIELDS) { const b = f.ball; if (!b || !b.pos) continue; if (b.pos.distanceTo(at) < R + .5) { b.vel.addScaledVector(dir, kind === 'kick' ? 18 : 10); b.vy = kind === 'kick' ? 5 : 2; n++; play('kick', { at: b.pos }); } }
   for (const p of npcs) { if (!p.holder.visible || !npcSolid(p)) continue; if (Math.hypot(p.holder.position.x - at.x, p.holder.position.z - at.z) < R + .4 * S) { CITY.npcHit = true; try { hitNPC(p, dir); } finally { CITY.npcHit = false; } n++; } }
   for (const s of GRAB_SLOTS) for (const h of slotHolders[s] || []) { if (h.userData.flying || (carried && carried.ref === h)) continue; if (Math.hypot(h.position.x - at.x, h.position.z - at.z) < R + .3) { flyers.push({ type: 'obj', ref: h, vel: dir.clone().multiplyScalar(14 + S * 2), vy: 5, strong: true }); h.userData.flying = true; n++; } }
   if (inCity) for (const c of CITY.cars) { if (!c.g.visible) continue; if (Math.hypot(c.g.position.x - at.x, c.g.position.z - at.z) < R + 1.6 && S > 2) { const g = c.g, p0 = g.position.clone(), t0 = elapsed; c.wreck = true; c.wreckT = 0; fx6({ u() { const u = Math.min(1, (elapsed - t0) / .5); g.position.copy(p0).addScaledVector(dir, 6 * S * (1 - (1 - u) * (1 - u))); g.position.y = p0.y + Math.sin(u * Math.PI) * 1.5 * S; return u < 1; } }); n++; } }
   if (typeof ANK !== 'undefined' && curKey === 'ankara') ankBlast(at.x, at.z, R * .8);
   for (let i = 0; i < 8; i++) spawnDust(at.x, Math.max(.1, at.y), at.z, .2 * Math.max(1, S * .5), .5, dir.x * 3, dir.z * 3, groundDust());
-  htMsg((kind === 'kick' ? '🦶 ' + adT('Şut!') : '👊 ' + adT('Yumruk!')) + (n ? ` (${n})` : ''));
+  htMsg((kind === 'kick' ? '🦶 ' + adT('Şut!') : '👊 ' + adT('Yumruk!')) + (n + n0 ? ` (${n + n0})` : ''));
 }
 function v4Gestures(P, dt) {   // P: karakter uzayında yumuşatılmış noktalar
   const r = playerRig, G = V4.g || (V4.g = { prev: null, cd: { kL: 0, kR: 0, pL: 0, pR: 0, j: 0 } }); for (const k in G.cd) G.cd[k] = Math.max(0, G.cd[k] - dt);
@@ -29387,9 +29388,9 @@ function schHandMesh(side) {
 }
 function schHandShow(side, w, curl, fwd) {   // w: el noktası (dünya)
   const S2 = SH[side] || (SH[side] = { m: schHandMesh(side), p: null, v: new THREE.Vector3(), held: null, fist: false, seen: -9 });
-  const g = S2.m, k = SCH.S / 1.25; g.visible = !HT.ok || !!S2.touch; g.scale.setScalar(k); g.position.copy(w); g.position.y += .03 * k;
+  const g = S2.m, k = SCH.S / 1.25; g.visible = false;   // ayrı el yok g.scale.setScalar(k); g.position.copy(w); g.position.y += .03 * k;
   g.rotation.set(0, Math.atan2(-fwd.x, -fwd.z), 0); g.fingers.forEach(([a, b], i) => { const c = curl ? curl[i] : 0; a.rotation.x = -c * 1.3; b.rotation.x = -c * 1.5; });
-  const l = schW2L(w.x, w.z), f = schOutside(l.x, l.z) && !SCH.focus ? 0 : SCH.view; g.ring.visible = true; g.ring.scale.setScalar(k); g.ring.position.set(w.x, schFloorY(f) + .006, w.z);
+  const l = schW2L(w.x, w.z), f = schOutside(l.x, l.z) && !SCH.focus ? 0 : SCH.view; g.ring.visible = !S2.touch; g.ring.scale.setScalar(k); g.ring.position.set(w.x, schFloorY(f) + .006, w.z);
 }
 function schHandHide(side) { const S2 = SH[side]; if (S2) { S2.m.visible = S2.m.ring.visible = false; } }
 function schHandPoint(lat, ver, dep) {   // ekrandaki el + derinlik → okul üstünde bir nokta (uzandıkça alçalır)
@@ -29661,6 +29662,7 @@ function footStomp(side) {
   if (curKey === 'school' && SCH.built) { schCrush(f); for (const p of SCH.ppl) if (p.h.visible && p.state !== 'gone') { const w = p.r.torso.getWorldPosition(new THREE.Vector3()); if (Math.hypot(w.x - f.x, w.z - f.z) < .5) { p.scareT = 1.5; p.shockT = 1.5; } } }
   let n = 0; const R = .55; for (const s of SQUASH_SLOTS) for (const h of slotHolders[s] || []) { if (h.userData.flying || (carried && carried.ref === h)) continue; const ob = h.userData.obs; if (Math.hypot(h.position.x - f.x, h.position.z - f.z) < R + (ob ? ob.r : .5) * .5) n += squashObj(h, null, false, ob); }
   for (const c of npcs) if (c.holder.visible && c.state !== 'held' && Math.hypot(c.holder.position.x - f.x, c.holder.position.z - f.z) < 1.2) { c.flee = Math.max(c.flee || 0, 2); }   // insanlar ezilmez, kaçar
+  try { n += shatterAt(f, .9, new THREE.Vector3(Math.random() - .5, 0, Math.random() - .5), .6); } catch (e) {}
   play('stomp', { gain: .45 }); shake = Math.max(shake, .12); for (let i = 0; i < 12; i++) spawnDust(f.x, .05, f.z, .25, .6, (Math.random() - .5) * 3, (Math.random() - .5) * 3, groundDust());
   htMsg('🦶 ' + adT('Ezdin!') + (n ? ` (${n})` : ''));
 }
@@ -29671,6 +29673,58 @@ function schBossVisit() {
   const p = cyPick(C.kids.filter(q => schFree(q) && !q.held && q.state !== 'fall')); if (!p) return; const [why, bad] = cyPick(SCH_BOSSWHY);
   if (bad && SCH.phase === 'lesson' && C.t && C.t.state === 'teach') { schSay(C.t, `${p.name}, ${adT('müdürün odasına!')} (${adT(why)})`); setTimeout(() => schToBoss(p, adT(why)), 1200); }
   else { schToBoss(p, adT(why)); if (!bad) setTimeout(() => schSay(SCH.boss, cyPick([adT('Gel bakalım evladım, dinliyorum.'), adT('Hayırdır? Anlat.'), adT('Aferin sana, tebrik ederim!')])), 3500); }
+}
+
+/* ---------- 💥 parçalanma: yumruk, tekme, ezme değdiği eşyaları parçalara ayırır (25 sn sonra yerinde yeniden belirir) ---------- */
+function shatterObj(h, dir, power = 1) {
+  const U = h.userData; if (U.shat || !h.visible) return 0;
+  const box = new THREE.Box3().setFromObject(h), sz = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3()); if (!(sz.length() > .05) || sz.length() > 45) return 0;
+  U.shat = true; let col = null; h.traverse(m => { if (!col && m.isMesh && m.material && m.material.color) col = m.material.color.clone(); }); col = col || new THREE.Color(0x9e9e9e);
+  const s0 = h.scale.clone(), ob = U.obs, pass0 = ob ? ob.pass : null; h.visible = false; if (ob) ob.pass = true;
+  const D = ankDebris(), n = THREE.MathUtils.clamp(Math.round(6 + sz.length() * 2), 6, 22), ps = THREE.MathUtils.clamp(sz.length() * .12, .1, 1.6), dk = col.clone().multiplyScalar(.65);
+  for (let k = 0; k < n; k++) { const j = D.i++ % D.N; D.list[j] = { p: new THREE.Vector3(c.x + (Math.random() - .5) * sz.x, box.min.y + Math.random() * sz.y, c.z + (Math.random() - .5) * sz.z), v: new THREE.Vector3((Math.random() - .5) * 7 + dir.x * 8 * power, 2 + Math.random() * 6 * power, (Math.random() - .5) * 7 + dir.z * 8 * power), r: new THREE.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6), rv: new THREE.Vector3((Math.random() - .5) * 10, (Math.random() - .5) * 10, (Math.random() - .5) * 10), s: new THREE.Vector3(ps * (.5 + Math.random()), ps * (.4 + Math.random() * .6), ps * (.5 + Math.random())), t: 0 }; D.m.setColorAt(j, k % 4 ? col : dk); D.m.count = Math.max(D.m.count, j + 1); }
+  if (D.m.instanceColor) D.m.instanceColor.needsUpdate = true;
+  for (let i = 0; i < 8; i++) spawnDust(c.x, c.y, c.z, sz.length() * .3, 1, dir.x * 3, dir.z * 3, groundDust());
+  setTimeout(() => { h.visible = true; if (ob) ob.pass = pass0; const t0 = elapsed; h.scale.copy(s0).multiplyScalar(.05); fx6({ u() { const k = Math.min(1, (elapsed - t0) / 1.2); h.scale.copy(s0).multiplyScalar(.05 + .95 * k); if (k >= 1) U.shat = false; return k < 1; } }); }, 25000);
+  return 1;
+}
+function shatterAt(at, R, dir, power = 1) {
+  let n = 0; dir = (dir || new THREE.Vector3()).clone().setY(0); if (dir.lengthSq() > 1e-6) dir.normalize();
+  for (const s of SQUASH_SLOTS) { if (s === 'house') continue; for (const h of slotHolders[s] || []) { if (h.userData.flying || (carried && carried.ref === h) || !h.visible) continue; const r0 = h.userData.obs ? h.userData.obs.r : .6; if (Math.hypot(h.position.x - at.x, h.position.z - at.z) < R + r0 * .6) { if (SQ.has(h)) unsquash(h); n += shatterObj(h, dir, power); } } }
+  if (curKey === 'school' && typeof SCH !== 'undefined' && SCH.built) { const v = new THREE.Vector3(); for (const o of SCH.items.slice()) { const U = o.userData.sch; if (U.held || !o.visible || o === SCH.ball) continue; o.getWorldPosition(v); if (Math.hypot(v.x - at.x, v.z - at.z) < R * .6 && Math.abs(v.y - at.y) < R) { n++; const b = !U.torn ? schTear(o) : null; for (const x of [o, b]) if (x) schPhysAdd(x, new THREE.Vector3(dir.x * 2.5 + (Math.random() - .5), 1.2 + Math.random(), dir.z * 2.5 + (Math.random() - .5))); } } }
+  if (n) play('squash', { gain: .55 });
+  return n;
+}
+/* ---------- 🧍 VR 4: kamera senin ayarında kalır · sol tık basılı = baktığın yöne yürü · tekerlek = sağa / sola dön ---------- */
+canvas.addEventListener('mousedown', e => { if (!V4.on || e.button !== 0 || paused) return; V4.walk = true; e.stopImmediatePropagation(); }, true);
+addEventListener('mouseup', e => { if (e.button === 0) V4.walk = false; }, true);
+addEventListener('wheel', e => { if (!V4.on || paused) return; yaw -= Math.sign(e.deltaY) * .14; e.stopImmediatePropagation(); e.preventDefault(); }, { capture: true, passive: false });
+/* ---------- 🏙️ Ultra grafikte şehir binaları: kat silmeleri, çatı parapeti, çatı kulesi, anten, balkonlar, dükkân tenteleri ---------- */
+function cyUltraTick() {
+  if (!inCity || !CITY.built || !CITY.bld) return; const on = GFX.q === 'ultra';
+  if (!CITY.ultraG) { if (!on) return; cyUltraBuild(); }
+  CITY.ultraG.visible = on; if (!on) return;
+  if ((CITY.ulT = (CITY.ulT || 0) + 1) % 30) return;   // yıkılan / sökülen binaların süsleri kaybolur
+  const B = CITY.bld, Z = new THREE.Matrix4().makeScale(0, 0, 0);
+  for (const m of CITY.ultraG.children) { const kk = m.userData.kk; let ch = false; for (let i = 0; i < kk.length; i++) { const k = kk[i], b = B[k]; if (b && (b.dead || b.falling || b[4] !== CITY.ulH[k]) && !m.userData.off[i]) { m.userData.off[i] = 1; m.setMatrixAt(i, Z); ch = true; } } if (ch) m.instanceMatrix.needsUpdate = true; }
+}
+function cyUltraBuild() {
+  const g = CITY.ultraG = new THREE.Group(); CITY.g.add(g); const B = CITY.bld, Mx = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), col = new THREE.Color(); CITY.ulH = B.map(b => b[4]);
+  const L = { led: [], par: [], awn: [], bal: [], ant: [], hut: [] };
+  B.forEach((b, k) => { const [x, z, w, d, h, sp] = b;
+    for (let y = 3.4; y < h - .5; y += 3.4) L.led.push([k, x, y, z, w + .35, .16, d + .35]);
+    L.par.push([k, x, h + .45, z - d / 2 + .15, w, .9, .3], [k, x, h + .45, z + d / 2 - .15, w, .9, .3], [k, x - w / 2 + .15, h + .45, z, .3, .9, d], [k, x + w / 2 - .15, h + .45, z, .3, .9, d]);
+    if (!sp) { L.awn.push([k, x, 3.05, z + d / 2 + .9, w * .85, .16, 1.8]); L.awn.push([k, x, 3.05, z - d / 2 - .9, w * .85, .16, 1.8]); }
+    if (!sp && h < 45) for (let y = 6.8; y < h - 2; y += 6.8) for (const s of [-1, 1]) { L.bal.push([k, x + s * w * .24, y - 1.25, z + d / 2 + .55, 3.2, .2, 1.1]); L.bal.push([k, x + s * w * .24, y - .75, z + d / 2 + 1.05, 3.2, .9, .06]); }
+    if (k % 2 === 0) L.ant.push([k, x - w * .3, h + 3.2, z - d * .3, .12, 6, .12]);
+    L.hut.push([k, x + w * .12, h + 1.4, z + d * .22, Math.min(6, w * .3), 2.8, Math.min(5, d * .25)]); });
+  const box = new THREE.BoxGeometry(1, 1, 1), M2 = { stone: new THREE.MeshStandardMaterial({ color: 0xe6e1d6, roughness: .8 }), dark: new THREE.MeshStandardMaterial({ color: 0x8f969c, roughness: .55, metalness: .35 }), awn: new THREE.MeshStandardMaterial({ roughness: .75 }) };
+  const pal = [0xc62828, 0x2e7d32, 0x1565c0, 0xf9a825, 0x6d4c41, 0x00897b, 0x6a1b9a];
+  for (const [key, mat, color] of [['led', M2.stone], ['par', M2.stone], ['awn', M2.awn, true], ['bal', M2.dark], ['ant', M2.dark], ['hut', M2.stone]]) {
+    const list = L[key]; if (!list.length) continue; const m = new THREE.InstancedMesh(box, mat, list.length); m.userData.kk = list.map(a => a[0]); m.userData.off = new Uint8Array(list.length);
+    list.forEach((a, i) => { Mx.compose(P.set(a[1], a[2], a[3]), Q, S.set(a[4], a[5], a[6])); m.setMatrixAt(i, Mx); if (color) m.setColorAt(i, col.setHex(pal[a[0] % pal.length])); });
+    m.castShadow = key !== 'led'; m.receiveShadow = true; g.add(m);
+  }
 }
 
 /* ---------- 🏷️ herkesin etiketi: bir kişiye sol tıkla / dokun → adı, yaşı, işi (köy, şehir, Ankara; okulda da) ---------- */
@@ -29827,7 +29881,7 @@ renderer.setAnimationLoop(() => {
   if (VRMA.state === 'ready' && VRMA.wrap.visible) { player.updateMatrixWorld(true); vrmUpdate(paused || photoMode ? 0 : dt); } vrmItemHold();   // anime kız modeli (menüde de duruşu doğru kalır)
   try { gpLate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }
   try { const dd = paused || photoMode ? 0 : dt; gvLate(dd); gpExtraLate(dd); gpLeftLate(dd); gpShoulderTick(dd); gpHeldPoseTick(); } catch (e) { sftErr(e); }
-  try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); schLoop(paused || photoMode ? 0 : dt); npcLblTick(paused ? 0 : dt); } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
+  try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); schLoop(paused || photoMode ? 0 : dt); npcLblTick(paused ? 0 : dt); if (curKey !== 'ankara') ankDebrisTick(paused || photoMode ? 0 : dt); cyUltraTick(); } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
   try { buddyUpdate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🤝 arkadaş: senin pozunu kopyalar
   updateDay(paused || photoMode || ADM.freeze ? 0 : dt * (ADM.daySpeed ? 40 : 1));
   updateWeather(paused || photoMode || ADM.freeze ? 0 : dt);
