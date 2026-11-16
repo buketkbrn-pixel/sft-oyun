@@ -4471,7 +4471,7 @@ three/build/three.module.js:
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-p</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-q</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -16697,7 +16697,7 @@ function setAnime(on, quiet, kind) {
   SETSYNC.forEach(f => f());
 }
 function animeVisual() {   // kıyafet ve çöp adam uzuvları anime görünümde gizlenir
-  const A = ANIME, show = A.on && !HERO.on && !charHolder.userData.glb, M = VRMS[A.kind], vrm = show && M.state === 'ready', key = show ? (vrm ? 2 : 1) + ({ boy: 10, girlA: 20, girlB: 30, girlC: 40 }[A.kind] || 0) : 0;
+  const A = ANIME, show = A.on && !HERO.on && !charHolder.userData.glb, M = VRMS[A.kind], vrm = show && M.state === 'ready', key = show ? (vrm ? 2 : 1) + ({ boy: 10, girlA: 20, girlB: 30, girlC: 40, custom: 50 }[A.kind] || 0) + (A.kind === 'custom' ? (VRMS.custom.gen || 0) * 100 : 0) : 0;
   if (A.vis === key) return; A.vis = key;
   if (A.built) for (const m of A.parts) m.visible = show && !vrm && A.kind === 'girl';
   for (const k in VRMS) if (VRMS[k].wrap) VRMS[k].wrap.visible = vrm && k === A.kind;
@@ -16728,6 +16728,7 @@ function animeHairUI() {
   el.innerHTML = `<button data-ahair="-1" title="Orijinal" style="background:linear-gradient(135deg,#8a5a3a,#5a3520)" class="${ANIME.hair < 0 ? 'on' : ''}"></button>` + ANIME_HAIR.map(([c], i) => `<button data-ahair="${i}" style="background:#${c.toString(16).padStart(6, '0')}" class="${i === ANIME.hair ? 'on' : ''}"></button>`).join('');
 }
 function pickChar(c) {
+  if (c === 'custom') { crigPick(); return; }
   play('ui');
   if (c === 'pati' || c === 'roach') { if (ANIME.on) setAnime(false, true); setHero(true, false, c); }
   else if (c === 'anime' || c === 'boy' || c === 'girlA' || c === 'girlB' || c === 'girlC') { if (HERO.on) setHero(false, true); setAnime(true, false, c === 'anime' ? 'girl' : c); }
@@ -16755,6 +16756,7 @@ const VQ = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion
 const VV = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
 const TOON_GRAD = (() => { const d = new Uint8Array([120, 120, 120, 255, 205, 205, 205, 255, 255, 255, 255, 255]), t = new THREE.DataTexture(d, 3, 1); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
 function vrmLoad(M = VRMA) {
+  if (M.custom) { if (M.state === 'none') crigRestore(); return; }   // 🧩 kendi modelin: tarayıcıda saklanandan
   if (M.state !== 'none') return; M.state = 'loading';
   const parse = buf => new GLTFLoader().parse(buf, '', g => { try { vrmSetup(M, g); } catch (e) { console.warn('VRM', e); M.state = 'fail'; } }, () => { M.state = 'fail'; });
   const s = window[M.src];
@@ -30122,6 +30124,224 @@ function roomTowerTopple(dt) {   // cam kırılınca masalar devrilir, pencereye
     else if (!d.done) { d.vy -= 20 * dt; d.g.position.addScaledVector(d.v, dt); d.g.position.y += d.vy * dt; d.g.rotation.x += d.spin * dt; d.g.rotation.z += d.spin * .5 * dt; const gy = .05;
       if (d.g.position.y <= gy) { d.g.position.y = gy; d.done = true; d.g.rotation.set(Math.PI / 2, d.g.rotation.y, 0); play('hit', { at: d.g.position.clone(), gain: .7 }); for (let i = 0; i < 12; i++) spawnDust(d.g.position.x, .2, d.g.position.z, 1.4, 1.5, 0, 0, 0x9a9a9a); setTimeout(() => { if (d.g.parent) d.g.parent.remove(d.g); }, 20000); } }
   }
+}
+
+/* =====================================================================
+   🧩 KENDİ 3D MODELİN (GLB) — Karakter bölümünden .glb yükle: model otomatik iskelet (kemik) ve deri ağırlıkları alır,
+   çöp adamın görünmez iskeletini izleyerek yürür, koşar, zıplar, oturur, tırmanır, eşya tutar (VR'da da senin hareketini yapar).
+   · Modelde zaten insan iskeleti varsa (Mixamo, Unity, Unreal, Blender adları) o kullanılır; yoksa iskelet şekline bakılarak kurulur:
+     bacak arası, diz, ayak bileği, boyun, omuz, kollar (T duruşu, A duruşu ya da kollar yanda) gövdenin enine kesitlerinden bulunur.
+   · Modelin önü otomatik bulunur (ayak uçları); ters duruyorsa "↻ Çevir". Model tarayıcıda saklanır, sayfa yenilenince geri gelir.
+   ===================================================================== */
+VRMS.custom = Object.assign(mkVRM(null, null), { custom: true });
+ANIME_SAVE.custom = 'custom'; ANIME_NAME.custom = '🧩 Kendi modelim';
+const CRIG = { buf: null, name: '', flip: null, busy: false, info: '' };
+function crigDB() { return new Promise((res, rej) => { const r = indexedDB.open('sftModel', 1); r.onupgradeneeded = () => r.result.createObjectStore('m'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function crigStore(v) { try { const db = await crigDB(); await new Promise((res, rej) => { const t = db.transaction('m', 'readwrite'); if (v) t.objectStore('m').put(v, 'char'); else t.objectStore('m').delete('char'); t.oncomplete = res; t.onerror = () => rej(t.error); }); } catch (e) { console.warn('crig db', e); } }
+async function crigFetch() { try { const db = await crigDB(); return await new Promise((res, rej) => { const t = db.transaction('m', 'readonly'), q = t.objectStore('m').get('char'); q.onsuccess = () => res(q.result || null); q.onerror = () => rej(q.error); }); } catch (e) { return null; } }
+function crigStatus(t) { CRIG.info = t; const e = $('crigSt'); if (e) e.textContent = t; }
+async function crigParse(buf) {
+  const L = new GLTFLoader(); let ext = [];
+  try { const dv = new DataView(buf); if (dv.getUint32(0, true) === 0x46546C67) { const len = dv.getUint32(12, true), j = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, len))); ext = j.extensionsUsed || []; } } catch (e) {}
+  if (ext.includes('KHR_draco_mesh_compression')) { const { DRACOLoader } = await import('three/addons/loaders/DRACOLoader.js'); const d = new DRACOLoader(); d.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/'); L.setDRACOLoader(d); }
+  if (ext.includes('EXT_meshopt_compression')) { const { MeshoptDecoder } = await import('three/addons/libs/meshopt_decoder.module.js'); L.setMeshoptDecoder(MeshoptDecoder); }
+  return await new Promise((res, rej) => L.parse(buf.slice(0), '', res, rej));
+}
+// insan iskeleti adları → VRM kemik adları
+function crigMapBones(root) {
+  const bones = []; root.traverse(o => { if (o.isBone) bones.push(o); }); if (bones.length < 10) return null;
+  const clean = n => (n || '').toLowerCase().replace(/^.*[:|]/, '').replace(/mixamorig_?/, '');
+  const sideOf = n => /left/.test(n) || /(^|[_.\s-])l($|[_.\s-])/.test(n) || /^l[A-Z_]/.test(n) ? 'left' : /right/.test(n) || /(^|[_.\s-])r($|[_.\s-])/.test(n) ? 'right' : '';
+  const fing = /thumb|index|middle|ring|pinky|little|finger|toe|end|top|nub|twist|roll|ik|pole|target/;
+  const B = {}, put = (k, b) => { if (!B[k]) B[k] = b; };
+  const spines = [];
+  for (const b of bones) {
+    const n = clean(b.name), s = sideOf(n), m = n.replace(/left|right/g, '');
+    if (fing.test(m) && !/forearm/.test(m)) continue;
+    if (!s) {
+      if (/hips?$|pelvis|^hip$/.test(m)) put('hips', b);
+      else if (/spine|chest|torso/.test(m)) spines.push(b);
+      else if (/neck/.test(m)) put('neck', b);
+      else if (/head/.test(m)) put('head', b);
+      continue;
+    }
+    const S = s;
+    if (/shoulder|clavicle|collar/.test(m)) put(S + 'Shoulder', b);
+    else if (/forearm|lowerarm|lower_arm|elbow/.test(m)) put(S + 'LowerArm', b);
+    else if (/upperarm|upper_arm|(^|[_.\s-])arm($|[_.\s-])|^arm|arm$/.test(m)) put(S + 'UpperArm', b);
+    else if (/hand|wrist/.test(m)) put(S + 'Hand', b);
+    else if (/upleg|upperleg|upper_leg|thigh/.test(m)) put(S + 'UpperLeg', b);
+    else if (/lowerleg|lower_leg|calf|shin|knee|(^|[_.\s-])leg($|[_.\s-])|^leg|leg$/.test(m)) put(S + 'LowerLeg', b);
+    else if (/foot|ankle/.test(m)) put(S + 'Foot', b);
+  }
+  if (spines.length) { const dep = b => { let d = 0; for (let q = b; q; q = q.parent) d++; return d; }; spines.sort((a, b) => dep(a) - dep(b)); put('spine', spines[0]); if (spines.length > 1) put('chest', spines[spines.length - 1]); if (spines.length > 2) put('upperChest', spines[spines.length - 1]), B.chest = spines[1]; }
+  const need = ['hips', 'head', 'leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'leftUpperLeg', 'rightUpperLeg', 'leftLowerLeg', 'rightLowerLeg'];
+  return need.every(k => B[k]) ? B : null;
+}
+// gövdenin enine kesitlerinden eklem yerleri (ayak ortası orijin, +Y yukarı, +Z ön, +X sol)
+function crigJoints(P, n, H) {
+  const NB = 100, BK = Array.from({ length: NB + 1 }, () => []);
+  for (let i = 0; i < n; i++) BK[THREE.MathUtils.clamp(Math.floor(P[i * 3 + 1] / H * NB), 0, NB)].push(i);
+  const band = (f0, f1) => { const o = []; for (let k = Math.max(0, Math.floor(f0 * NB)); k <= Math.min(NB, Math.floor(f1 * NB)); k++) for (const i of BK[k]) o.push(i); return o; };
+  const pct = (a, q) => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
+  const side = (ids, s) => { let x = 0, z = 0, c = 0; for (const i of ids) if (P[i * 3] * s > .004 * H) { x += P[i * 3]; z += P[i * 3 + 2]; c++; } return c ? { x: x / c, z: z / c, c } : null; };
+  // bacak arası: bacakların arası boşken ortanın dolduğu ilk yükseklik
+  let crotch = .47, empty = false;
+  for (let k = 18; k <= 62; k++) { const ids = BK[k]; if (ids.length < 6) continue; let c = 0; for (const i of ids) if (Math.abs(P[i * 3]) < .02 * H) c++; if (c < 2) empty = true; else if (empty) { crotch = k / NB; break; } }
+  crotch = THREE.MathUtils.clamp(crotch, .3, .6);
+  // boyun: omuzla baş arasındaki en dar yer
+  let neck = .84, wmin = 1e9;
+  for (let k = 74; k <= 93; k++) { const ids = BK[k]; if (ids.length < 4) continue; const w = pct(ids.map(i => Math.abs(P[i * 3])), .95); if (w < wmin * .98) { wmin = w; neck = k / NB; } }
+  const shY = (neck - .05) * H, hipY = Math.min(crotch + .035, .58) * H;
+  // gövde yarı genişliği: göğüs hizasında içteki küme (kollar ayrık duruyorsa aradaki boşluktan ayrılır)
+  const tb = band(shY / H - .13, shY / H - .06).map(i => Math.abs(P[i * 3])).sort((a, b) => a - b);
+  let tw = pct(tb, .9); for (let j = Math.floor(tb.length * .3); j < tb.length - 1; j++) if (tb[j + 1] - tb[j] > .03 * H) { tw = tb[j]; break; }
+  tw = THREE.MathUtils.clamp(tw || .12 * H, .05 * H, .3 * H);
+  let hz = 0; { let c = 0; for (const i of band(.55, .75)) if (Math.abs(P[i * 3]) < tw) { hz += P[i * 3 + 2]; c++; } hz = c ? hz / c : 0; }
+  const J = { H, hipY, shY, neckY: neck * H, hz, tw, crotch: crotch * H, side: {} };
+  for (const s of [1, -1]) {
+    const hp = side(band(crotch - .1, crotch - .02), s) || { x: .085 * H * s, z: hz }, kn = side(band(.25, .31), s) || { x: hp.x, z: hz }, an = side(band(.05, .1), s) || { x: kn.x, z: hz };
+    let toe = { x: an.x, z: an.z + .05 * H }; { let zm = -1e9; for (const i of band(0, .035)) if (P[i * 3] * s > 0 && P[i * 3 + 2] > zm) { zm = P[i * 3 + 2]; toe = { x: P[i * 3], z: zm }; } }
+    // kollar: en uçtaki nokta gövdeden çok uzaktaysa kollar açık (T / A duruşu), değilse yanda
+    let tip = null, xm = -1e9; for (const i of band(.3, .97)) { const x = P[i * 3] * s; if (x > xm) { xm = x; tip = new THREE.Vector3(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]); } }
+    const out = tip && xm > tw + .14 * H; let S, E, W, T;
+    if (out) { S = new THREE.Vector3(s * tw * .8, shY, hz); E = S.clone().lerp(tip, .46); E.z -= .01 * H; W = S.clone().lerp(tip, .82); T = tip.clone(); }
+    else {
+      const ab = band(.5, .64).filter(i => P[i * 3] * s > 0).map(i => [Math.abs(P[i * 3]), P[i * 3 + 2]]).sort((a, b) => a[0] - b[0]); let ax = tw * 1.05, az = hz;
+      for (let j = Math.floor(ab.length * .2); j < ab.length - 1; j++) if (ab[j][0] > tw * .6 && ab[j + 1][0] - ab[j][0] > .02 * H) { const o = ab.slice(j + 1); ax = o.reduce((a, q) => a + q[0], 0) / o.length; az = o.reduce((a, q) => a + q[1], 0) / o.length; break; }
+      S = new THREE.Vector3(s * Math.min(tw * .85, ax), shY, hz); E = new THREE.Vector3(s * ax, shY - .19 * H, (hz + az) / 2 - .01 * H); W = new THREE.Vector3(s * ax, shY - .35 * H, az); T = new THREE.Vector3(s * ax, shY - .45 * H, az);
+    }
+    J.side[s] = { out, S, E, W, T, hip: new THREE.Vector3(hp.x, hipY - .02 * H, hp.z), knee: new THREE.Vector3(kn.x, .28 * H, kn.z), ankle: new THREE.Vector3(an.x, .06 * H, an.z), toe: new THREE.Vector3(toe.x, .02 * H, toe.z) };
+  }
+  return J;
+}
+// iskeletsiz model: kemikleri kur, her köşeyi en yakın kemiklere ağırlıkla bağla
+function crigAuto(root, flipOv) {
+  root.updateMatrixWorld(true);
+  const parts = []; root.traverse(o => { if (o.isMesh && o.geometry && o.geometry.attributes.position && o.visible !== false) parts.push(o); });
+  if (!parts.length) throw new Error(adT('Modelde çizilecek parça yok'));
+  const geos = parts.map(m => { const gm = m.geometry.clone(); gm.morphAttributes = {}; delete gm.morphTargetsRelative; for (const k of ['skinIndex', 'skinWeight']) if (gm.attributes[k]) gm.deleteAttribute(k); gm.applyMatrix4(m.matrixWorld); return { gm, mat: m.material }; });
+  const box = new THREE.Box3(); for (const q of geos) { q.gm.computeBoundingBox(); box.union(q.gm.boundingBox); }
+  let H = box.max.y - box.min.y; if (!(H > 1e-6)) throw new Error(adT('Model boyutu okunamadı'));
+  let tot = 0; for (const q of geos) tot += q.gm.attributes.position.count; const st = Math.max(1, Math.floor(tot / 40000)), P = new Float32Array(Math.ceil(tot / st) * 3 + 12); let n = 0;
+  for (const q of geos) { const p = q.gm.attributes.position; for (let i = 0; i < p.count; i += st) { P[n * 3] = p.getX(i); P[n * 3 + 1] = p.getY(i); P[n * 3 + 2] = p.getZ(i); n++; } }
+  // gövde ortası (omuz-göğüs bandının ortancası) ve önü (ayak uçları baldırdan öndedir)
+  const y0 = box.min.y, mids = [[], []]; for (let i = 0; i < n; i++) { const f = (P[i * 3 + 1] - y0) / H; if (f > .5 && f < .8) { mids[0].push(P[i * 3]); mids[1].push(P[i * 3 + 2]); } }
+  const med = a => { if (!a.length) return 0; a.sort((x, y) => x - y); return a[a.length >> 1]; }, cx = med(mids[0]), cz = med(mids[1]);
+  let zf = 0, cf = 0, zs = 0, cs = 0; for (let i = 0; i < n; i++) { const f = (P[i * 3 + 1] - y0) / H; if (f < .04) { zf += P[i * 3 + 2]; cf++; } else if (f > .14 && f < .3) { zs += P[i * 3 + 2]; cs++; } }
+  const flip = flipOv != null ? flipOv : (cf && cs && zf / cf < zs / cs - .004 * H);
+  const Mx = new THREE.Matrix4().makeTranslation(-cx, -y0, -cz); if (flip) Mx.premultiply(new THREE.Matrix4().makeRotationY(Math.PI));
+  for (const q of geos) q.gm.applyMatrix4(Mx); for (let i = 0; i < n; i++) { const v = new THREE.Vector3(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]).applyMatrix4(Mx); P[i * 3] = v.x; P[i * 3 + 1] = v.y; P[i * 3 + 2] = v.z; }
+  const J = crigJoints(P, n, H), L = J.side[1], R = J.side[-1];
+  // kemikler (dinlenme dönüşü yok; yönleri çocuk kemiğin konumundan)
+  const defs = [['hips', null, new THREE.Vector3(0, J.hipY, J.hz)], ['spine', 'hips', new THREE.Vector3(0, THREE.MathUtils.lerp(J.hipY, J.shY, .33), J.hz)], ['chest', 'spine', new THREE.Vector3(0, THREE.MathUtils.lerp(J.hipY, J.shY, .72), J.hz)],
+    ['neck', 'chest', new THREE.Vector3(0, J.neckY, J.hz)], ['head', 'neck', new THREE.Vector3(0, J.neckY + .035 * H, J.hz)]];
+  for (const [S, Q] of [['left', L], ['right', R]]) defs.push([S + 'UpperArm', 'chest', Q.S], [S + 'LowerArm', S + 'UpperArm', Q.E], [S + 'Hand', S + 'LowerArm', Q.W], [S + 'UpperLeg', 'hips', Q.hip], [S + 'LowerLeg', S + 'UpperLeg', Q.knee], [S + 'Foot', S + 'LowerLeg', Q.ankle]);
+  const B = {}, W = {}, list = [];
+  for (const [k, par, p] of defs) { const b = new THREE.Bone(); b.name = k; W[k] = p.clone(); b.position.copy(par ? p.clone().sub(W[par]) : p); if (par) B[par].add(b); B[k] = b; list.push(b); }
+  const ends = { head: new THREE.Vector3(0, H, J.hz), leftHand: L.T, rightHand: R.T, leftFoot: L.toe, rightFoot: R.toe };
+  const kid = { hips: 'spine', spine: 'chest', chest: 'neck', neck: 'head', leftUpperArm: 'leftLowerArm', leftLowerArm: 'leftHand', rightUpperArm: 'rightLowerArm', rightLowerArm: 'rightHand', leftUpperLeg: 'leftLowerLeg', leftLowerLeg: 'leftFoot', rightUpperLeg: 'rightLowerLeg', rightLowerLeg: 'rightFoot' };
+  const segs = list.map((b, bi) => { const k = b.name, a = k === 'hips' ? W.hips.clone().setY(J.hipY - .05 * H) : W[k], e = kid[k] ? W[kid[k]] : ends[k]; const s = /^left/.test(k) ? 1 : /^right/.test(k) ? -1 : 0; return { bi, a, ab: e.clone().sub(a), l2: Math.max(1e-9, e.clone().sub(a).lengthSq()), s, leg: /Leg|Foot/.test(k), arm: /Arm|Hand/.test(k), head: k === 'head' || k === 'neck' }; });
+  const hipTop = J.hipY + .07 * H, eps2 = (.012 * H) ** 2, armsOut = L.out || R.out, v = new THREE.Vector3(), q = new THREE.Vector3();
+  const weigh = (x, y, z, out4, w4) => {
+    let b1 = -1, b2 = -1, w1 = 0, w2 = 0;
+    for (let pass = 0; pass < 2 && b1 < 0; pass++) for (const s of segs) {
+      if (!pass) {
+        if (s.s && x * s.s < -.015 * H) continue;
+        if (s.leg && y > hipTop) continue;
+        if (s.arm && !armsOut && Math.abs(x) < J.tw * .92 && y < J.shY - .03 * H) continue;
+        if (s.head && y < J.neckY - .04 * H) continue;
+      }
+      v.set(x - s.a.x, y - s.a.y, z - s.a.z); const t = THREE.MathUtils.clamp(v.dot(s.ab) / s.l2, 0, 1); q.copy(s.ab).multiplyScalar(t).add(s.a);
+      const d2 = (x - q.x) ** 2 + (y - q.y) ** 2 + (z - q.z) ** 2, w = 1 / ((d2 + eps2) ** 2);
+      if (w > w1) { b2 = b1; w2 = w1; b1 = s.bi; w1 = w; } else if (w > w2) { b2 = s.bi; w2 = w; }
+    }
+    const sum = w1 + w2 || 1; out4[0] = Math.max(0, b1); out4[1] = Math.max(0, b2); out4[2] = out4[3] = 0; w4[0] = w1 / sum; w4[1] = w2 / sum; w4[2] = w4[3] = 0;
+  };
+  const grp = new THREE.Group(); grp.add(B.hips); grp.updateMatrixWorld(true);
+  const skel = new THREE.Skeleton(list), i4 = [0, 0, 0, 0], w4 = [0, 0, 0, 0];
+  for (const g of geos) {
+    const p = g.gm.attributes.position, N = p.count, si = new Uint16Array(N * 4), sw = new Float32Array(N * 4);
+    for (let i = 0; i < N; i++) { weigh(p.getX(i), p.getY(i), p.getZ(i), i4, w4); si.set(i4, i * 4); sw.set(w4, i * 4); }
+    g.gm.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); g.gm.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+    if (!g.gm.attributes.normal) g.gm.computeVertexNormals();
+    const m = new THREE.SkinnedMesh(g.gm, g.mat); m.castShadow = true; m.frustumCulled = false; grp.add(m); m.bind(skel, new THREE.Matrix4());
+  }
+  return { grp, bones: B, flip, H, armsOut };
+}
+// model hazır: dinlenme duruşunu kaydet, karaktere tak
+function crigFinish(M, wrap, B) {
+  const hipY = B.hips.getWorldPosition(VV[0]).y; if (!(hipY > 1e-6)) throw new Error(adT('Kalça bulunamadı'));
+  M.scale = 1 / hipY; wrap.scale.setScalar(M.scale); wrap.updateMatrixWorld(true);
+  const W0 = wrap.getWorldQuaternion(new THREE.Quaternion()).invert(), CH = { leftUpperArm: 'leftLowerArm', leftLowerArm: 'leftHand', rightUpperArm: 'rightLowerArm', rightLowerArm: 'rightHand', leftUpperLeg: 'leftLowerLeg', leftLowerLeg: 'leftFoot', rightUpperLeg: 'rightLowerLeg', rightLowerLeg: 'rightFoot' };
+  for (const [k, b] of Object.entries(B)) {
+    const r = { local: b.quaternion.clone(), rel: W0.clone().multiply(b.getWorldQuaternion(new THREE.Quaternion())), pos: b.position.clone() };
+    const c = CH[k] && B[CH[k]]; if (c) { r.dir = c.parent === b ? c.position.clone().normalize() : b.worldToLocal(c.getWorldPosition(new THREE.Vector3())).normalize(); }
+    else if (CH[k]) r.dir = new THREE.Vector3(0, -1, 0);
+    M.rest[k] = r; b.userData.vk = k;
+  }
+  wrap.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false; } });
+  wrap.visible = false; charHolder.add(wrap); M.wrap = wrap; M.bones = B; M.state = 'ready'; M.gen = (M.gen || 0) + 1; ANIME.vis = null; animeVisual();
+}
+async function crigBuild(buf, flipOv) {
+  const M = VRMS.custom; if (M.wrap && M.wrap.parent) M.wrap.parent.remove(M.wrap);
+  Object.assign(M, { state: 'loading', wrap: null, bones: {}, rest: {}, cons: [], springs: [], cols: [], expr: {}, hairMats: [], eyeMats: [], fingers: [] });
+  const g = await crigParse(buf), root = g.scene, wrap = new THREE.Group(); let msg; root.updateMatrixWorld(true);
+  const mapped = crigMapBones(root);
+  if (mapped) {   // hazır insan iskeleti
+    wrap.add(root); wrap.updateMatrixWorld(true);
+    const lx = mapped.leftUpperArm.getWorldPosition(new THREE.Vector3()).x, rx = mapped.rightUpperArm.getWorldPosition(new THREE.Vector3()).x;
+    const flip = flipOv != null ? flipOv : lx < rx; if (flip) root.rotation.y = Math.PI;
+    const bb = new THREE.Box3().setFromObject(root), c = bb.getCenter(new THREE.Vector3()); root.position.x -= c.x; root.position.z -= c.z; root.position.y -= bb.min.y; wrap.updateMatrixWorld(true);
+    root.traverse(o => { if (o.isSkinnedMesh) o.frustumCulled = false; });
+    crigFinish(M, wrap, mapped); CRIG.flip = flip; msg = adT('✓ Modelin kendi iskeleti kullanıldı');
+  } else {   // iskelet yok: otomatik kur
+    const A = crigAuto(root, flipOv); wrap.add(A.grp); crigFinish(M, wrap, A.bones); CRIG.flip = A.flip;
+    msg = adT('✓ Otomatik iskelet kuruldu') + ` (${A.armsOut ? adT('kollar açık') : adT('kollar yanda')})`;
+  }
+  return msg;
+}
+async function crigUse(buf, name, flipOv, quiet) {
+  if (CRIG.busy) return; CRIG.busy = true; crigStatus(adT('🦴 İskelet kuruluyor…'));
+  try {
+    const msg = await crigBuild(buf, flipOv); CRIG.buf = buf; CRIG.name = name || CRIG.name;
+    crigStatus(`${CRIG.name ? CRIG.name + ' · ' : ''}${msg}`);
+    if (HERO.on) setHero(false, true); setAnime(true, !!quiet, 'custom');
+    crigStore({ buf, name: CRIG.name, flip: flipOv ?? null });
+  } catch (e) {
+    console.warn('crig', e); VRMS.custom.state = 'none'; crigStatus('⚠️ ' + adT('Model açılamadı') + ': ' + ((e && e.message) || e));
+    if (ANIME.on && ANIME.kind === 'custom') setAnime(false, true);
+    if (!quiet) showMsg('⚠️ ' + adT('Model açılamadı — .glb dosyası olmalı'), 3);
+  } finally { CRIG.busy = false; crigUI(); }
+}
+async function crigRestore() {   // sayfa açılınca saklanan model
+  const M = VRMS.custom; if (M.state !== 'none' || CRIG.busy) return;
+  const v = await crigFetch(); if (!v || !v.buf) { M.state = 'fail'; crigStatus(adT('Henüz model yüklenmedi')); return; }
+  await crigUse(v.buf, v.name, v.flip, true);
+}
+function crigPick() {
+  play('ui');
+  if (VRMS.custom.state === 'ready') { if (HERO.on) setHero(false, true); setAnime(true, false, 'custom'); return; }
+  $('crigFile').click();
+}
+function crigUI() {
+  const r = $('crigRow'); if (!r) return; const ok = VRMS.custom.state === 'ready';
+  r.querySelector('[data-crig="flip"]').disabled = !ok || CRIG.busy; r.querySelector('[data-crig="del"]').disabled = !ok || CRIG.busy;
+  const b = document.querySelector('.charPick [data-char="custom"] small'); if (b) b.textContent = ok ? (CRIG.name || adT('Yüklendi')) + ' · ' + adT('seç') : adT('.glb yükle → otomatik iskelet');
+}
+{
+  const pick = document.querySelector('.charPick');
+  if (pick) {
+    pick.insertAdjacentHTML('beforeend', `<button data-char="custom"><span class="ci">🧩</span><b>${adT('Kendi modelim')}</b><small>${adT('.glb yükle → otomatik iskelet')}</small></button>`);
+    pick.insertAdjacentHTML('afterend', `<div id="crigRow" class="setRow" style="flex-wrap:wrap;gap:6px"><span>🧩 ${adT('Kendi 3D modelin')}</span><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-crig="up">📁 ${adT('GLB yükle')}</button><button class="btn" data-crig="flip">↻ ${adT('Çevir')}</button><button class="btn" data-crig="del">🗑️ ${adT('Kaldır')}</button></span></div><div class="hint" id="crigSt">${adT('Bir .glb seç: iskeleti yoksa otomatik kurulur, varsa (Mixamo, Unity, Blender) o kullanılır. Model tarayıcında saklanır.')}</div><input type="file" id="crigFile" accept=".glb,model/gltf-binary" style="display:none">`);
+    $('crigFile').addEventListener('change', async e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return; if (f.size > 120e6) { crigStatus('⚠️ ' + adT('Dosya çok büyük (en fazla 120 MB)')); return; } crigStatus(adT('📂 Okunuyor…')); const buf = await f.arrayBuffer(); crigUse(buf, f.name.replace(/\.glb$/i, ''), null); });
+    $('crigRow').addEventListener('click', e => { const b = e.target.closest('[data-crig]'); if (!b) return; e.stopPropagation(); play('ui'); const k = b.dataset.crig;
+      if (k === 'up') $('crigFile').click();
+      else if (k === 'flip' && CRIG.buf) crigUse(CRIG.buf, CRIG.name, !CRIG.flip);
+      else if (k === 'del') { const M = VRMS.custom; if (ANIME.on && ANIME.kind === 'custom') setAnime(false, true); if (M.wrap && M.wrap.parent) M.wrap.parent.remove(M.wrap); Object.assign(M, { state: 'none', wrap: null, bones: {}, rest: {} }); CRIG.buf = null; CRIG.name = ''; crigStore(null); crigStatus(adT('Model kaldırıldı')); try { localStorage.setItem('copAdamKarakter', 'stick'); } catch (x) {} crigUI(); SETSYNC.forEach(f => f()); } });
+    crigUI();
+  }
+  try { if (localStorage.getItem('copAdamKarakter') === 'custom') setTimeout(() => crigRestore(), 400); } catch (e) {}
 }
 
 /* ---------- 🏷️ herkesin etiketi: bir kişiye sol tıkla / dokun → adı, yaşı, işi (köy, şehir, Ankara; okulda da) ---------- */
