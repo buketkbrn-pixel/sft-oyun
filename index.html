@@ -4471,7 +4471,7 @@ three/build/three.module.js:
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-f</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-g</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -27876,6 +27876,7 @@ function htTick(dt) {
     if (H.P) { const vv = T.clone().sub(H.P).divideScalar(Math.max(.03, (now - (H.tP || now)) / 1000)); H.vel.lerp(vv, .5); } H.P = T.clone(); H.tP = now; HT.T[side].copy(T);
     // hareketler
     const avg = (H.curl[1] + H.curl[2] + H.curl[3] + H.curl[4]) / 4; H.cd = Math.max(0, H.cd - HT.dd);
+    if (curKey === 'school' && typeof SCH !== 'undefined' && SCH.built && !giant) schHand(side, H, lat, ver, dep, avg, htPinch(lm, r, H)); else {   // 🏫 okulda: dev eli
     if (!giant) { htNormal(side, H, avg); if (VRMA && VRMA.state === 'ready' && VRMA.wrap.visible) gpVrmFingers(side === 'R' ? 'right' : 'left', H.curl, .15); }
     const holding = giant && !!htHeld(side);
     const pin = htPinch(lm, r, H);   // ✌️ iki parmakla (başparmak + işaret) tutmak da tutmadır
@@ -27886,6 +27887,7 @@ function htTick(dt) {
     const fwdV = H.vel.dot(cf), downV = -H.vel.dot(up0);
     if (giant && !H.fist && avg < .3 && fwdV > 3.2 * giantS && H.cd <= 0) { H.cd = .9; htPush(side, T, cf); }
     if (giant && H.fist && !holding && downV > 3.4 * giantS && H.cd <= 0) { H.cd = .9; htSlam(side); }
+    }
     // önizlemede iskelet (aynalı)
     g.strokeStyle = side === 'R' ? '#69f0ae' : '#ffd166'; g.lineWidth = 2; g.beginPath();
     for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [0, 17], [17, 18], [18, 19], [19, 20]]) { g.moveTo(fx(lm[a].x) * cv.width, lm[a].y * cv.height); g.lineTo(fx(lm[b].x) * cv.width, lm[b].y * cv.height); }
@@ -28592,6 +28594,37 @@ const HU_SKIN = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac, 0xeac086], HU
 const HU_SHIRT = [0xffffff, 0x1e88e5, 0xe53935, 0x43a047, 0xfdd835, 0x8e24aa, 0x6d4c41, 0x90a4ae, 0xf06292, 0x26a69a, 0x3949ab, 0xff7043], HU_PANTS = [0x263238, 0x1a237e, 0x4e342e, 0x37474f, 0x5d4037, 0x212121, 0x546e7a];
 const huPick = a => a[(Math.random() * a.length) | 0];
 function huMat(c) { return HU.mats[c] || (HU.mats[c] = new THREE.MeshStandardMaterial({ color: c, roughness: .82 })); }
+const HU_FACE = {};   // 🙂 yüz ifadeleri (mimik): kafanın önüne oturan ince bir yüz katmanı
+function huFaceMat(kind) {
+  if (HU_FACE[kind]) return HU_FACE[kind];
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256; const c = cv.getContext('2d'), L = 84, R = 172, EY = 106;
+  const brow = (x, y, tilt, up = 0) => { c.save(); c.translate(x, y - up); c.rotate(tilt); c.fillStyle = '#3b2a20'; c.beginPath(); if (c.roundRect) c.roundRect(-17, -3.5, 34, 7, 3.5); else c.rect(-17, -3.5, 34, 7); c.fill(); c.restore(); };
+  const eye = (x, open = 1, iris = 1) => { if (open < .2) { c.strokeStyle = '#3b2a20'; c.lineWidth = 4; c.beginPath(); c.arc(x, EY - 2, 12, .2 * Math.PI, .8 * Math.PI); c.stroke(); return; } c.fillStyle = '#fff'; c.beginPath(); c.ellipse(x, EY, 14, 10 * open, 0, 0, 6.283); c.fill(); c.strokeStyle = 'rgba(40,25,15,.75)'; c.lineWidth = 2.2; c.stroke(); c.fillStyle = '#5b3a1f'; c.beginPath(); c.arc(x, EY, 7.5 * iris, 0, 6.283); c.fill(); c.fillStyle = '#111'; c.beginPath(); c.arc(x, EY, 3.6 * iris, 0, 6.283); c.fill(); c.fillStyle = '#fff'; c.beginPath(); c.arc(x + 2.5, EY - 3, 2, 0, 6.283); c.fill(); };
+  const nose = () => { c.strokeStyle = 'rgba(120,70,50,.55)'; c.lineWidth = 3; c.beginPath(); c.moveTo(128, 120); c.quadraticCurveTo(122, 146, 130, 150); c.stroke(); };
+  const lips = '#a8483f';
+  const mouth = { line: () => { c.strokeStyle = lips; c.lineWidth = 4.5; c.beginPath(); c.moveTo(110, 178); c.lineTo(146, 178); c.stroke(); },
+    smile: () => { c.strokeStyle = lips; c.lineWidth = 4.5; c.beginPath(); c.arc(128, 166, 20, .2 * Math.PI, .8 * Math.PI); c.stroke(); },
+    sad: () => { c.strokeStyle = lips; c.lineWidth = 4.5; c.beginPath(); c.arc(128, 192, 18, 1.2 * Math.PI, 1.8 * Math.PI); c.stroke(); },
+    open: (w, h) => { c.fillStyle = '#5a1f1b'; c.beginPath(); c.ellipse(128, 178, w, h, 0, 0, 6.283); c.fill(); c.strokeStyle = lips; c.lineWidth = 3; c.stroke(); },
+    laugh: () => { c.fillStyle = '#5a1f1b'; c.beginPath(); c.moveTo(104, 168); c.quadraticCurveTo(128, 204, 152, 168); c.closePath(); c.fill(); c.fillStyle = '#fff'; c.fillRect(110, 168, 36, 6); c.strokeStyle = lips; c.lineWidth = 3; c.stroke(); },
+    wavy: () => { c.strokeStyle = lips; c.lineWidth = 4; c.beginPath(); for (let i = 0; i <= 6; i++) c.lineTo(108 + i * 7, 180 + (i % 2 ? -4 : 4)); c.stroke(); } };
+  const blush = () => { c.fillStyle = 'rgba(240,110,110,.25)'; c.beginPath(); c.ellipse(L - 6, 142, 14, 8, 0, 0, 6.283); c.ellipse(R + 6, 142, 14, 8, 0, 0, 6.283); c.fill(); };
+  const F = {
+    n: () => { brow(L, 80, .05); brow(R, 80, -.05); eye(L); eye(R); nose(); mouth.line(); },
+    smile: () => { brow(L, 79, .08); brow(R, 79, -.08); eye(L, .85); eye(R, .85); nose(); blush(); mouth.smile(); },
+    laugh: () => { brow(L, 76, .12, 3); brow(R, 76, -.12, 3); eye(L, .1); eye(R, .1); nose(); blush(); mouth.laugh(); },
+    talk: () => { brow(L, 79, .05); brow(R, 79, -.05); eye(L); eye(R); nose(); mouth.open(11, 7); },
+    angry: () => { brow(L, 86, .45); brow(R, 86, -.45); eye(L, .75, .9); eye(R, .75, .9); nose(); mouth.open(13, 4); },
+    sad: () => { brow(L, 82, -.35); brow(R, 82, .35); eye(L, .8); eye(R, .8); nose(); mouth.sad(); },
+    shock: () => { brow(L, 70, -.1, 6); brow(R, 70, .1, 6); eye(L, 1.25, .7); eye(R, 1.25, .7); nose(); mouth.open(9, 12); },
+    scared: () => { brow(L, 74, -.4, 4); brow(R, 74, .4, 4); eye(L, 1.2, .65); eye(R, 1.2, .65); nose(); mouth.wavy(); },
+    sleep: () => { brow(L, 84, 0); brow(R, 84, 0); eye(L, 0); eye(R, 0); nose(); mouth.open(5, 3); },
+  };
+  (F[kind] || F.n)();
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 2;
+  return HU_FACE[kind] = new THREE.MeshLambertMaterial({ map: t, transparent: true, alphaTest: .3 });
+}
+function huFace(r, kind) { if (!r || !r.face || r.faceK === kind) return; r.faceK = kind; r.face.material = huFaceMat(kind); }
 function huCap(node) { return node.children.find(m => m.isMesh && m.geometry && m.geometry.type === 'CapsuleGeometry'); }
 function humanize(r, o = {}) {
   const body = o.body || huPick(['normal', 'normal', 'normal', 'fat', 'fat', 'thin', 'thin', 'muscle']), skin = o.skin ?? huPick(HU_SKIN), shirt = o.shirt ?? huPick(HU_SHIRT), pants = o.pants ?? huPick(HU_PANTS), hair = o.hair ?? huPick(HU_HAIR), long = o.long ?? Math.random() < .4;
@@ -28601,7 +28634,8 @@ function humanize(r, o = {}) {
   set(r.armL.sh, huMat(shirt), S[1]); set(r.armR.sh, huMat(shirt), S[1]); set(r.armL.el, huMat(o.longSleeve ? shirt : skin), S[1] * .92); set(r.armR.el, huMat(o.longSleeve ? shirt : skin), S[1] * .92);
   set(r.legL.hip, huMat(pants), S[2]); set(r.legR.hip, huMat(pants), S[2]); set(r.legL.kn, huMat(pants), S[2] * .9); set(r.legR.kn, huMat(pants), S[2] * .9);
   set(r.look, huMat(skin), 1.3);
-  r.head.material = huMat(skin); r.head.scale.setScalar(.92);
+  r.head.material = huMat(skin); r.head.scale.setScalar(o.head ?? .86);
+  { const sx = .03 + .05 * S[0], hx = .035 + .025 * S[2]; for (const [a, sg] of [[r.armL, 1], [r.armR, -1]]) a.sh.position.x = sx * sg; for (const [l, sg] of [[r.legL, 1], [r.legR, -1]]) l.hip.position.x = hx * sg; r.huHip = hx; }   // omuz ve kalça genişliği gövdeye göre
   for (const m of r.huAdd || []) m.parent && m.parent.remove(m); r.huAdd = [];
   const G = HU.geo; G.hair ||= new THREE.SphereGeometry(.18, 14, 10, 0, 6.283, 0, 1.62); G.long ||= new THREE.BoxGeometry(.3, .34, .1); G.shoe ||= new THREE.BoxGeometry(.12, .07, .22); G.belly ||= new THREE.SphereGeometry(.17, 14, 10); G.hand ||= new THREE.SphereGeometry(.055, 8, 6);
   const add = (geo, mat, par, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; par.add(m); r.huAdd.push(m); return m; };
@@ -28609,6 +28643,10 @@ function humanize(r, o = {}) {
   for (const l of [r.legL, r.legR]) add(G.shoe, huMat(o.shoe ?? 0x2b2b2b), l.kn, 0, -.5, .045);
   for (const a of [r.armL, r.armR]) add(G.hand, huMat(skin), a.el, 0, -.39, 0);
   if (body === 'fat') add(G.belly, huMat(shirt), r.torso, 0, .2, .07).scale.set(1.15, 1.05, 1);
+  G.pelvis ||= new THREE.BoxGeometry(1, 1, 1); add(G.pelvis, huMat(pants), r.hips, 0, -.02, 0).scale.set(2 * r.huHip + .11, .15, .085 * S[2] + .03);   // kalça (pantolon)
+  G.face ||= new THREE.SphereGeometry(.173, 18, 14, Math.PI / 2 - .85, 1.7, Math.PI / 2 - .85, 1.7);
+  r.face = add(G.face, huFaceMat('n'), r.head, 0, 0, 0); r.face.castShadow = false; r.faceK = 'n';
+  for (const m of r.head.children) if (m.geometry && m.geometry.parameters && m.geometry.parameters.radius === .025) m.visible = false;   // eski nokta gözler yerine gerçek gözler
   r.human = body; return body;
 }
 
@@ -28686,12 +28724,13 @@ function schRoute(p, dest, df) {   // kapı + merdiven geçişli yol (BFS)
   if (df === 0 && dest.z > .99) way.push({ x: -.5, z: .9, fl: 0 });   // kapıdan çık
   way.push({ x: dest.x, z: dest.z, fl: df }); p.path = way;
 }
-function schGo(p, dest, df, then) { if (p.state === 'gone') return; if (p.seatSlot) { p.seatSlot.who = null; p.seatSlot = null; } schRoute(p, dest, df ?? p.fl); p.state = 'walk'; p.then = then || null; }
+function schGo(p, dest, df, then) { if (p.state === 'gone' || p.held || p.state === 'fall') return; if (p.seatSlot) { p.seatSlot.who = null; p.seatSlot = null; } schRoute(p, dest, df ?? p.fl); p.state = 'walk'; p.then = then || null; }
 function schSetFl(p, f) { if (p.fl === f) return; p.fl = f; SCH.F[f].add(p.h); }
 // 🪑 oturma: öğrenci sırasına, öğretmen / misafir boş sandalyeye
 function schSeatPos(p) { const d = p.seat; if (!d) return null; const ry = d.rotation.y; return v3(d.position.x + Math.sin(ry) * .058, d.position.z + Math.cos(ry) * .058); }
 function schSit(p) { const sp = schSeatPos(p); if (!sp) return; schGo(p, sp, p.seat.userData.sch.fl, () => { p.state = 'sit'; }); }
 function schSlot(p, kind, then) {   // boş sandalye bul ve otur
+  if (p.held || p.state === 'fall') return false;
   const L = SCH.slots.filter(s => s.kind === kind && (!s.who || s.who === p)); if (!L.length) return false; const s = cyPick(L); s.who = p;
   schGo(p, v3(s.x, s.z), s.fl, () => { p.state = 'sit'; p.face = s.face; p.seatSlot = s; s.who = p; if (then) then(); }); return true;
 }
@@ -28859,7 +28898,7 @@ function schBubble(p, txt, bg, fg, dur, key) {
   sp.scale.set(.42 / p.k, .059 / p.k, 1); sp.position.y = key === 'lbl' ? 2.62 : 2.12; p.h.add(sp);
   const old = p[key]; if (old) { p.h.remove(old.sp); old.sp.material.map.dispose(); old.sp.material.dispose(); } p[key] = { sp, t: dur };
 }
-function schSay(p, txt, dur = 2.8) { if (!p || p.state === 'gone') return; schBubble(p, txt, 'rgba(255,255,255,.96)', '#1a1a1a', dur, 'say'); schLogAdd(`${p.name}: ${txt}`); }
+function schSay(p, txt, dur = 2.8) { if (!p || p.state === 'gone') return; schBubble(p, txt, 'rgba(255,255,255,.96)', '#1a1a1a', dur, 'say'); schLogAdd(`${p.name}: ${txt}`); if (/😂|🤣|[Hh]aha|Gooool|Yaşasın/.test(txt)) p.laughT = 1.8; if (/Sessiz|Yeter|Ayrılın|Kim attı|telefonu|Uyanık|müdür|Velini|saygısız|dışarı/i.test(txt) && p.role !== 'student') p.madT = 2.2; if (/😱|😳|Az kalsın|Dikkat|Dev el/.test(txt)) p.shockT = 1.6; }
 function schInfo(p) { return p.role === 'student' ? `${p.cls} ${adT('öğrencisi')} · ${p.age} ${adT('yaş')}` : p.role === 'teacher' ? `${adT(p.subj)} ${adT('öğretmeni')} · ${adT(p.zum)} ${adT('zümresi')}` : adT(p.job); }
 function schLabel(p) { schBubble(p, `🏷️ ${p.name} ${p.sur} · ${schInfo(p)}`, 'rgba(13,71,161,.94)', '#fff', 5, 'lbl'); }
 function schLogAdd(t) { SCH.log.unshift(t); SCH.log.length = Math.min(SCH.log.length, 8); const el = $('schLog'); if (el) el.innerHTML = SCH.log.slice(0, 4).map(x => `<div>${x}</div>`).join(''); }
@@ -28867,7 +28906,8 @@ function schBell(n = 6) { try { const ctx = AU.ctx; if (ctx && ctx.state === 'ru
 // 📅 günlük akış
 function schNewDay(first) {
   if (!first) SCH.day++; SCH.per = 0; SCH.phase = 'arrive'; SCH.t = 0; SCH.greet = false; SCH.prep = false;
-  for (const p of SCH.ppl) { p.toBoss = null; p.fight = null; p.busy = null; p.h.visible = true; p.state = 'idle'; p.path = []; p.y = 0; if (p.seatSlot) { p.seatSlot.who = null; p.seatSlot = null; } }
+  for (const s2 of ['R', 'L']) if (typeof SH !== 'undefined' && SH[s2]) SH[s2].held = null; SCH.carry = null;
+  for (const p of SCH.ppl) { p.toBoss = null; p.fight = null; p.busy = null; p.held = null; p.h.visible = true; p.state = 'idle'; p.path = []; p.y = 0; if (p.seatSlot) { p.seatSlot.who = null; p.seatSlot = null; } }
   let i = 0; for (const p of schKids()) { p.hw = Math.random() > .18; schSetFl(p, 0); p.pos.set(-.5 + (Math.random() - .5) * .2, 0, 1.12 + Math.random() * .08); p.state = 'wait'; p.waitT = i++ * .55 + Math.random(); }
   for (const t of schTeachers()) { schSetFl(t, 0); t.pos.set(SCH_RCX[1] + (Math.random() - .5) * .4, 0, -.75); schSlot(t, 'tr'); }
   const B = SCH.boss; schSetFl(B, 0); B.pos.set(SCH_RCX[0], 0, -1.6); schGo(B, v3(-1.75, .58), 0, () => { B.state = 'idle'; B.face = Math.PI; });
@@ -29010,7 +29050,7 @@ function schTick(dt) {
   for (let i = SCH.planes.length - 1; i >= 0; i--) { const P = SCH.planes[i]; P.t += dt / 1.2; const k = Math.min(1, P.t); P.m.position.lerpVectors(P.a, P.b, k); P.m.position.y += Math.sin(k * Math.PI) * .12; P.m.lookAt(P.m.parent.localToWorld(P.b.clone())); if (k >= 1) { P.m.parent.remove(P.m); SCH.planes.splice(i, 1); } }
   // ⚽ top
   const Bl = SCH.ball, bv = SCH.bv, dragB = SCH.drag && SCH.drag.o === Bl;
-  if (!dragB) {
+  if (!dragB && !Bl.userData.sch.fly && !Bl.userData.sch.held) {
     Bl.position.addScaledVector(bv, dt); bv.multiplyScalar(Math.exp(-1.2 * dt)); Bl.position.y = .014;
     for (const w of SCH.walls[0]) { const dx = Bl.position.x - w.x, dz = Bl.position.z - w.z, px = w.hx + .014 - Math.abs(dx), pz = w.hz + .014 - Math.abs(dz); if (px > 0 && pz > 0) { if (px < pz) { Bl.position.x += Math.sign(dx || 1) * px; bv.x = -bv.x * .7; } else { Bl.position.z += Math.sign(dz || 1) * pz; bv.z = -bv.z * .7; } } }
     const L = SCH.lim; if (Bl.position.x < L[0] || Bl.position.x > L[1]) { Bl.position.x = THREE.MathUtils.clamp(Bl.position.x, L[0], L[1]); bv.x *= -.6; } if (Bl.position.z < L[2] || Bl.position.z > L[3]) { Bl.position.z = THREE.MathUtils.clamp(Bl.position.z, L[2], L[3]); bv.z *= -.6; }
@@ -29050,13 +29090,17 @@ function schTick(dt) {
     else if (p.mopping) arms = { R: [-.9 + Math.sin(t * 4) * .3, -.3, -.6], L: [-.9 + Math.sin(t * 4) * .3, .3, -.6], k: 8 };
     else if (p.toBoss && p.state === 'idle') arms = { R: [.1, .1, -.3], L: [.1, -.1, -.3], neck: .35, k: 6 };
     else if (p.say && p.state !== 'walk') arms = talkArms(t);
-    animateStick(r, dt, { speed: spd, running: spd > 3.6, airborne: false, vy: 0, sliding: false, sit, arms });
+    const held = p.state === 'held' || p.state === 'fall'; if (held) { const w = Math.sin(t * 9); arms = { R: [-.3 + w * .5, -2.2 + w * .3, -.5], L: [-.3 - w * .5, 2.2 - w * .3, -.5], k: 14 }; }
+    { let fk = 'n'; if (held || p.scareT > 0) fk = 'scared'; else if (p.fight || p.madT > 0) fk = 'angry'; else if (p.toBoss) fk = 'sad'; else if (p.busy === 'sleep') fk = 'sleep'; else if (p.state === 'watch' || p.shockT > 0) fk = 'shock'; else if (p.laughT > 0) fk = 'laugh'; else if (SCH.phase !== 'lesson' || p.role === 'cook') fk = 'smile';
+      if (p.say && (fk === 'n' || fk === 'smile') && (elapsed * 6 + p.mood * 7) % 1 < .5) fk = 'talk'; huFace(r, fk); }
+    animateStick(r, dt, { speed: held ? 0 : spd, running: spd > 3.6, airborne: held, vy: held ? -2 : 0, sliding: false, sit: sit && !held, arms });
   }
   // aynı katta birbirinin içinden geçmesinler
-  const L = SCH.ppl; for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const a = L[i], b = L[j]; if (a.fl !== b.fl || a.state === 'sit' || b.state === 'sit' || a.state === 'gone' || b.state === 'gone' || a.fight === b || a.path[0] && a.path[0].climb || b.path[0] && b.path[0].climb) continue; const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, d = Math.hypot(dx, dz); if (d > 1e-4 && d < .03) { const k = (.03 - d) / 2 / d; a.pos.x -= dx * k; a.pos.z -= dz * k; b.pos.x += dx * k; b.pos.z += dz * k; } }
+  const L = SCH.ppl; for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const a = L[i], b = L[j]; if (a.fl !== b.fl || a.held || b.held || a.state === 'fall' || b.state === 'fall' || a.state === 'sit' || b.state === 'sit' || a.state === 'gone' || b.state === 'gone' || a.fight === b || a.path[0] && a.path[0].climb || b.path[0] && b.path[0].climb) continue; const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, d = Math.hypot(dx, dz); if (d > 1e-4 && d < .03) { const k = (.03 - d) / 2 / d; a.pos.x -= dx * k; a.pos.z -= dz * k; b.pos.x += dx * k; b.pos.z += dz * k; } }
   // 🪑 sırası taşınan öğrenci kalkar, yeni yerine gider
   for (const p of schKids(q => q.state === 'sit' && q.seat && !q.seatSlot && schFree(q))) { if (SCH.drag && SCH.drag.o === p.seat) { p.state = 'idle'; schSay(p, adT('Sıram uçuyor! 😲'), 1.8); continue; } const sp = schSeatPos(p); if (p.pos.distanceTo(sp) > .03 || p.fl !== p.seat.userData.sch.fl) { const C = SCH.C[p.cls], away = p.seat.userData.sch.fl !== C.fl || schReg(sp.x, sp.z, C.fl) !== 'c' + C.room; schSay(p, away ? adT('Sıram nereye gitti?!') : adT('Sıram kaymış…'), 1.8); schGo(p, sp, p.seat.userData.sch.fl, () => { p.state = 'sit'; if (away) { schSay(p, adT('Burada mı ders dinleyeceğim? 😅')); if (C.t && SCH.phase === 'lesson') setTimeout(() => schSay(C.t, `${p.name}, ${adT('o sıra orada ne arıyor?!')}`), 1500); } }); } }
   if (SCH.drag && SCH.drag.lock) schDragTo(innerWidth / 2, innerHeight / 2);
+  schPhysTick(dt); schPeopleTick(dt);
   if (SCH.student) schStudentTick(dt);
 }
 // 🎒 öğrenci modu (7-A, 1. kat; 7. sıra senin)
@@ -29105,6 +29149,7 @@ function schDragTo(x, y) {
   const hit = rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -D.py), new THREE.Vector3()); if (!hit) return;
   const l = schW2L(hit.x, hit.z), L = SCH.lim, f = D.o.userData.sch.fl, inB = f > 0, nx = THREE.MathUtils.clamp(l.x + D.ox, inB ? -2.95 : L[0], inB ? 1.95 : L[1]), nz = THREE.MathUtils.clamp(l.z + D.oz, inB ? -1.85 : L[2], inB ? -.05 : L[3]), now = performance.now() / 1000, ddt = Math.max(.016, now - (D.tt || now - .016));
   D.vx = (nx - D.o.position.x) / ddt; D.vz = (nz - D.o.position.z) / ddt; D.tt = now; D.o.position.x = nx; D.o.position.z = nz;
+  { const S2 = SH.R || (SH.R = { m: schHandMesh('R'), p: null, v: new THREE.Vector3(), held: null, fist: false, seen: -9 }); S2.touch = true; S2.avg = 1; S2.p = D.o.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, .05 * SCH.S, 0)); }   // dev eli görünür
 }
 function schCanPick() { return SCH.built && curKey === 'school' && !SCH.student && !paused && !teleporting && started; }
 canvas.addEventListener('pointerdown', e => {
@@ -29114,17 +29159,17 @@ canvas.addEventListener('pointerdown', e => {
   e.stopImmediatePropagation(); SCH.picked = performance.now(); if (!lock) { e.preventDefault(); try { canvas.setPointerCapture(e.pointerId); } catch (q) {} }
   if (N.it && !SCH.student && (!N.pp || N.id + 12 < N.pd)) {   // kişiler önceliklidir (etiket)
     const o = N.it, py = SCH.top + o.userData.sch.fl * SCH_FH * SCH.S, rc = SCH.rc || (SCH.rc = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), camera); const hit = rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -py), new THREE.Vector3()), l = hit ? schW2L(hit.x, hit.z) : null;
+    SCH.phys = SCH.phys.filter(q => q.o !== o); o.userData.sch.fly = false;
     SCH.drag = { o, id: e.pointerId, lock, py, y0: o.position.y, ox: l ? o.position.x - l.x : 0, oz: l ? o.position.z - l.z : 0, vx: 0, vz: 0 }; o.position.y = SCH.drag.y0 + .035; play('pop', { gain: .35 });
     if (o === SCH.ball) SCH.bv.set(0, 0, 0);
-  } else SCH.tap = { p: N.pp, id: e.pointerId };
+  } else SCH.tap = { p: N.pp, id: e.pointerId, x0: x, y0: y, t0: performance.now(), lock };
 }, true);
-canvas.addEventListener('pointermove', e => { const D = SCH.drag; if (D && e.pointerId === D.id && !D.lock) { e.preventDefault(); e.stopImmediatePropagation(); schDragTo(e.clientX, e.clientY); } else if (SCH.tap && e.pointerId === SCH.tap.id) e.stopImmediatePropagation(); }, true);
+canvas.addEventListener('pointermove', e => { const D = SCH.drag; if (D && e.pointerId === D.id && !D.lock) { e.preventDefault(); e.stopImmediatePropagation(); schDragTo(e.clientX, e.clientY); } else if (SCH.carry && e.pointerId === SCH.carry.id) { e.preventDefault(); e.stopImmediatePropagation(); if (!SCH.carry.lock) { SCH.carry.x = e.clientX; SCH.carry.y = e.clientY; } } else if (SCH.tap && e.pointerId === SCH.tap.id) { e.stopImmediatePropagation(); if (!SCH.tap.lock && Math.hypot(e.clientX - SCH.tap.x0, e.clientY - SCH.tap.y0) > 12) schCarryStart(e.clientX, e.clientY); } }, true);
 { const up = e => {
+    if (SCH.carry && e.pointerId === SCH.carry.id) { const C = SCH.carry; SCH.carry = null; e.stopImmediatePropagation(); schTouchCarry(C.p, C.lock ? innerWidth / 2 : C.x, C.lock ? innerHeight / 2 : C.y, true); return; }
     if (SCH.tap && e.pointerId === SCH.tap.id) { const T = SCH.tap; SCH.tap = null; e.stopImmediatePropagation(); schLabel(T.p); schPanel(T.p); return; }
     const D = SCH.drag; if (!D || e.pointerId !== D.id) return; e.stopImmediatePropagation(); SCH.drag = null;
-    const o = D.o; o.position.y = D.y0; play('land', { k: .12 });
-    if (o === SCH.ball) { const v = Math.hypot(D.vx, D.vz); if (v > .15) SCH.bv.set(D.vx, 0, D.vz).multiplyScalar(Math.min(1, 2.5 / v)); }
-    schDropped(o, o.userData.sch.kind);
+    const o = D.o; if (SH.R) { SH.R.touch = false; schHandHide('R'); } const v = new THREE.Vector3(D.vx, .4, D.vz); if (v.length() > 3.5) v.setLength(3.5); schPhysAdd(o, v);   // bırakınca fizikle düşer
   };
   canvas.addEventListener('pointerup', up, true); canvas.addEventListener('pointercancel', up, true); }
 canvas.addEventListener('click', e => { if (curKey === 'school' && performance.now() - (SCH.picked || 0) < 900) e.stopImmediatePropagation(); }, true);
@@ -29173,7 +29218,7 @@ function schPanelAct(k) {
 }
 function schUI() {
   if ($('schUI')) return;
-  document.head.insertAdjacentHTML('beforeend', '<style>#schUI{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;display:none;gap:4px;flex-wrap:wrap;justify-content:center;max-width:80vw;background:rgba(14,20,34,.84);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:5px;font:11px system-ui,sans-serif}#schUI button,#schP button,#schFl button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:9px;padding:4px 8px;font:inherit}#schFl{position:fixed;right:calc(8px + env(safe-area-inset-right));top:50%;transform:translateY(-50%);z-index:30;display:none;flex-direction:column;gap:4px;background:rgba(14,20,34,.8);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:5px;font:11px system-ui}#schFl button.on{background:#1565c0;border-color:#90caf9}#schFl .schSt{display:none;flex-direction:column;gap:4px;margin-top:4px}#schLog{position:fixed;right:calc(10px + env(safe-area-inset-right));top:calc(112px + env(safe-area-inset-top));z-index:29;display:none;max-width:38vw;color:#fff;font:11px system-ui;text-shadow:0 1px 3px #000;pointer-events:none}#schLog div{background:rgba(0,0,0,.38);border-radius:6px;padding:2px 6px;margin:2px 0}#schHud{position:fixed;left:50%;top:calc(52px + env(safe-area-inset-top));transform:translateX(-50%);z-index:29;display:none;color:#fff;font:bold 12px system-ui;background:rgba(14,20,34,.7);border-radius:10px;padding:3px 10px;pointer-events:none;max-width:70vw;text-align:center}#schP{position:fixed;left:50%;bottom:calc(58px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:31;display:none;max-width:86vw;background:rgba(14,20,34,.92);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:6px 8px;color:#fff;font:12px system-ui;text-align:center}#schP small{opacity:.8}#schP div{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:5px}</style>');
+  document.head.insertAdjacentHTML('beforeend', '<style>body.inSchool #prompt{display:none!important}#schUI{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;display:none;gap:4px;flex-wrap:wrap;justify-content:center;max-width:80vw;background:rgba(14,20,34,.84);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:5px;font:11px system-ui,sans-serif}#schUI button,#schP button,#schFl button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:9px;padding:4px 8px;font:inherit}#schFl{position:fixed;right:calc(8px + env(safe-area-inset-right));top:50%;transform:translateY(-50%);z-index:30;display:none;flex-direction:column;gap:4px;background:rgba(14,20,34,.8);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:5px;font:11px system-ui}#schFl button.on{background:#1565c0;border-color:#90caf9}#schFl .schSt{display:none;flex-direction:column;gap:4px;margin-top:4px}#schLog{position:fixed;right:calc(10px + env(safe-area-inset-right));top:calc(112px + env(safe-area-inset-top));z-index:29;display:none;max-width:38vw;color:#fff;font:11px system-ui;text-shadow:0 1px 3px #000;pointer-events:none}#schLog div{background:rgba(0,0,0,.38);border-radius:6px;padding:2px 6px;margin:2px 0}#schHud{position:fixed;left:50%;top:calc(52px + env(safe-area-inset-top));transform:translateX(-50%);z-index:29;display:none;color:#fff;font:bold 12px system-ui;background:rgba(14,20,34,.7);border-radius:10px;padding:3px 10px;pointer-events:none;max-width:70vw;text-align:center}#schP{position:fixed;left:50%;bottom:calc(58px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:31;display:none;max-width:86vw;background:rgba(14,20,34,.92);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:6px 8px;color:#fff;font:12px system-ui;text-align:center}#schP small{opacity:.8}#schP div{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:5px}</style>');
   document.body.insertAdjacentHTML('beforeend', `<div id="schUI"><button data-sch="bell">🔔 ${adT('Zil')}</button><button data-sch="ev">🎲 ${adT('Olay')}</button><button data-sch="zm">👥 ${adT('Zümre')}</button><button data-sch="me">🎒 ${adT('Öğrenci ol')}</button><button data-sch="day">⏩ ${adT('Hızlı')}</button><button data-sch="home">🚪 ${adT('Çıkış')}</button></div><div id="schFl"><button data-schb="1" class="on">👁️ ${adT('Kuş bakışı')}</button><small style="color:#fff;text-align:center">📏 ${adT('Okul boyu')}</small><div style="display:flex;gap:3px"><button data-schz="-1">−</button><b id="schSz" style="color:#fff;align-self:center;min-width:34px;text-align:center">1×</b><button data-schz="1">+</button></div><button id="schTab" data-scht="1">🪵 ${adT('Masada')}</button><small style="color:#fff;text-align:center">🏢 ${adT('Kat')}</small><button data-schf="2">2 · ${adT('Lise')}</button><button data-schf="1">1 · ${adT('Ortaokul')}</button><button data-schf="0">${adT('Zemin')}</button><div class="schSt"><button data-schm="1">⬆️ ${adT('Üst kat')}</button><button data-schm="-1">⬇️ ${adT('Alt kat')}</button></div></div><div id="schLog"></div><div id="schHud"></div><div id="schP"></div>`);
   for (const id of ['schUI', 'schP', 'schFl']) { const u = $(id); for (const ev of ['pointerdown', 'mousedown', 'touchstart']) u.addEventListener(ev, e => e.stopPropagation(), { passive: true }); }
   $('schP').addEventListener('click', e => { const b = e.target.closest('[data-schp]'); if (b) { e.stopPropagation(); schPanelAct(b.dataset.schp); } });
@@ -29194,24 +29239,203 @@ function schHud() {
 }
 function schGo2() {   // durdurma menüsünden
   if (RIDE.on) { try { rideExit(); } catch (e) {} }
-  const A = AREAS.school, k = Math.max(1, SCH.S / 1.25); teleportTo('school', A.cx - .8, A.cz + (SCH.table ? 2.3 * k + .7 : 1.5 * SCH.S + 1.3), Math.PI, adT('🏫 Gazi Koleji — eşyaları taşı, birine dokun (etiket), sağdan kat seç'), () => { schBuild(); dist = 5; pitch = .7; yaw = 0; SCH.camT = null; schAreaTick(); });
+  const A = AREAS.school, k = Math.max(1, SCH.S / 1.25); teleportTo('school', A.cx - .8, A.cz + (SCH.table ? 2.3 * k + .7 : 1.5 * SCH.S + 1.3), Math.PI, adT('🏫 Gazi Koleji — dev olarak yukarıdan izle · eşyayı sürükle · büyüklere basılı tut = havaya kaldır · VR3 el sensörü de çalışır'), () => { schBuild(); dist = 5; pitch = .7; yaw = 0; SCH.camT = null; schAreaTick(); });
 }
 function schAreaTick() {
-  const inS = curKey === 'school' && (!teleporting || SCH.uiOn); if (SCH.uiOn !== inS) { SCH.uiOn = inS; for (const id of ['schUI', 'schLog', 'schHud', 'schFl']) { const e = $(id); if (e) e.style.display = inS ? (id === 'schUI' || id === 'schFl' ? 'flex' : 'block') : 'none'; } }
+  const inS = curKey === 'school' && (!teleporting || SCH.uiOn); if (SCH.uiOn !== inS) { SCH.uiOn = inS; document.body.classList.toggle('inSchool', inS); for (const id of ['schUI', 'schLog', 'schHud', 'schFl']) { const e = $(id); if (e) e.style.display = inS ? (id === 'schUI' || id === 'schFl' ? 'flex' : 'block') : 'none'; } }
   if (!inS) { const p = $('schP'); if (p && p.style.display !== 'none') p.style.display = 'none'; if (SCH.student) schStudent(false); if (SCH.drag) SCH.drag = null; return; }
-  if (giant && (SCH.gwT -= 1 / 60) <= 0) { SCH.gwT = 3; try { keyAction('KeyB'); } catch (e) {} showMsg(adT('🏫 Okulda dev olunmaz — eşyaları elinle taşıyabilirsin'), 1.6); }
+  if (giant && (SCH.gwT -= 1 / 60) <= 0) { SCH.gwT = 3; try { keyAction('KeyB'); } catch (e) {} showMsg(adT('🏫 Zaten devsin: okula yukarıdan bakıyorsun — elinle eşyaları ve büyükleri taşı'), 1.8); }
 }
 function schCam() {   // 👁️ kuş bakışı: seçili katın içine yukarıdan bak (sürükle = döndür, iki parmak / tekerlek = yakınlaş)
   if (!SCH.bird || SCH.student || curKey !== 'school' || photoMode || !SCH.built) return;
   const P = player.position, L = schW2L(P.x, P.z), tgt = schL2W(THREE.MathUtils.clamp(L.x, -2.6, 3.2), -.8, SCH.view); tgt.y += .05;
-  const el = THREE.MathUtils.clamp(.35 + pitch * .8, .35, 1.5), D = THREE.MathUtils.clamp(1.3 + dist * .5, 1.3, 9) * SCH.S / 1.25;
+  if (!(typeof GV3 !== 'undefined' && GV3.on)) { SCH.cy = yaw; SCH.cp = pitch; } const Y = SCH.cy ?? yaw, Pp = SCH.cp ?? pitch;   // VR3 açıkken telefon dönse de kamera sabit
+  const el = THREE.MathUtils.clamp(.35 + Pp * .8, .35, 1.5), D = THREE.MathUtils.clamp(1.3 + dist * .5, 1.3, 9) * SCH.S / 1.25;
   if (!SCH.camT) SCH.camT = tgt.clone(); SCH.camT.lerp(tgt, .12);
-  camera.position.set(SCH.camT.x + Math.sin(yaw) * Math.cos(el) * D, SCH.camT.y + Math.sin(el) * D, SCH.camT.z + Math.cos(yaw) * Math.cos(el) * D);
+  camera.position.set(SCH.camT.x + Math.sin(Y) * Math.cos(el) * D, SCH.camT.y + Math.sin(el) * D, SCH.camT.z + Math.cos(Y) * Math.cos(el) * D);
   if (SCH.table) { const A = AREAS.school, k = Math.max(1, SCH.S / 1.25); camera.position.x = THREE.MathUtils.clamp(camera.position.x, A.cx - 8.4 * k, A.cx + 8.4 * k); camera.position.z = THREE.MathUtils.clamp(camera.position.z, A.cz - 6.4 * k, A.cz + 6.4 * k); }   // oda duvarlarının dışına çıkmasın
   camera.lookAt(SCH.camT);
 }
-function schLoop(dt) { if (!SCH.built && curKey !== 'school') return; schAreaTick(); const k = SCH.fast ? 4 : 1; for (let i = 0; i < k; i++) schTick(dt); schHud(); if (SCH.ceil) { const v = !(SCH.bird && !SCH.student); for (const m of SCH.ceil) m.visible = v; } schCam(); }
+function schLoop(dt) { if (!SCH.built && curKey !== 'school') return; schAreaTick(); const k = SCH.fast ? 4 : 1; for (let i = 0; i < k; i++) schTick(dt); schHud(); try { schCarryTick(); schHandFrame(dt); } catch (e) { sftErr(e); } if (SCH.ceil) { const v = !(SCH.bird && !SCH.student); for (const m of SCH.ceil) m.visible = v; } schCam(); }
 { const a = $('pAnk'); if (a) { a.insertAdjacentHTML('afterend', `<button id="pSch">🏫 ${adT('Gazi Koleji (masadaki minyatür okul)')}</button>`); $('pSch').addEventListener('click', () => { resumeGame(); setTimeout(schGo2, 60); }); } }
+
+/* =====================================================================
+   🖐️ OKULDA DEV ELİ — okula yukarıdan bakarken elinle karış (dokun / fare / el sensörü VR3)
+   Eşyalar: tut, kaldır, taşı, bırak (fizikle düşer, seker, masadan yere düşebilir), ez (yumruğu hızla indir), sıkıştır (tutarken
+   sıkı yumruk), ikiye kopar (iki elle tutup ayır), fiske (işaret parmağını başparmaktan fırlat), it (açık avuçla süpür).
+   Büyükler (öğretmen, müdür, müdür yardımcısı, kantinci, görevli): tutup havaya kaldır, başka yere (sınıftan bahçeye) taşı;
+   itiraz ederler, indirince kendilerine gelip işlerine dönerler. Öğrenciler tutulmaz: el yaklaşınca kaçışırlar, açık avuç yollarını keser.
+   ===================================================================== */
+SCH.phys = []; const SH = { R: null, L: null, sayT: 0, obs: [] };
+const schFloorY = f => SCH.top + f * SCH_FH * SCH.S;
+const schOutside = (x, z) => x < -3 || x > 2 || z < -1.9 || z > 0;
+const schAdult = p => !!p && p.role !== 'student' && p.state !== 'gone';
+const SCH_HELD = { teacher: ['İndirin beni, dersim var!', 'Bu da ne böyle?!', 'Aman düşeceğim!', 'Çocuklar sakin olun, ben iyiyim!'], principal: ['Bu ne saygısızlık?!', 'Ben bu okulun müdürüyüm!', 'İndirin beni hemen!', 'Kim bu dev?!'], vice: ['Hey! Nöbetteyim ben!', 'Aaa, uçuyorum!'], cook: ['Tostlar yanacak!', 'Kantin boş kaldı!'], janitor: ['Yerler daha kurumadı!', 'Paspasım düştü!'] };
+// 🫳 eşya fiziği (bırakınca düşer, seker, durur)
+function schPhysAdd(o, v) { if (o.userData.sch.held) return; let Q = SCH.phys.find(q => q.o === o); if (!Q) { Q = { o, v: new THREE.Vector3(), spin: (Math.random() - .5) * 5 }; SCH.phys.push(Q); } Q.v.copy(v); o.userData.sch.fly = true; }
+function schPhysTick(dt) {
+  const g = 9.8 / SCH.S;
+  for (let i = SCH.phys.length - 1; i >= 0; i--) {
+    const Q = SCH.phys[i], o = Q.o, U = o.userData.sch; if (U.held) { SCH.phys.splice(i, 1); U.fly = false; continue; }
+    Q.v.y -= g * dt; o.position.addScaledVector(Q.v, dt); if (o !== SCH.ball) { o.rotation.x += Q.spin * dt; o.rotation.z += Q.spin * .6 * dt; }
+    if (U.fl > 0 && schOutside(o.position.x, o.position.z)) { o.position.y += U.fl * SCH_FH; SCH.F[0].add(o); U.fl = 0; continue; }   // pencereden / binadan dışarı: yere düşer
+    const L = SCH.lim, offT = SCH.table && U.fl === 0 && (o.position.x < L[0] - .05 || o.position.x > L[1] + .05 || o.position.z < L[2] - .05 || o.position.z > L[3] + .05);
+    const fy = (offT ? -SCH.top / SCH.S : 0) + (o === SCH.ball ? .014 : 0);
+    if (o.position.y <= fy) {
+      o.position.y = fy;
+      if (Math.abs(Q.v.y) > .7) { Q.v.y = -Q.v.y * .35; Q.v.x *= .7; Q.v.z *= .7; Q.spin *= .5; play('land', { k: .06 }); }
+      else { if (o === SCH.ball) SCH.bv.set(Q.v.x, 0, Q.v.z); Q.v.set(0, 0, 0); if (o !== SCH.ball) { o.rotation.x = 0; o.rotation.z = 0; } SCH.phys.splice(i, 1); U.fly = false; if (o !== SCH.ball && !offT) schDropped(o, U.kind); if (offT) schLogAdd(`💥 ${adT('Bir eşya masadan yere düştü!')}`); }
+    }
+  }
+  for (const o of SCH.items) { const U = o.userData.sch; if (U.wob > 0 && !U.fly && !U.held) { U.wob -= dt; o.rotation.z = U.wob > 0 ? Math.sin(elapsed * 38) * .07 * U.wob : 0; } }
+}
+// 🙋 büyükleri tut / taşı / indir
+function schHold(p, by) {
+  if (!schAdult(p) || p.held) return false;
+  if (p.seatSlot) { p.seatSlot.who = null; p.seatSlot = null; } p.path = []; p.then = null; p.busy = null; p.fight = null; p.held = by; p.state = 'held'; p.heldT = 0; p.sayHT = .4;
+  play('pop', { gain: .4 }); schLogAdd(`🖐️ ${p.name} ${p.sur} ${adT('dev eliyle havaya kalktı!')}`);
+  const C = Object.values(SCH.C).find(c => c.t === p); if (C) setTimeout(() => { for (const q of C.kids) if (q.state === 'sit' && Math.random() < .55) { q.shockT = 2; schSay(q, cyPick([adT('Hocam uçuyor!'), adT('Dev el hocayı aldı!'), '😱', adT('Ders bitti mi yani?')]), 2); } }, 700);
+  if (p === SCH.boss) { for (const q of schKids(k => k.toBoss)) { q.shockT = 2; setTimeout(() => schSay(q, adT('Müdür havada! 😳')), 500); } }
+  return true;
+}
+function schHeldMove(p, w) {   // tutulan kişi elin altında asılı durur
+  const base = new THREE.Vector3(w.x, w.y - 1.3 * p.k * SCH.S, w.z), l = SCH.F[p.fl].worldToLocal(base.clone());
+  p.pos.x = l.x; p.pos.z = l.z; p.y = l.y;
+}
+function schPutDown(p, w) {
+  if (!p.held) return; const l = schW2L(w.x, w.z), f = schOutside(l.x, l.z) ? 0 : SCH.view, base = w.y - 1.3 * p.k * SCH.S;
+  schSetFl(p, f); p.pos.x = THREE.MathUtils.clamp(l.x, SCH.lim[0], SCH.lim[1]); p.pos.z = THREE.MathUtils.clamp(l.z, SCH.lim[2], SCH.lim[3]); p.y = Math.max(0, (base - schFloorY(f)) / SCH.S); p.held = null; p.state = 'fall'; p.vy = 0;
+}
+function schResume(p) {
+  schSay(p, cyPick([adT('Az önce bir dev beni taşıdı!'), adT('Neyse… işime döneyim.'), adT('Başım döndü biraz…'), adT('Kimse görmedi değil mi?')]), 2.6);
+  for (const q of SCH.ppl) if (q !== p && q.fl === p.fl && q.state !== 'gone' && q.pos.distanceTo(p.pos) < .4 && Math.random() < .5) { q.laughT = 1.6; setTimeout(() => schSay(q, cyPick(['😂', adT('Gördün mü?!'), adT('İnanılmaz!')]), 1.6), 400 + Math.random() * 800); }
+  setTimeout(() => {
+    if (p.held || p.state === 'gone') return; const C = Object.values(SCH.C).find(c => c.t === p);
+    if (p.role === 'teacher') { if (C && SCH.phase === 'lesson') { if (C.gym) schGo(p, v3(2.35, -.45), 0, () => { p.state = 'idle'; }); else schGo(p, v3(C.cx - .26, -1.72), C.fl, () => { p.state = 'teach'; p.face = 0; schSay(p, adT('Nerede kalmıştık? Devam ediyoruz.')); }); } else schSlot(p, 'tr'); }
+    else if (p.role === 'principal') schSlot(p, 'boss'); else if (p.role === 'cook') schGo(p, v3(SCH_RCX[3], -1.8), 0, () => { p.state = 'idle'; p.face = 0; }); else schGo(p, v3(-.5, -.25), 0, () => { p.state = 'idle'; });
+  }, 1800);
+}
+function schPeopleTick(dt) {   // tutulan / düşen büyükler, ele tepki
+  const g = 9.8 / SCH.S;
+  for (const p of SCH.ppl) {
+    if (p.state === 'held') { p.heldT += dt; p.sayHT -= dt; p.scareT = .5; if (p.sayHT <= 0) { p.sayHT = 2.6 + Math.random() * 2; schSay(p, adT(cyPick(SCH_HELD[p.role] || SCH_HELD.teacher)), 2.2); } }
+    else if (p.state === 'fall') { p.vy -= g * dt; p.y += p.vy * dt; if (p.y <= 0) { p.y = 0; p.state = 'idle'; p.scareT = 1.2; play('land', { k: .1 }); schResume(p); } }
+    if (p.scareT > 0) p.scareT -= dt; if (p.laughT > 0) p.laughT -= dt; if (p.shockT > 0) p.shockT -= dt; if (p.madT > 0) p.madT -= dt;
+  }
+  // el yakınındaki öğrenciler kaçışır, açık avuç yolu keser
+  SH.sayT -= dt;
+  for (const O of SH.obs) for (const p of SCH.ppl) {
+    if (p.fl !== O.f || p.state === 'gone' || p.held || p.state === 'fall') continue; const dx = p.pos.x - O.x, dz = p.pos.z - O.z, d = Math.hypot(dx, dz);
+    if (d < O.r + .1) { p.scareT = Math.max(p.scareT || 0, .8); if (SH.sayT <= 0 && !p.say) { SH.sayT = 2.2; schSay(p, cyPick(O.palm ? [adT('✋ Yol kapalı!'), adT('Dev bir el yolu kesti!')] : [adT('Dev el!! 😱'), adT('Kaçın!'), adT('Yukarıda biri var!')]), 1.8); } }
+    if (d < O.r && d > 1e-4 && p.state !== 'sit' && p.state !== 'teach') { const k = (O.r - d) / d; p.pos.x += dx * k; p.pos.z += dz * k; }
+  }
+}
+// 🤚 dev eli modeli (parmaklar ellerinin bükülmesini izler)
+function schHandMesh(side) {
+  const g = new THREE.Group(), m = huMat(0xf1c27d), sx = side === 'R' ? 1 : -1, box = (w, h, d, par, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = true; par.add(b); return b; };
+  box(.085, .03, .09, g, 0, 0, 0); g.fingers = [];
+  [[-.05, -.01, .03, .9], [-.03, -.045, .045, 1], [-.01, -.045, .05, 1], [.01, -.045, .047, 1], [.03, -.045, .038, .9]].forEach(([x, z, len, w], i) => {
+    const p1 = new THREE.Group(); p1.position.set(x * sx, 0, z); if (i === 0) p1.rotation.y = .7 * sx; g.add(p1); box(.017 * w, .018, len * .55, p1, 0, 0, -len * .27);
+    const p2 = new THREE.Group(); p2.position.z = -len * .55; p1.add(p2); box(.016 * w, .017, len * .45, p2, 0, 0, -len * .22); g.fingers.push([p1, p2]);
+  });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(.03, .042, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .55, depthWrite: false })); scene.add(ring); g.ring = ring;
+  g.visible = ring.visible = false; scene.add(g); return g;
+}
+function schHandShow(side, w, curl, fwd) {   // w: el noktası (dünya)
+  const S2 = SH[side] || (SH[side] = { m: schHandMesh(side), p: null, v: new THREE.Vector3(), held: null, fist: false, seen: -9 });
+  const g = S2.m, k = SCH.S / 1.25; g.visible = true; g.scale.setScalar(k); g.position.copy(w); g.position.y += .03 * k;
+  g.rotation.set(0, Math.atan2(-fwd.x, -fwd.z), 0); g.fingers.forEach(([a, b], i) => { const c = curl ? curl[i] : 0; a.rotation.x = -c * 1.3; b.rotation.x = -c * 1.5; });
+  const l = schW2L(w.x, w.z), f = schOutside(l.x, l.z) ? 0 : SCH.view; g.ring.visible = true; g.ring.scale.setScalar(k); g.ring.position.set(w.x, schFloorY(f) + .006, w.z);
+}
+function schHandHide(side) { const S2 = SH[side]; if (S2) { S2.m.visible = S2.m.ring.visible = false; } }
+function schHandPoint(lat, ver, dep) {   // ekrandaki el + derinlik → okul üstünde bir nokta (uzandıkça alçalır)
+  const rc = SH.rc || (SH.rc = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(THREE.MathUtils.clamp(lat * 1.15, -1, 1), THREE.MathUtils.clamp(ver * 1.15, -1, 1)), camera);
+  const at = f => { const hy = schFloorY(f) + (.02 + (1 - dep) * .4) * SCH.S, t = (hy - rc.ray.origin.y) / rc.ray.direction.y; return t > 0 ? rc.ray.origin.clone().addScaledVector(rc.ray.direction, t) : null; };
+  let P = at(SCH.view); if (P) { const l = schW2L(P.x, P.z); if (schOutside(l.x, l.z) && SCH.view > 0) P = at(0) || P; } return P;
+}
+function schHandPick(w, adults = true) {   // elin altındaki en yakın eşya / büyük
+  let best = null, bd = .085 * SCH.S, kind = null; const v = new THREE.Vector3(), top = SCH.view;
+  if (adults) for (const p of SCH.ppl) { if (!schAdult(p) || p.held || p.fl > top || p.fl !== top && !(p.fl === 0 && schOutside(p.pos.x, p.pos.z))) continue; p.r.torso.getWorldPosition(v); const d = Math.hypot(v.x - w.x, v.z - w.z); if (d < bd && w.y < v.y + .16 * SCH.S) { bd = d; best = p; kind = 'p'; } }
+  for (const o of SCH.items) { const U = o.userData.sch; if (U.held || U.fl > top || U.fl !== top && !(U.fl === 0 && schOutside(o.position.x, o.position.z))) continue; o.getWorldPosition(v); const d = Math.hypot(v.x - w.x, v.z - w.z); if (d < bd && w.y < v.y + .2 * SCH.S) { bd = d; best = o; kind = 'o'; } }
+  return best ? { o: best, kind } : null;
+}
+function schGrab(side, hit, w) {
+  const S2 = SH[side]; if (!hit) return;
+  if (hit.kind === 'p') { if (schHold(hit.o, side)) S2.held = { p: hit.o }; return; }
+  const o = hit.o, wp = o.getWorldPosition(new THREE.Vector3()); o.userData.sch.held = side; o.userData.sch.fly = false; S2.held = { o, off: new THREE.Vector3(wp.x - w.x, -.03 * SCH.S, wp.z - w.z) }; o.userData.sch.s0 ||= o.scale.x; play('pop', { gain: .35 });
+  const near = SCH.ppl.filter(p => p.fl === o.userData.sch.fl && p.state !== 'gone' && p.pos.distanceTo(o.position) < .35 && !p.say); if (near.length) { near[0].shockT = 2; schSay(near[0], cyPick([adT('Eşyalar havada uçuyor!'), adT('Dev bir el!'), '😳']), 1.8); }
+}
+function schRelease(side, vw) {   // vw: elin hızı (dünya)
+  const S2 = SH[side]; const H = S2 && S2.held; if (!H) return; S2.held = null;
+  if (H.p) { schPutDown(H.p, S2.p); return; }
+  const o = H.o; o.userData.sch.held = null; const v = vw.clone().divideScalar(SCH.S); if (v.length() > 4) v.setLength(4); schPhysAdd(o, v); if (v.length() > 1.5) schLogAdd(`🤾 ${adT('Bir eşya fırlatıldı!')}`);
+}
+function schHeldTick(side, dt) {   // tutulan şey eli izler
+  const S2 = SH[side]; if (!S2 || !S2.held || !S2.p) return; const H = S2.held;
+  if (H.p) { schHeldMove(H.p, S2.p); return; }
+  const o = H.o, f = o.userData.sch.fl, tw = S2.p.clone().add(H.off); tw.y = Math.max(tw.y, schFloorY(f) + .005); const l = SCH.F[f].worldToLocal(tw); o.position.copy(l);
+}
+function schCrush(w) {   // yumruğu indir: altındaki eşyalar ezilir (insanlar kaçar)
+  let n = 0; const v = new THREE.Vector3();
+  for (const o of SCH.items) { const U = o.userData.sch; if (U.held || o === SCH.ball) continue; o.getWorldPosition(v); if (Math.hypot(v.x - w.x, v.z - w.z) < .07 * SCH.S && Math.abs(w.y - v.y) < .2 * SCH.S) { o.scale.y = Math.max(.15, o.scale.y * .35); o.scale.x *= 1.12; o.scale.z *= 1.12; U.crushed = true; n++; for (let i = 0; i < 6; i++) spawnDust(v.x, v.y + .02, v.z, .05 * SCH.S, .4, 0, 0, 0xbcaaa4); } }
+  if (n) { play('squash'); shake = Math.max(shake, .08); const near = SCH.ppl.filter(p => p.state !== 'gone' && p.fl === SCH.view); const q = near.sort((a, b) => a.pos.distanceTo(schW2L(w.x, w.z)) - b.pos.distanceTo(schW2L(w.x, w.z)))[0]; if (q) { q.shockT = 2; schSay(q, cyPick([adT('Sıra ezildi!!'), adT('Dev yumruk!'), adT('Masa dümdüz oldu!')]), 2); } schLogAdd(`👊 ${n} ${adT('eşya ezildi')}`); }
+}
+function schSqueeze(o) { const U = o.userData.sch, s0 = U.s0 || 1; if (o.scale.x <= s0 * .36) return; o.scale.multiplyScalar(.86); play('squash', { gain: .4 }); if (o.scale.x <= s0 * .37) showMsg(adT('🤏 Sıkıştırdın — ufacık oldu!'), 1.2); }
+function schTear(o) {   // iki elle ayır: ikiye kopar
+  const U = o.userData.sch, f = U.fl; if (o === SCH.ball) return null; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); const w = (o.geometry.boundingBox.max.x - o.geometry.boundingBox.min.x) * o.scale.x;
+  const b = new THREE.Mesh(o.geometry, o.material); b.castShadow = b.receiveShadow = true; b.position.copy(o.position); b.rotation.copy(o.rotation); b.scale.copy(o.scale); SCH.F[f].add(b);
+  o.scale.x *= .5; b.scale.x *= .5; const ax = new THREE.Vector3(Math.cos(o.rotation.y), 0, -Math.sin(o.rotation.y)).multiplyScalar(w * .3); o.position.sub(ax); b.position.add(ax);
+  b.userData.sch = { ...U, held: null, torn: true, i: -1, me: false }; U.torn = true; SCH.items.push(b);
+  const wp = o.getWorldPosition(new THREE.Vector3()); for (let i = 0; i < 10; i++) spawnDust(wp.x, wp.y + .02, wp.z, .06 * SCH.S, .5, 0, 0, 0xd7ccc8); play('slam', { gain: .5 });
+  const near = SCH.ppl.filter(p => p.fl === f && p.state !== 'gone' && p.pos.distanceTo(o.position) < .45); for (const q of near.slice(0, 2)) { q.shockT = 2; schSay(q, cyPick([adT('İkiye böldü!!'), adT('Sıram ikiye ayrıldı!'), '😱']), 2); } schLogAdd(`✂️ ${adT('Bir eşya ikiye koparıldı')}`);
+  return b;
+}
+// 📷 el sensörü (VR3): her tanınan karede çağrılır
+function schHand(side, H, lat, ver, dep, avg, pin) {
+  const w = schHandPoint(lat, ver, dep); if (!w) return; const fwd = camera.getWorldDirection(new THREE.Vector3()); fwd.y = 0; fwd.normalize();
+  const S2 = SH[side] || (SH[side] = { m: schHandMesh(side), p: null, v: new THREE.Vector3(), held: null, fist: false, seen: -9 });
+  if (S2.p) { const vv = w.clone().sub(S2.p).divideScalar(Math.max(.012, HT.dd || .033)); S2.v.lerp(vv, .5); S2.p.lerp(w, .65); } else S2.p = w.clone();
+  S2.seen = elapsed; S2.curl = H.curl; S2.avg = avg; S2.fwd = fwd; const other = SH[side === 'R' ? 'L' : 'R'];
+  const closed = avg > .62 || pin, fy = schFloorY(schOutside(schW2L(w.x, w.z).x, schW2L(w.x, w.z).z) ? 0 : SCH.view), low = S2.p.y - fy < .09 * SCH.S, sp = S2.v.length() / SCH.S;
+  if (!S2.fist && closed) {
+    S2.fist = true; S2.byPin = pin && avg <= .62; S2.sq = 0;
+    if (other && other.held && other.held.o && other.fist && S2.p.distanceTo(other.held.o.getWorldPosition(new THREE.Vector3())) < .12 * SCH.S) { S2.co = { o: other.held.o, d0: S2.p.distanceTo(other.p) }; htMsg('🤲 ' + adT('İki elle tuttun — ayır, kopsun')); }
+    else { const hit = schHandPick(S2.p); if (hit) { schGrab(side, hit, S2.p); htMsg(hit.kind === 'p' ? '🖐️ ' + adT('Havaya kaldırdın') : S2.byPin ? '🤏 ' + adT('İki parmakla tuttun') : '✊ ' + adT('Tuttun')); } else if (avg > .7 && S2.v.y < -.9 * SCH.S && low) schCrush(S2.p); }
+  } else if (S2.fist && (S2.byPin ? !pin && avg < .55 : avg < .32 && !pin)) { S2.fist = false; S2.co = null; if (S2.held) { schRelease(side, S2.v); htMsg('✋ ' + adT('Bıraktın')); } }
+  if (S2.fist && !S2.held && !S2.co && avg > .72 && S2.v.y < -1.1 * SCH.S && low && (S2.cd || 0) < elapsed) { S2.cd = elapsed + .8; schCrush(S2.p); }   // yumruk indir: ez
+  if (S2.held && S2.held.o && avg > .86) { S2.sq += HT.dd || .033; if (S2.sq > .35) { S2.sq = 0; schSqueeze(S2.held.o); } } else S2.sq = 0;   // sık
+  if (S2.co && other && other.held && other.held.o === S2.co.o) { if (S2.p.distanceTo(other.p) > S2.co.d0 + .1 * SCH.S) { const b = schTear(S2.co.o); S2.co = null; if (b) { b.userData.sch.held = side; S2.held = { o: b, off: new THREE.Vector3(0, -.03 * SCH.S, 0) }; } } }
+  // fiske: işaret parmağı bükülüyken birden açılır
+  const ic = H.curl[1]; if (ic > .65) S2.icT = elapsed; else if (ic < .3 && S2.icT && elapsed - S2.icT < .25 && !S2.held) { S2.icT = 0; const hit = schHandPick(S2.p, false); if (hit) { const v = new THREE.Vector3(fwd.x * 2.6, 1.3, fwd.z * 2.6); schPhysAdd(hit.o, v); play('swing', { gain: .4 }); htMsg('👆 ' + adT('Fiske!')); } }
+  // açık avuçla süpür: eşyalar itilir
+  if (!closed && low && sp > .6) { const v = new THREE.Vector3(); for (const o of SCH.items) { const U = o.userData.sch; if (U.held || U.fly || (U.pushT || 0) > elapsed) continue; o.getWorldPosition(v); if (Math.hypot(v.x - S2.p.x, v.z - S2.p.z) < .06 * SCH.S && Math.abs(v.y - S2.p.y) < .12 * SCH.S) { U.pushT = elapsed + .5; schPhysAdd(o, S2.v.clone().divideScalar(SCH.S).multiplyScalar(.9).setY(.4)); } } }
+  else if (!closed && low) { const v = new THREE.Vector3(); for (const o of SCH.items) { const U = o.userData.sch; if (U.held || U.fly) continue; o.getWorldPosition(v); if (Math.hypot(v.x - S2.p.x, v.z - S2.p.z) < .05 * SCH.S) U.wob = Math.max(U.wob || 0, .35); } }   // dokun: titrer
+}
+function schHandFrame(dt) {   // her kare: el modeli, tutulanlar, engel
+  SH.obs.length = 0; if (curKey !== 'school' || !SCH.built) { schHandHide('R'); schHandHide('L'); return; }
+  for (const side of ['R', 'L']) {
+    const S2 = SH[side]; if (!S2) continue;
+    const live = S2.touch || (typeof HT !== 'undefined' && HT.on && elapsed - S2.seen < .35);
+    if (!live) { schHandHide(side); if (S2.held) schRelease(side, new THREE.Vector3()); S2.fist = false; continue; }
+    if (!S2.touch && S2.v.lengthSq() > 0 && elapsed - S2.seen < .2) S2.p.addScaledVector(S2.v, Math.min(dt, .04) * .5);   // iki kare arasında akıcı
+    schHandShow(side, S2.p, S2.touch ? [.9, .9, .9, .9, .9] : S2.curl, S2.fwd || camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize());
+    schHeldTick(side, dt);
+    const l = schW2L(S2.p.x, S2.p.z), f = schOutside(l.x, l.z) ? 0 : SCH.view; if (S2.p.y - schFloorY(f) < .18 * SCH.S) SH.obs.push({ f, x: l.x, z: l.z, r: (S2.avg < .3 && S2.v.length() < .3 * SCH.S ? .1 : .06), palm: S2.avg < .3 });
+  }
+}
+// 🖱️ dokunarak / fareyle büyükleri taşı (sürükle) — dev eli de görünür
+function schTouchCarry(p, x, y, end) {
+  const rc = SCH.rc || (SCH.rc = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), camera);
+  const lift = end ? .05 : .16, at = f => rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -(schFloorY(f) + lift * SCH.S)), new THREE.Vector3());
+  let w = at(SCH.view); if (w) { const l = schW2L(w.x, w.z); if (schOutside(l.x, l.z) && SCH.view > 0) w = at(0) || w; } if (!w) return;
+  const S2 = SH.R || (SH.R = { m: schHandMesh('R'), p: null, v: new THREE.Vector3(), held: null, fist: false, seen: -9 }); S2.touch = !end; S2.p = w.clone(); S2.held = end ? S2.held : { p }; S2.avg = 1;
+  if (end) { S2.held = { p }; schRelease('R', new THREE.Vector3()); S2.touch = false; schHandHide('R'); } else schHeldMove(p, w);
+}
+function schCarryStart(x, y) {   // basılı tut / sürükle: büyükleri havaya kaldır
+  const T = SCH.tap; if (!T) return; SCH.tap = null; if (!schAdult(T.p)) { schLabel(T.p); if (SH.sayT <= 0) { SH.sayT = 2; T.p.scareT = 1.2; schSay(T.p, cyPick([adT('Dev el!! 😱'), adT('Kaçın!')]), 1.6); } return; }
+  if (!schHold(T.p, 'touch')) return; SCH.carry = { p: T.p, id: T.id, lock: T.lock, x, y }; schTouchCarry(T.p, T.lock ? innerWidth / 2 : x, T.lock ? innerHeight / 2 : y);
+}
+function schCarryTick() { const T = SCH.tap; if (T && performance.now() - T.t0 > 380 && schAdult(T.p)) schCarryStart(T.x0, T.y0); const C = SCH.carry; if (C) { if (!C.p.held) { SCH.carry = null; return; } schTouchCarry(C.p, C.lock ? innerWidth / 2 : C.x, C.lock ? innerHeight / 2 : C.y); } }
 
 /* ---------- 🏷️ herkesin etiketi: bir kişiye sol tıkla / dokun → adı, yaşı, işi (köy, şehir, Ankara; okulda da) ---------- */
 const NPCL = { list: [] };
