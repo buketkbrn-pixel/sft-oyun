@@ -344,7 +344,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-v</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-w</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -765,7 +765,7 @@ const adT = t => LANG === 'en' ? (L_EN[t] ?? t) : t;
 Object.assign(L_EN, {"🔐 Admin": "🔐 Admin", "Admin paneli şifreli. Açmak için kodu yazıp düğmeye bas; kapatmak için aynı kodu tekrar yaz.": "The admin panel is locked. Type the code and press the button to unlock; type the same code again to lock it.", "Admin: 🔒 kapalı": "Admin: 🔒 locked", "Admin: 🔓 açık": "Admin: 🔓 unlocked", "🔑 Admini etkinleştir": "🔑 Enable admin", "🔒 Admini kapat": "🔒 Disable admin", "❌ Yanlış kod": "❌ Wrong code", "🛠️ Admin açıldı! M ya da 🛠️ Admin düğmesi": "🛠️ Admin unlocked! Press M or the 🛠️ Admin button", "🔒 Admin kapatıldı": "🔒 Admin locked", "🔒 Admin kilitli — Ayarlar → 🔐 Admin bölümüne kodu yaz": "🔒 Admin is locked — type the code in Settings → 🔐 Admin", "🦾 Ultra mod için önce envanterden robotik çantayı seç (I)": "🦾 Pick the robotic backpack from the inventory first (I)", "🦖 Devken ultra mod olmaz": "🦖 No ultra mode while giant", "🔥 ULTRA MOD! 8 kol · dörtlü lazer · süper hız (P: kapat)": "🔥 ULTRA MODE! 8 arms · quad laser · super speed (P: off)", "🦾 Ultra mod kapandı": "🦾 Ultra mode off", "P / 🔥": "P / 🔥", "ULTRA mod: 8 kol, kırmızı ışıklar, dev bacaklar, dörtlü lazer, süper hız · yüksekten inince yere çakılır": "ULTRA mode: 8 arms, red lights, giant legs, quad laser, super speed · slams the ground when landing from high up", "🎵 Burada çalan kendi şarkın yok (Ayarlar → Sesler → Kendi müziğin)": "🎵 No song of yours is playing here (Settings → Sounds → Your own music)", "⏱️ 60 saniye! Yenebildiğin kadar canavar yen": "⏱️ 60 seconds! Defeat as many monsters as you can"});
 const LANG_ORIG = new WeakMap();   // çeviri öncesi özgün metinler (dil İngilizceyken açılışta erken kullanılır)
 const BODYSZ = { v: 1 };
-try { const v = +localStorage.getItem('sftVucutBoyu'); if (v >= .1 && v <= 2.5) BODYSZ.v = v; } catch (e) {}
+try { const v = +localStorage.getItem('sftVucutBoyu'); if (v >= .0001 && v <= 2.5) BODYSZ.v = v; } catch (e) {}
 try { const r = parseFloat(localStorage.getItem('sftKeskinlik')); if (r >= .7 && r <= 1.5) DYN.user = r; DYN.auto = localStorage.getItem('sftOtoKeskinlik') === '1'; } catch (e) {}
 const CLIMB = { on: false, o: null, t: 0, top: 0, nx: 0, nz: 0 };
 const FLY = { on: false, ph: '', t: 0, eng: 0, dest: null, pl: null, rw: null, skip: false, prevDist: 6, x: 0, y: 0, z: 0, v: 0, dz: -1, pitch: 0 }, AIRP = { p: null };   // uçuş durumu
@@ -1379,6 +1379,19 @@ function terrH(x, z) {
   if (!(fx >= 0 && fz >= 0 && fx < T.N - 1 && fz < T.N - 1)) return 0;
   const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, N = T.N, H = T.H, i = iz * N + ix;
   return (H[i] * (1 - tx) + H[i + 1] * tx) * (1 - tz) + (H[i + N] * (1 - tx) + H[i + N + 1] * tx) * tz;
+}
+// 🐜 köy zemininin çizilen (üçgenli) yüzeyindeki yükseklik: minik boyda karakter zeminin içine gömülmesin
+function terrMeshH(x, z) {
+  const G = TERR.gm; if (!G) return terrH(x, z); const { radii, NA, pos } = G, r = Math.hypot(x, z); if (r >= radii[radii.length - 1]) return terrH(x, z);
+  let lo = 0, hi = radii.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (radii[m] <= r) lo = m; else hi = m; }
+  let th = Math.atan2(z, x); if (th < 0) th += 6.283185307179586;
+  const V = (j, i) => j === 0 ? 0 : 1 + (j - 1) * NA + (((i % NA) + NA) % NA);
+  const tri = (A, B, C) => { const ax = pos[A * 3], az = pos[A * 3 + 2], bx = pos[B * 3], bz = pos[B * 3 + 2], cx = pos[C * 3], cz = pos[C * 3 + 2], det = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(det) < 1e-12) return null;
+    const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / det, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / det, l3 = 1 - l1 - l2; if (l1 < -1e-7 || l2 < -1e-7 || l3 < -1e-7) return null; return l1 * pos[A * 3 + 1] + l2 * pos[B * 3 + 1] + l3 * pos[C * 3 + 1]; };
+  if (lo === 0) { const i0 = Math.floor(th / 6.283185307179586 * NA - .5); for (let d = -1; d <= 2; d++) { const h = tri(0, V(1, i0 + d + 1), V(1, i0 + d)); if (h != null) return h; } return terrH(x, z); }
+  const i0 = Math.floor(th / 6.283185307179586 * NA - (lo % 2) * .5);
+  for (let d = -2; d <= 2; d++) { const i = i0 + d, a = V(lo, i), b = V(lo, i + 1), c = V(lo + 1, i), e = V(lo + 1, i + 1); let h = tri(a, b, c); if (h != null) return h; h = tri(b, e, c); if (h != null) return h; }
+  return terrH(x, z);
 }
 // Işının araziye çarptığı mesafe (mermi / lazer); arazi yoksa düz zemin
 function rayGround(o, d, maxT = 250) {
@@ -8641,7 +8654,7 @@ function lockFailedNow() {
   h.style.display = 'block'; setTimeout(() => { h.style.display = 'none'; }, 7000);
 }
 function tryLock() {
-  if (isLocked()) return;
+  if (isLocked() || (typeof DESK !== 'undefined' && DESK.on)) return;   // 🗄️ masa odasında fare serbest (oyuncakları sürüklersin)
   const fail = () => { if (!lockWorked) lockFailedNow(); else showResume(); };
   try {
     const p = canvas.requestPointerLock();
@@ -8658,7 +8671,7 @@ function showResume() {
 }
 document.addEventListener('pointerlockchange', () => {
   if (isLocked()) { lockWorked = true; lockFailed = false; overlay.style.display = 'none'; canvas.style.cursor = ''; }
-  else { mouseHeld = false; if (DRESS.open || TET.open || HOME.picking || ADM.open || CITY.menu || CITY.talk || FB.on || (window.__mp && window.__mp.ui())) return; if (started && !paused && !touchMode) openPause(); else showResume(); }   // Esc: oyun durur, menü açılır
+  else { mouseHeld = false; if (DRESS.open || TET.open || HOME.picking || ADM.open || CITY.menu || CITY.talk || FB.on || (window.__mp && window.__mp.ui()) || (typeof DESK !== 'undefined' && DESK.on)) return; if (started && !paused && !touchMode) openPause(); else showResume(); }   // Esc: oyun durur, menü açılır
 });
 document.addEventListener('pointerlockerror', () => { if (!lockWorked) lockFailedNow(); else showResume(); });
 overlay.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') enableTouch(); });
@@ -9432,6 +9445,7 @@ function hitNPC(n, dir) {
 const toP = new THREE.Vector3(), npcTarget = new THREE.Vector3();
 const npcSolid = n => n.state !== 'down' && n.state !== 'held' && n.state !== 'thrown';
 function updateNPC(n, dt) {
+  if (n.possessed) return;   // 🧢 başındasın: onu sen yönetiyorsun
   if (window.__mp && window.__mp.npc(n, dt)) return;   // 👥 ev sahibinin NPC'si
   if (n.state === 'held' || n.state === 'thrown') {   // devin elinde ya da havada: bacaklar sallanır
     n.rig.look.rotation.y = 0;
@@ -9742,7 +9756,7 @@ function teleportTo(key, x, z, face, msg, onArrive) {
     camBase.copy(player.position).y += 1.5;
     if (inArena) { kills = 0; $('kills').textContent = `Yenilen ${killNoun()}: 0`; }
     if (inParkour || inRoyale) { giant = false; ROBO.open = false; }
-    brArea(); iceArea(); desertArea(); questArea(); blankArea(); cityArea();
+    brArea(); iceArea(); desertArea(); questArea(); blankArea(); cityArea(); try { deskArea(); } catch (e) { sftErr(e); }
     $('hpWrap').style.display = $('kills').style.display = inArena ? 'block' : 'none';
     if (onArrive) onArrive();
     if (!inHouse && !inMall && !inCloset && !inHome && !inParkour) for (let i = 0; i < 20; i++) spawnDust(x, 0, z, 1.5, 2, 0, 0, 0xc9a2ff);
@@ -10480,8 +10494,9 @@ function update(dt) {
   {
     const gf = Math.max(0, giantS - 1);
     const fk = (curArea === AREAS.hub ? DYN.fogK || 1 : curArea === AREAS.blank ? 4 : 1) * (ADM.nofog ? 3 : 1); scene.fog.near = (curArea.fog[0] + gf * 32) * fk; scene.fog.far = (curArea.fog[1] + gf * 60) * fk;
-    const cf = (400 + gf * 85) * fk; if (Math.abs(camera.far - cf) > 1) { camera.far = cf; camera.updateProjectionMatrix(); }
-    SH_K = 1 + gf * .2;
+    const cf = giantS < .13 ? Math.max(3, Math.min(400, 3000 * giantS)) * fk : (400 + gf * 85) * fk; if (Math.abs(camera.far - cf) > Math.min(1, cf * .01)) { camera.far = cf; camera.updateProjectionMatrix(); }   // 🐜 minikken yakın düzlem de küçülür, görüş kısalır (titreşmez)
+    if (giantS < .13) { scene.fog.far = Math.min(scene.fog.far, cf * .95); scene.fog.near = Math.min(scene.fog.near, cf * .3); }
+    SH_K = giantS < .5 ? Math.max(.004, giantS * 1.3) : 1 + gf * .2; sun.shadow.normalBias = .025 * Math.min(1, SH_K);
     const se = SHADOW_EXT * SH_K; if (Math.abs(sc.right - se) > .05) { sc.left = sc.bottom = -se; sc.right = sc.top = se; sc.far = 140 * SH_K * 1.25; sc.updateProjectionMatrix(); }
   }
 
@@ -10710,6 +10725,7 @@ function update(dt) {
     }
     charHolder.position.y += ROBO.lift + (INV.skate && INV.eq === 'skate' && !giant ? .11 : 0);
   }
+  if (giantS < .3 && curKey === 'hub' && onGround) { const dh = terrMeshH(pos.x, pos.z) - terrH(pos.x, pos.z); if (dh > 0) charHolder.position.y += dh; }   // 🐜 minikken çimenli zeminin içinde kalmasın
 
   if (swing) {
     swing.t += dt;
@@ -10864,13 +10880,13 @@ function update(dt) {
   updateCyclists(ADM.npcStop ? 0 : wdt);
   updateSquash(wdt);
   {
-    const hubNow = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && curKey !== 'ankara' && curKey !== 'school';
+    const hubNow = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && curKey !== 'ankara' && curKey !== 'school' && curKey !== 'desk';
     for (const fl of flocks) for (const b of fl.birds) b.obj.visible = hubNow && !DAY.night && Math.abs(b.pos.x - pos.x) + Math.abs(b.pos.z - pos.z) < 115;
     if (!hubNow) for (const k of birdKids) k.holder.visible = false;
     updateHoods(ADM.npcStop ? 0 : wdt, hubNow); updateAmbience(wdt, hubNow); updateAdventurer(wdt, hubNow); updateLife(wdt, hubNow); updateLuna(wdt, hubNow); updateRoyale(dt); updateFlight(dt); updateIce(wdt); updateDesert(wdt); questUpdate(wdt); cityUpdate(wdt); updateDetail(wdt, hubNow);
     for (const g of SIGNS) g.visible = hubNow && Math.abs(g.position.x - pos.x) + Math.abs(g.position.z - pos.z) < 140;
   }
-  grass.visible = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inIce && !inDesert && !inQuest && !inBlank && !inCity && curKey !== 'ankara' && curKey !== 'school';
+  grass.visible = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inIce && !inDesert && !inQuest && !inBlank && !inCity && curKey !== 'ankara' && curKey !== 'school' && curKey !== 'desk';
   grassMat.uniforms.uWalk.value = onGround && !flying ? 1 : 0;
   {   // çimen alanı kameranın baktığı yöne kaydırılır: arkada boşa çimen çizilmez, önde daha uzağa kadar çimen olur
     const U = grassMat.uniforms, fx = -Math.sin(yaw), fz = -Math.cos(yaw), sh = GRASS_S * .19;
@@ -10951,20 +10967,21 @@ function update(dt) {
   updateAura(dt);
   $('boost').style.display = boostMode ? 'block' : 'none';
 
+  try { npcRidePre(dt); } catch (e) { sftErr(e); }   // 🫴 NPC'nin avucunda / omzunda / başında
   heroAnimate(dt); updateWebFx(dt); superLegs(dt);
   // Kamera: normalde etrafında döner; silah modunda omuz üstü (sağdan) kilitli nişan kamerası; devken uzaklaşır
   gunBlend = THREE.MathUtils.lerp(gunBlend, (aiming || ROBO.aimT > 0 || (INV.eq === 'water' && mouseHeld && !giant)) && !dead ? 1 : 0, 1 - Math.exp(-10 * dt));
   camLow = THREE.MathUtils.lerp(camLow, slide ? 1 : 0, 1 - Math.exp(-8 * dt));
   camBase.lerp(tmp.copy(pos).add(new THREE.Vector3(0, ((HERO.on ? 1.02 : 1.5) - .55 * camLow + .25 * gunBlend) * giantS * (gSit ? (gSit.mode === 'lie' ? .32 : .55) : 1) * (1 - .3 * reachK) * (HOME.sleep ? .5 : 1) * (FB.on || V4.on ? .62 : 1) + ROBO.lift, 0)), 1 - Math.exp(-12 * dt));
   camTarget.copy(camBase).addScaledVector(right, .95 * gunBlend);
-  { const nr = giantS < .6 ? .02 : giantS > 40 ? Math.round(giantS * .0625 * 4) / 4 : giantS > 1.5 ? Math.min(2.5, Math.round(giantS * 1.4) / 20) : .1; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); } }   // minikken kamera yakına gelir · devken yakın düzlem büyür (zeminler titremez)
-  let camD = THREE.MathUtils.lerp(dist, 3.6, gunBlend) * (giantS >= 1 ? 1 + (giantS - 1) * .75 : Math.pow(giantS, .8)) + ROBO.k * (INV.eq === 'robo' ? 1.6 : 0);
+  { const nr = giantS < .6 ? Math.min(.02, Math.max(2e-6, giantS * .03)) : giantS > 40 ? Math.round(giantS * .0625 * 4) / 4 : giantS > 1.5 ? Math.min(2.5, Math.round(giantS * 1.4) / 20) : .1; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); } }   // minikken kamera yakına gelir · devken yakın düzlem büyür (zeminler titremez)
+  let camD = THREE.MathUtils.lerp(dist, 3.6, gunBlend) * (giantS >= 1 ? 1 + (giantS - 1) * .75 : giantS >= .1 ? Math.pow(giantS, .8) : 1.585 * giantS) + ROBO.k * (INV.eq === 'robo' ? 1.6 : 0);
   if (inHouse) camD = Math.min(camD, 4.5);
   if (inMall) camD = Math.min(camD, 8);
   if (inHome) camD = Math.min(camD, 4.2);
   camera.position.set(
     camTarget.x + Math.sin(yaw) * Math.cos(pitch) * camD,
-    Math.max(.3 + terrH(camTarget.x + Math.sin(yaw) * Math.cos(pitch) * camD, camTarget.z + Math.cos(yaw) * Math.cos(pitch) * camD), camTarget.y + Math.sin(pitch) * camD),
+    Math.max(Math.min(.3, .3 * giantS) + (giantS < .3 && curKey === 'hub' ? terrMeshH : terrH)(camTarget.x + Math.sin(yaw) * Math.cos(pitch) * camD, camTarget.z + Math.cos(yaw) * Math.cos(pitch) * camD), camTarget.y + Math.sin(pitch) * camD),
     camTarget.z + Math.cos(yaw) * Math.cos(pitch) * camD);
   // Kamera tribün / duvar kutularının içine girerse karaktere doğru çekilir
   if (!inArena && !inHouse && !inMall && fpBlend < .5 && (Math.hypot(pos.x - STADIUM.x, pos.z - STADIUM.z) < 95 || Math.hypot(pos.x - MALL_POS.x, pos.z - MALL_POS.z) < 80 || Math.hypot(pos.x - HOME_EXT.x, pos.z - HOME_EXT.z) < 30)) {
@@ -11951,7 +11968,7 @@ function updateWeather(dt) {
     WXC.copy(scene.background).lerp(fog ? WX_FOG : WX_GRAY, (wet ? .55 : snow ? .35 : .6) * k * (1 - DAY.N * .6));
     scene.background.copy(WXC); scene.fog.color.copy(WXC);
     const gf = Math.max(0, giantS - 1), fk = fog ? .46 : wet ? .62 : snow ? .58 : 1, f = 1 - (1 - fk) * k;
-    const uk = (DYN.fogK || 1) * (ADM.nofog ? 3 : 1); scene.fog.near = (curArea.fog[0] + gf * 32) * f * (fog ? .55 : 1) * uk; scene.fog.far = (curArea.fog[1] + gf * 60) * f * uk;
+    const uk = (DYN.fogK || 1) * (ADM.nofog ? 3 : 1); scene.fog.near = (curArea.fog[0] + gf * 32) * f * (fog ? .55 : 1) * uk; scene.fog.far = (curArea.fog[1] + gf * 60) * f * uk; if (giantS < .13) { scene.fog.far = Math.min(scene.fog.far, camera.far * .95); scene.fog.near = Math.min(scene.fog.near, camera.far * .3); }
     if (snow) grassMat.uniforms.uLight.value.lerp(WXC.setRGB(1.25, 1.3, 1.4), .55 * k);
   }
   // şimşek
@@ -15555,7 +15572,7 @@ function terrainBuild() {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeVertexNormals(); geo.computeBoundingSphere();
-    ground.geometry.dispose(); ground.geometry = geo; ground.rotation.set(0, 0, 0);
+    ground.geometry.dispose(); ground.geometry = geo; ground.rotation.set(0, 0, 0); T.gm = { radii, NA, pos };   // 🐜 minikken zeminin gerçek (üçgen) yüksekliği için
   }
   // 5) Patikalar
   T.paths = buildPaths();
@@ -15628,9 +15645,9 @@ function updateDynRes() {   // ortalama kare süresine göre çözünürlük öl
 }
 /* ---------- 📏 Tam vücut boyu (Ayarlar → Karakter): 1× normal; sağa doğru doğal büyüme (iri, uzun adımlı), 1×'in altı doğaüstü küçülme
    (karınca kadar olup çimenlerin arasında gezebilirsin). Hız, zıplama, kamera ve sis boyla birlikte ayarlanır. ---------- */
-function bodySzTxt() { const v = BODYSZ.v, el = $('sBodyV'); if (el) el.textContent = v < .995 ? `${v.toFixed(2)}× 🐜` : v > 1.005 ? `${v.toFixed(2)}× 💪` : '1× normal'; }
+function bodySzTxt() { const v = BODYSZ.v, el = $('sBodyV'); if (el) el.textContent = v < .1 ? `${v}× 🐜` : v < .995 ? `${v.toFixed(2)}× 🐜` : v > 1.005 ? `${v.toFixed(2)}× 💪` : '1× normal'; }
 function setBodySize(v, quiet) {
-  v = Math.round(THREE.MathUtils.clamp(+v || 1, .1, 2.5) * 100) / 100; const old = BODYSZ.v; BODYSZ.v = v;
+  v = THREE.MathUtils.clamp(+v || 1, .0001, 2.5); v = v >= .1 ? Math.round(v * 100) / 100 : +v.toPrecision(2); const old = BODYSZ.v; BODYSZ.v = v;   // 🐜 cüce: 0,0001x'e kadar
   try { localStorage.setItem('sftVucutBoyu', String(v)); } catch (e) {}
   const sl = $('sBody'); if (sl && +sl.value !== v) sl.value = v; bodySzTxt();
   if (quiet || v === old) return;
@@ -23994,6 +24011,7 @@ function htTick(dt) {
     const r = htRead(lm), H = HT.hands[side] || (HT.hands[side] = { c: { ...r.c }, size: r.size, curl: r.curl.slice(), seen: 0, fist: false, P: null, vel: new THREE.Vector3(), sqT: 0, cd: 0, hist: [] });
     const k = THREE.MathUtils.clamp(.3 + Math.hypot(r.c.x - H.c.x, r.c.y - H.c.y) * 8, .3, .85); H.c.x += (r.c.x - H.c.x) * k; H.c.y += (r.c.y - H.c.y) * k; H.size += (r.size - H.size) * k; H.curl = H.curl.map((c0, j) => c0 + (r.curl[j] - c0) * .6); H.seen = elapsed;
     HT.s0[side] = HT.s0[side] ? HT.s0[side] + (H.size - HT.s0[side]) * .005 : H.size;   // ortalama el boyu (derinlik referansı · uzakta da yakında da çalışır)
+    if (DESK.on) { try { deskHand(side, H, lm, r); } catch (e) {} return; }   // 🗄️ masa odasında eller oyuncaklarla oynar
     const back = HT.cam === 'environment', mx = fx(H.c.x), lat = (mx - .5) * 2, ver = (.5 - H.c.y) * 2, rr = H.size / HT.s0[side];
     const dk = THREE.MathUtils.clamp(Math.pow(1 / Math.max(.2, rr), 1.35), .3, 1.8);   // 📏 el kameraya yaklaşınca oyunda da yaklaşır, uzaklaşınca uzaklaşır (ön ve arka kamera)
     const rc = HT.rc3 || (HT.rc3 = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(THREE.MathUtils.clamp(lat * 1.05, -1, 1), THREE.MathUtils.clamp(ver * 1.05, -1, 1)), camera);
@@ -26204,9 +26222,20 @@ function mpAvVrm(p) {   // anime karakter: o model (3D modeller kapalı olsa bil
   const src = [], dst = []; M.wrap.traverse(o => src.push(o)); const cl = SkeletonUtils.clone(M.wrap); cl.traverse(o => dst.push(o));
   const vb = {}; for (const k in M.bones) { const i = src.indexOf(M.bones[k]); if (i >= 0) { vb[k] = dst[i]; vb[k].userData.vk = k; } }
   cl.visible = true; cl.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
+  av.cons = vrmConsMap(M, src, dst);   // bükülme kemikleri (kollar T duruşunda kalmasın)
   av.body.add(cl); av.vw = cl; av.vb = vb; av.vm = M; av.rig.stick.visible = false;
 }
 function mpAim(b, tw, R) { const r = R[b.userData.vk]; if (!r || !r.dir) return; const pq = b.parent.getWorldQuaternion(new THREE.Quaternion()), q2 = pq.clone().multiply(r.local), r0 = r.dir.clone().applyQuaternion(q2); const q3 = new THREE.Quaternion().setFromUnitVectors(r0, tw).multiply(q2); b.quaternion.copy(pq.invert()).multiply(q3); b.updateMatrixWorld(true); }
+function vrmConsMap(M, src, dst) { return (M.cons || []).map(c => Object.assign({}, c, { o: dst[src.indexOf(c.o)], src: dst[src.indexOf(c.src)] })).filter(c => c.o && c.src && c.o.parent); }
+const VCQ = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion()], VCV = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+function vrmConsApply(list) {   // VRM kısıtları (kopyalanan modeller için): bükülme / bakma kemikleri kaynağını izler
+  for (const c of list) { const o = c.o;
+    if (c.type === 'aim') { const pq = o.parent.getWorldQuaternion(VCQ[1]), q2 = VCQ[2].copy(pq).multiply(c.rest), from = VCV[1].copy(c.axis).applyQuaternion(q2), to = c.src.getWorldPosition(VCV[2]).sub(o.getWorldPosition(VCV[3])).normalize();
+      VCQ[3].setFromUnitVectors(from, to).multiply(q2); const wq = q2.clone().slerp(VCQ[3], c.w); o.quaternion.copy(pq.invert()).multiply(wq); }
+    else if (c.type === 'roll') { const d = c.srcRest.clone().invert().multiply(c.src.quaternion), ax = VCV[1].copy(c.axis), pp = VCV[2].set(d.x, d.y, d.z), pr = ax.multiplyScalar(pp.dot(ax)); const tw = VCQ[3].set(pr.x, pr.y, pr.z, d.w).normalize(); o.quaternion.copy(c.rest).multiply(VCQ[2].identity().slerp(tw, c.w)); }
+    else { const d = c.srcRest.clone().invert().multiply(c.src.quaternion); o.quaternion.copy(c.rest).multiply(VCQ[2].identity().slerp(d, c.w)); }
+    o.updateMatrixWorld(true); }
+}
 function mpVrmPose(av) {   // (arkadaş sistemindeki eşlemenin her model için hali)
   const Bn = av.vb, W = av.vw, r = av.rig, M = av.vm, R = M && M.rest; if (!Bn || !W || !Bn.hips || !R || !R.hips) return;
   W.updateMatrixWorld(true);
@@ -26219,6 +26248,7 @@ function mpVrmPose(av) {   // (arkadaş sistemindeki eşlemenin her model için 
   const wp = (o, y) => o.localToWorld(new THREE.Vector3(0, y, 0));
   for (const [S, sd] of [['left', r.armL], ['right', r.armR]]) { const U = Bn[S + 'UpperArm'], Lo = Bn[S + 'LowerArm']; if (!U || !Lo || !R[S + 'UpperArm']) continue; const a = sd.sh.getWorldPosition(new THREE.Vector3()), e = sd.el.getWorldPosition(new THREE.Vector3()), h = wp(sd.el, -.32); mpAim(U, e.clone().sub(a).normalize(), R); mpAim(Lo, h.sub(e).normalize(), R); }
   for (const [S, lg] of [['left', r.legL], ['right', r.legR]]) { const U = Bn[S + 'UpperLeg'], Lo = Bn[S + 'LowerLeg']; const a = lg.hip.getWorldPosition(new THREE.Vector3()), k = lg.kn.getWorldPosition(new THREE.Vector3()), f = wp(lg.kn, -.47); if (U && R[S + 'UpperLeg']) mpAim(U, k.clone().sub(a).normalize(), R); if (Lo && R[S + 'LowerLeg']) mpAim(Lo, f.sub(k).normalize(), R); }
+  if (av.cons && av.cons.length) vrmConsApply(av.cons);
 }
 // ---------- 🎉 eğlence: 10 özellik (👥 menüsünde) ----------
 const MPF = { compass: false, trail: false, train: false, trails: {}, fx: [], pings: [], photoT: 0, cmp: {} };
@@ -26959,6 +26989,465 @@ function v4RightGrab() {
 }
 canvas.addEventListener('mousedown', e => { if (!V4.on || e.button !== 2 || paused) return; e.stopImmediatePropagation(); e.preventDefault(); v4RightGrab(); }, true);
 
+/* =====================================================================
+   🐜 CÜCE MODU: 1x'ten 0,0001x'e kadar küçül (durdurma menüsü / Ayarlar → Karakter / admin NPC paneli). Cüceyken etrafında
+   senin boyunda başka cüceler gezer. Kamera ve görüş küçük boyuna göre ayarlanır.
+   ===================================================================== */
+const DWARF = { on: false, k: (() => { try { const v = +localStorage.getItem('sftCuceK'); return v >= .0001 && v <= 1 ? v : .1; } catch (e) { return .1; } })(), prev: 1, list: [], t: 0 };
+const dwT = v => Math.round(-1000 * Math.log10(v) / 4), dwV = t => +Math.pow(10, -4 * t / 1000).toPrecision(2);
+const dwTxt = v => v >= .1 ? v.toFixed(2).replace(/0$/, '') + 'x' : v >= .001 ? v.toFixed(4).replace(/0+$/, '') + 'x' : v.toPrecision(1) + 'x';
+function dwarfSet(on, quiet) {
+  if (on === DWARF.on) { if (on) setBodySize(DWARF.k, true); return; }
+  if (on) { if (giant) giantReq = true; if (PRIDE.n) prideEnd(true); DWARF.prev = BODYSZ.v >= .1 ? BODYSZ.v : 1; DWARF.on = true; setBodySize(DWARF.k, true); if (!quiet) { showMsg('🐜 ' + adT('Cüce oldun') + ': ' + dwTxt(DWARF.k), 1.6); play('magic'); } }
+  else { DWARF.on = false; if (PRIDE.n) prideEnd(true); setBodySize(DWARF.prev || 1, true); dwClear(); if (!quiet) { showMsg('📏 ' + adT('Normal boyuna döndün'), 1.4); play('grow', { up: true }); } }
+  dwUI();
+}
+function dwSize(v) { DWARF.k = THREE.MathUtils.clamp(v, .0001, 1); try { localStorage.setItem('sftCuceK', DWARF.k); } catch (e) {} if (DWARF.on) setBodySize(DWARF.k, true); dwUI(); }
+function dwUI() {
+  const b = $('dwarfBox'); if (b) b.style.display = DWARF.on && !paused ? 'block' : 'none';
+  const s = $('dwSize'); if (s && document.activeElement !== s) s.value = dwT(DWARF.k); const t = $('dwTxt'); if (t) t.textContent = dwTxt(DWARF.k);
+  const p = $('pDwarf'); if (p) p.innerHTML = DWARF.on ? `📏 ${adT('Normal boya dön')} <small>${adT('cüce modundan çık')}</small>` : `🐜 ${adT('Cüce ol')} <small>1x – 0,0001x</small>`;
+}
+// senin boyunda cüceler
+function dwSpawn() {
+  const P = player.position, S = BODYSZ.v;
+  while (DWARF.list.length < 8) {
+    const rig = createStickman(cyPick(NPC_COLORS)), holder = new THREE.Group(); holder.add(rig.stick); scene.add(holder);
+    try { humanize(rig, {}); } catch (e) {}
+    const a = Math.random() * 6.283, r = (2 + Math.random() * 6) * S; holder.position.set(P.x + Math.cos(a) * r, P.y, P.z + Math.sin(a) * r);
+    DWARF.list.push({ holder, rig, tgt: holder.position.clone(), timer: Math.random() * 2, facing: Math.random() * 6.283, sp: 0 });
+  }
+}
+function dwClear() { for (const d of DWARF.list) if (d.holder.parent) d.holder.parent.remove(d.holder); DWARF.list.length = 0; }
+function dwTick(dt) {
+  if (!DWARF.on || BODYSZ.v > .6 || teleporting || POSS.n) { if (DWARF.list.length) dwClear(); return; }
+  if (!DWARF.list.length) dwSpawn(); const P = player.position, S = giantS;
+  for (const d of DWARF.list) {
+    const h = d.holder.position; h.y += 0; d.timer -= dt;
+    if (h.distanceTo(P) > 40 * S) { const a = Math.random() * 6.283, r = (3 + Math.random() * 6) * S; h.set(P.x + Math.cos(a) * r, P.y, P.z + Math.sin(a) * r); d.tgt.copy(h); }
+    const dx = d.tgt.x - h.x, dz = d.tgt.z - h.z, dd = Math.hypot(dx, dz);
+    if (d.timer <= 0 || dd < .3 * S) { if (d.timer <= 0) { const a = Math.random() * 6.283, r = (1 + Math.random() * 8) * S; d.tgt.set(P.x + Math.cos(a) * r, 0, P.z + Math.sin(a) * r); d.timer = 3 + Math.random() * 5; d.run = Math.random() < .2; } d.sp = 0; }
+    else { const sp = (d.run ? 4 : 1.6) * S; h.x += dx / dd * sp * dt; h.z += dz / dd * sp * dt; d.sp = sp; d.facing += wrapAng(Math.atan2(dx, dz) - d.facing) * (1 - Math.exp(-8 * dt)); }
+    let gy = groundAt(h.x, h.z, h.y + .5 * S); if (curKey === 'hub' && gy - terrH(h.x, h.z) < 1e-4) gy = Math.max(gy, terrMeshH(h.x, h.z)); h.y += (gy - h.y) * Math.min(1, dt * 12);
+    d.holder.rotation.y = d.facing; d.holder.scale.setScalar(S);
+    animateStick(d.rig, dt, { speed: d.sp / S, running: d.sp / S > 3, airborne: false, vy: 0 });
+  }
+}
+document.body.insertAdjacentHTML('beforeend', `<div id="dwarfBox" style="position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;display:none;background:linear-gradient(135deg,#7b2ff7,#c43ad6);color:#fff;border-radius:14px;padding:7px 12px;font:600 13px system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.35);width:min(360px,86vw)">
+  <div style="display:flex;align-items:center;gap:8px">🐜 ${adT('Cüce')}<input type="range" id="dwSize" min="0" max="1000" step="1" style="flex:1" aria-label="${adT('Cüce boyu')}"><b id="dwTxt"></b><button id="dwOff" style="background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:9px;padding:3px 8px;font:inherit">✕</button></div></div>`);
+{
+  const b = $('dwarfBox'); for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'wheel']) b.addEventListener(ev, e => e.stopPropagation(), { passive: true });
+  $('dwSize').addEventListener('input', () => dwSize(dwV(+$('dwSize').value)));
+  $('dwOff').addEventListener('click', e => { e.stopPropagation(); dwarfSet(false); });
+  const pb = $('pBlank'); if (pb) { pb.insertAdjacentHTML('beforebegin', '<button id="pDwarf"></button>'); $('pDwarf').addEventListener('click', () => { resumeGame(); setTimeout(() => dwarfSet(!DWARF.on), 60); }); }
+  const row = $('sBody') && $('sBody').closest('.sl'); if (row) { row.insertAdjacentHTML('afterend', `<div class="setRow"><span>🐜 ${adT('Cüce modu')} (1x – 0,0001x)</span><button class="btn" id="sDwarf">${adT('Aç / kapat')}</button></div>`); $('sDwarf').addEventListener('click', () => dwarfSet(!DWARF.on)); }
+  try { if (BODYSZ.v < .1) { DWARF.on = true; DWARF.k = BODYSZ.v; } } catch (e) {}
+  dwUI();
+}
+
+/* =====================================================================
+   🧑‍🤝‍🧑 NPC YÖNETİMİ (admin → 🧑‍🤝‍🧑): insan NPC'lerin karakterini seç (Ayarlar'daki hepsi: çöp adam, anime kızlar, anime erkek, Pati,
+   hamam böceği, kendi GLB modelin), bir NPC seç: yanına ışınlan, yanına getir, seni eline / omzuna / başına alsın.
+   Başına koyarsa onu sen yönetirsin: o senin dev bedenin olur (yürür, koşar, zıplar, vurur, dev bile olur), sen başında durursun.
+   ===================================================================== */
+const NPCM = { kinds: [['stick', '🕴️', 'Çöp adam'], ['girl', '🎀', 'Anime kız'], ['girlA', '🌸', 'Mia'], ['girlB', '🌙', 'Luna'], ['girlC', '🖤', 'Mita'], ['boy', '🧢', 'Anime erkek'], ['pati', '🐾', 'Pati'], ['roach', '🪳', 'Hamam böceği'], ['custom', '🧩', 'Kendi modelim']], sel: null, all: null, pend: [] };
+function npcHuman(n) { return n && n.rig && n.holder && !n.dead && !n.bossProxy && !n.isKid; }
+function npcModelSet(n, kind) {
+  if (!npcHuman(n)) return false;
+  if (n.mdl) { if (n.mdl.o.parent) n.mdl.o.parent.remove(n.mdl.o); n.mdl = null; }
+  n.rig.stick.visible = true; n.mkind = kind;
+  if (!kind || kind === 'stick') return true;
+  if (kind === 'pati' || kind === 'roach') { const r = kind === 'pati' ? buildPati() : buildRoach(); r.g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } }); n.body.add(r.g); n.mdl = { o: r.g, hero: r, kind }; n.rig.stick.visible = false; return true; }
+  const M = VRMS[kind === 'girl' ? 'girl' : kind]; if (!M) return false;
+  if (M.state !== 'ready' || !M.wrap) { if (M.state === 'none') { M.force = true; try { vrmLoad(M); } catch (e) {} } if (!NPCM.pend.some(p => p.n === n)) NPCM.pend.push({ n, kind }); return true; }
+  const src = [], dst = []; M.wrap.traverse(o => src.push(o)); const cl = SkeletonUtils.clone(M.wrap); cl.traverse(o => dst.push(o));
+  const vb = {}; for (const k in M.bones) { const i = src.indexOf(M.bones[k]); if (i >= 0) { vb[k] = dst[i]; vb[k].userData.vk = k; } }
+  cl.visible = true; cl.position.set(0, 0, 0); cl.quaternion.identity(); cl.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
+  n.body.add(cl); n.mdl = { o: cl, av: { vb, vw: cl, rig: n.rig, vm: M, cons: vrmConsMap(M, src, dst) }, kind }; n.rig.stick.visible = false; return true;
+}
+function npcModelPose(n) {   // NPC'nin modeli, çöp adam iskeletini izler
+  const m = n.mdl; if (!m) return;
+  if (m.av) { try { mpVrmPose(m.av); } catch (e) {} return; }
+  const h = m.hero, r = n.rig; if (!h) return;
+  const cp = (a, b, axes = 'xyz') => { if (a && b) for (const ax of axes) a.rotation[ax] = b.rotation[ax]; };
+  cp(h.torso, r.torso); if (h.head) h.head.rotation.y = r.look.rotation.y;
+  for (const s of ['L', 'R']) { const A = h['arm' + s], a = r['arm' + s]; if (A) { cp(A.sh, a.sh, 'xz'); cp(A.el, a.el, 'x'); } cp(h['leg' + s], r['leg' + s].hip, 'x'); cp(h['knee' + s], r['leg' + s].kn, 'x'); }
+}
+function npcList(max = 14) {
+  const P = player.position; return npcs.filter(n => npcHuman(n) && n.holder.visible !== false && Math.hypot(n.holder.position.x - P.x, n.holder.position.z - P.z) < 400 * Math.max(1, giantS)).sort((a, b) => a.holder.position.distanceToSquared(P) - b.holder.position.distanceToSquared(P)).slice(0, max);
+}
+const npcNm = n => { try { npcLblText(n); } catch (e) {} return n.lblN || n.name || adT('Kişi'); };
+function npcModelAll(kind) {
+  NPCM.all = kind; let c = 0; const lim = kind === 'stick' || kind === 'pati' || kind === 'roach' ? 400 : 12;   // anime modelleri ağır: en yakın 12 kişi
+  for (const n of npcs) { if (!npcHuman(n)) continue; if (kind !== 'stick' && c >= lim) { if (n.mdl) npcModelSet(n, 'stick'); continue; } if (npcModelSet(n, kind)) c++; }
+  showMsg(`🎭 ${c} ${adT('kişinin karakteri değişti')}`, 1.6);
+}
+// 🫴 NPC seni tutar: avucunda, omzunda ya da başında (başındaysan onu sen yönetirsin)
+const PRIDE = { n: null, pt: null, t: 0 }, POSS = { n: null, size: 1, rider: null, was: null };
+function npcPoint(n, pt, out) {
+  const m = n.mdl, B = m && m.av ? m.av.vb : null, s = n.holder.scale.x || 1;
+  if (B && pt === 'head' && B.head) { B.head.getWorldPosition(out); out.y += .22 * s; return out; }
+  if (B && (pt === 'shR' || pt === 'shL')) { const b = pt === 'shR' ? B.rightUpperArm : B.leftUpperArm; if (b) { b.getWorldPosition(out); const nk = (B.neck || B.head).getWorldPosition(new THREE.Vector3()); out.lerp(nk, .2); out.y += .06 * s; return out; } }
+  if (B && pt === 'hand' && B.rightHand) { B.rightHand.getWorldPosition(out); out.y += .03 * s; return out; }
+  const r = m && m.hero ? m.hero : n.rig;
+  if (pt === 'head') { r.head.getWorldPosition(out); out.y += (m && m.hero ? .24 : .19) * s; return out; }
+  if (pt === 'hand') { const a = (m && m.hero ? n.rig : r).armR; a.el.localToWorld(out.set(0, -.36, .04)); out.y += .02 * s; return out; }
+  const a = pt === 'shR' ? r.armR : r.armL; a.sh.getWorldPosition(out); const t = r.torso.getWorldPosition(new THREE.Vector3()), d = new THREE.Vector3(out.x - t.x, 0, out.z - t.z);
+  if (d.lengthSq() > 1e-8) out.addScaledVector(d.normalize(), .07 * s); out.y += .05 * s; return out;
+}
+function prideStart(n, pt) {
+  if (!npcHuman(n)) return; if (MP && MP.on) { showMsg('👥 ' + adT('Çok oyunculu odada kullanılamaz'), 1.6); return; }
+  if (pt === 'head') { possStart(n); return; }
+  if (giant) giantReq = true; if (POSS.n) possEnd(true);
+  if (BODYSZ.v > .3) { if (!DWARF.on) { DWARF.k = Math.min(DWARF.k, .12); dwarfSet(true, true); } else dwSize(.12); }
+  PRIDE.n = n; PRIDE.pt = pt; PRIDE.t = 0; n.prevState = n.state; play('pop');
+  showMsg(`🫴 ${npcNm(n)} ${adT(pt === 'hand' ? 'seni avucuna aldı' : pt === 'shR' ? 'seni sağ omzuna koydu' : 'seni sol omzuna koydu')} · ${adT('Boşluk: in')}`, 2.2);
+}
+function prideEnd(quiet) {
+  const n = PRIDE.n; if (!n) return; PRIDE.n = null; const P = player.position, s = n.holder.scale.x || 1, f = n.facing || 0;
+  P.set(n.holder.position.x + Math.sin(f) * .5 * s, groundAt(n.holder.position.x + Math.sin(f) * .5 * s, n.holder.position.z + Math.cos(f) * .5 * s, n.holder.position.y + 1), n.holder.position.z + Math.cos(f) * .5 * s);
+  vel.set(0, 0, 0); vy = 0; if (!quiet) showMsg('⬇️ ' + adT('İndin'), 1.2);
+}
+function npcRidePre(dt) {   // NPC'ler güncellendikten sonra, kameradan önce
+  if (POSS.n) { possPre(dt); return; }
+  const n = PRIDE.n; if (!n) return;
+  if (n.dead || teleporting || !n.holder.parent || keys.Space || dead) { prideEnd(); keys.Space = false; return; }
+  PRIDE.t += dt;
+  if (PRIDE.pt === 'hand') { const r = n.rig, k = Math.min(1, PRIDE.t * 3); r.armR.sh.rotation.x = -1.15 * k; r.armR.sh.rotation.z = -.12 * k; r.armR.el.rotation.x = -.75 * k; }
+  if (n.state === 'flee' || n.state === 'walk' && n.run) n.run = false;
+  n.holder.updateMatrixWorld(true); npcModelPose(n); n.holder.updateMatrixWorld(true);
+  const T = npcPoint(n, PRIDE.pt, new THREE.Vector3()); player.position.copy(T); vel.set(0, 0, 0); vy = 0; onGround = true;
+  if (PRIDE.pt !== 'hand') facing = n.facing; else facing = n.facing + Math.PI;
+}
+// 🧢 başına koyarsa: onu sen yönetirsin — o senin bedenin olur, sen başında durursun
+function possStart(n) {
+  if (POSS.n || !npcHuman(n)) return; if (PRIDE.n) prideEnd(true); if (giant) giantReq = true;
+  POSS.size = BODYSZ.v < 1 ? BODYSZ.v : .12; POSS.dwarf = DWARF.on; POSS.n = n; n.possessed = true; n.state = 'idle';
+  // başındaki minik sen (görünüşünün kopyası)
+  charHolder.updateMatrixWorld(true); let rider = null;
+  try { if (VRMA && VRMA.state === 'ready' && VRMA.wrap.visible) { rider = SkeletonUtils.clone(VRMA.wrap); rider.scale.setScalar(VRMA.scale); } else if (HERO.on) rider = HERO.rig.g.clone(); else rider = playerRig.stick.clone(); } catch (e) { rider = playerRig.stick.clone(); }
+  const R = new THREE.Group(); rider.position.set(0, 0, 0); rider.rotation.set(0, 0, 0); R.add(rider); rider.traverse(o => { if (o.isMesh) o.frustumCulled = false; }); scene.add(R); POSS.rider = R;
+  if (DWARF.on) { DWARF.on = false; dwClear(); dwUI(); }
+  const s = n.holder.scale.x || 1; setBodySize(THREE.MathUtils.clamp(s, .1, 2.5), true);
+  player.position.copy(n.holder.position); facing = n.facing || 0; yaw = facing - Math.PI; vel.set(0, 0, 0); vy = 0;
+  if (n.lblSp) npcLblDrop(n);
+  play('pop'); showMsg(`🧢 ${npcNm(n)} ${adT('artık senin bedenin! Sen başındasın · onu yürüt, koştur, zıplat, vur, dev yap · ⏏ ya da Boşluk ×2: in')}`, 3.2); possUI();
+}
+function possEnd(quiet) {
+  const n = POSS.n; if (!n) return; POSS.n = null; n.possessed = false; n.state = 'idle'; n.timer = 1.5; n.vel.set(0, 0, 0); n.vy = 0;
+  if (giant) { giant = false; dropCarried(false); }
+  n.holder.position.copy(player.position); n.holder.rotation.set(0, facing, 0); n.facing = facing; n.holder.scale.setScalar(1); n.body.rotation.set(0, 0, 0);
+  if (POSS.rider) { scene.remove(POSS.rider); POSS.rider = null; }
+  charHolder.visible = true;
+  // yere in: NPC'nin önüne, eski küçük boyunla
+  const sz = POSS.size; DWARF.k = sz < 1 ? sz : DWARF.k; if (POSS.dwarf || sz < .1) dwarfSet(true, true); else setBodySize(sz, true);
+  const f = facing; player.position.x += Math.sin(f) * .6; player.position.z += Math.cos(f) * .6; vel.set(0, 0, 0); vy = 0;
+  if (!quiet) showMsg('⏏ ' + adT('Başından indin'), 1.4); possUI();
+}
+function possPre(dt) {   // bedenin seni izler (konum, yön, boy, eklemler) · başındaki minik sen
+  const n = POSS.n; if (!n || n.dead || !n.holder.parent || teleporting) { possEnd(true); return; }
+  const r = n.rig, p = playerRig;
+  n.holder.position.copy(player.position); n.holder.rotation.set(0, facing, 0); n.facing = facing; n.holder.scale.setScalar(charHolder.scale.x); n.holder.visible = true;
+  for (const k of ['hips', 'torso', 'neck', 'look']) { r[k].quaternion.copy(p[k].quaternion); } r.hips.position.y = p.hips.position.y;
+  for (const s of ['L', 'R']) { r['arm' + s].sh.quaternion.copy(p['arm' + s].sh.quaternion); r['arm' + s].el.quaternion.copy(p['arm' + s].el.quaternion); r['leg' + s].hip.quaternion.copy(p['leg' + s].hip.quaternion); r['leg' + s].kn.quaternion.copy(p['leg' + s].kn.quaternion); }
+  n.body.rotation.set(0, 0, 0); n.body.position.y = 0;
+  n.holder.updateMatrixWorld(true); npcModelPose(n); n.holder.updateMatrixWorld(true);
+  const T = npcPoint(n, 'head', new THREE.Vector3()), R = POSS.rider; if (R) { R.position.copy(T); R.rotation.set(0, facing, 0); R.scale.setScalar(POSS.size * (n.holder.scale.x || 1)); }
+}
+function possLate() { if (POSS.n) charHolder.visible = false; }   // senin asıl bedenin görünmez, NPC'nin bedeni seni izler
+document.body.insertAdjacentHTML('beforeend', `<button id="possX" style="position:fixed;right:calc(12px + env(safe-area-inset-right));bottom:calc(120px + env(safe-area-inset-bottom));z-index:31;display:none;background:linear-gradient(135deg,#ff8c42,#e63946);color:#fff;border:0;border-radius:14px;padding:10px 14px;font:700 14px system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.35)">⏏ ${adT('Başından in')}</button>`);
+$('possX').addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); if (POSS.n) possEnd(); else if (PRIDE.n) prideEnd(); });
+function possUI() { const b = $('possX'); if (!b) return; b.style.display = POSS.n || PRIDE.n ? 'block' : 'none'; b.textContent = POSS.n ? '⏏ ' + adT('Başından in') : '⬇️ ' + adT('İn'); }
+// ---------- admin NPC paneli ----------
+document.head.insertAdjacentHTML('beforeend', `<style>
+#npcAdm{position:fixed;top:54px;right:10px;bottom:10px;width:min(380px,94vw);z-index:8;display:none;flex-direction:column;background:rgba(14,18,28,.96);color:#eef3ff;border:1px solid rgba(140,170,255,.25);border-radius:16px;font:13px system-ui,sans-serif;box-shadow:0 10px 40px rgba(0,0,0,.45)}
+#npcAdm.on{display:flex}#npcAdm h4{margin:0;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:8px}#npcAdm h4 button{margin-left:auto}
+#npcAdm .nb{overflow-y:auto;padding:8px 10px;flex:1}#npcAdm .nt{font-weight:700;font-size:12px;opacity:.85;margin:10px 2px 6px}
+#npcAdm button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:10px;padding:6px 8px;font:600 12px system-ui,sans-serif;cursor:pointer}
+#npcAdm .ng{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}#npcAdm .ng button.on{background:linear-gradient(135deg,#3a7bff,#7a4dff);border-color:#9fb8ff}
+#npcAdm .nl button{display:flex;width:100%;justify-content:space-between;margin-bottom:4px;text-align:left}#npcAdm .nl button.on{background:#2a9d62;border-color:#6fe0a5}
+#npcAdm .nh{font-size:11px;opacity:.7;margin:4px 2px}
+</style>`);
+document.body.insertAdjacentHTML('beforeend', `<div id="npcAdm"><h4>🧑‍🤝‍🧑 ${adT('NPC yönetimi')}<button data-na="x">✕</button></h4><div class="nb" id="npcAdmB"></div></div>`);
+function npcAdmOpen(on = true) { const E = $('npcAdm'); E.classList.toggle('on', on); if (on) npcAdmUI(); }
+function npcAdmUI() {
+  const E = $('npcAdmB'); if (!E || !$('npcAdm').classList.contains('on')) return; const L = npcList(), sel = NPCM.sel && L.includes(NPCM.sel) ? NPCM.sel : null; NPCM.sel = sel;
+  const P = player.position, dist = n => Math.round(Math.hypot(n.holder.position.x - P.x, n.holder.position.z - P.z));
+  const kb = (pre, cur) => NPCM.kinds.filter(([k]) => k !== 'custom' || (VRMS.custom && VRMS.custom.state === 'ready')).map(([k, ic, t]) => `<button data-${pre}="${k}" class="${cur === k ? 'on' : ''}">${ic} ${adT(t)}</button>`).join('');
+  E.innerHTML = `<div class="nt">🎭 ${adT('Tüm insan NPC\'lerin karakteri')}</div><div class="ng">${kb('nk', NPCM.all)}</div><div class="nh">${adT('Anime ve kendi modelin ağırdır: en yakın 12 kişiye uygulanır.')}</div>
+  <div class="nt">🐜 ${adT('Cüce')}</div><div class="ng"><button data-na="dw">${DWARF.on ? '📏 ' + adT('Normal boy') : '🐜 ' + adT('Cüce ol')}</button><button data-na="sp">➕ ${adT('NPC ekle')}</button><button data-na="rf">🔄 ${adT('Yenile')}</button></div>
+  ${POSS.n || PRIDE.n ? `<div class="ng" style="margin-top:6px"><button data-na="off" style="grid-column:span 3;background:#e63946">⏏ ${adT(POSS.n ? 'Başından in' : 'İn')}</button></div>` : ''}
+  <div class="nt">👥 ${adT('Yakındaki kişiler')} (${L.length})</div><div class="nl">${L.map((n, i) => `<button data-ni="${i}" class="${n === sel ? 'on' : ''}"><span>${n.mdl ? NPCM.kinds.find(k => k[0] === n.mkind)?.[1] || '🧍' : '🧍'} ${npcNm(n)}</span><small>${dist(n)} m</small></button>`).join('') || `<div class="nh">${adT('Yakında kimse yok')}</div>`}</div>
+  ${sel ? `<div class="nt">⭐ ${npcNm(sel)}</div><div class="ng">
+    <button data-nc="go">📍 ${adT('Yanına ışınlan')}</button><button data-nc="bring">🧲 ${adT('Yanıma getir')}</button><button data-nc="hand">🫴 ${adT('Beni avucuna al')}</button>
+    <button data-nc="shR">🫱 ${adT('Sağ omzuna koy')}</button><button data-nc="shL">🫲 ${adT('Sol omzuna koy')}</button><button data-nc="head">🧢 ${adT('Başına koy (yönet)')}</button>
+    <button data-nc="del">🗑️ ${adT('Kaldır')}</button></div><div class="nt">🎭 ${adT('Bu kişinin karakteri')}</div><div class="ng">${kb('nm', sel.mkind || 'stick')}</div>` : `<div class="nh">${adT('Bir kişi seç: ışınlan, getir, seni avucuna / omzuna / başına alsın (başındaysan onu sen yönetirsin).')}</div>`}`;
+  E._L = L;
+}
+{
+  const E = $('npcAdm'); for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'wheel', 'keydown']) E.addEventListener(ev, e => e.stopPropagation(), { passive: true });
+  E.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return; play('ui'); const L = $('npcAdmB')._L || [], n = NPCM.sel;
+    if (b.dataset.na === 'x') { npcAdmOpen(false); return; }
+    if (b.dataset.na === 'dw') dwarfSet(!DWARF.on); else if (b.dataset.na === 'rf') {} else if (b.dataset.na === 'off') { if (POSS.n) possEnd(); else prideEnd(); }
+    else if (b.dataset.na === 'sp') { const P = player.position, f = facing; spawnNPC(P.x + Math.sin(f) * 3, P.z + Math.cos(f) * 3, P.x, P.z, cyPick(NPC_COLORS)); const m = npcs[npcs.length - 1]; try { humanize(m.rig, {}); } catch (x) {} m.holder.position.y = groundAt(m.holder.position.x, m.holder.position.z, P.y + 2); if (NPCM.all && NPCM.all !== 'stick') npcModelSet(m, NPCM.all); NPCM.sel = m; }
+    else if (b.dataset.nk) npcModelAll(b.dataset.nk);
+    else if (b.dataset.ni !== undefined) NPCM.sel = L[+b.dataset.ni] || null;
+    else if (b.dataset.nm && n) npcModelSet(n, b.dataset.nm);
+    else if (b.dataset.nc && n) { const c = b.dataset.nc, P = player.position, Q = n.holder.position, f = facing;
+      if (c === 'go') { P.set(Q.x + Math.sin(n.facing || 0) * 1.5, Q.y, Q.z + Math.cos(n.facing || 0) * 1.5); vel.set(0, 0, 0); }
+      else if (c === 'bring') { Q.set(P.x + Math.sin(f) * 2 * Math.max(1, giantS), groundAt(P.x + Math.sin(f) * 2, P.z + Math.cos(f) * 2, P.y + 2), P.z + Math.cos(f) * 2 * Math.max(1, giantS)); n.vel.set(0, 0, 0); n.state = 'idle'; n.timer = 3; n.facing = f + Math.PI; }
+      else if (c === 'del') { if (POSS.n === n) possEnd(true); if (PRIDE.n === n) prideEnd(true); npcModelSet(n, 'stick'); n.holder.visible = false; n.dead = true; n.state = 'down'; NPCM.sel = null; }
+      else { prideStart(n, c); npcAdmOpen(false); possUI(); return; } }
+    npcAdmUI();
+  });
+  try { $('admX').insertAdjacentHTML('beforebegin', `<button id="admNpc" title="${adT('NPC yönetimi')}" style="background:#6a1b9a;border:1px solid #ce93d8;color:#fff;border-radius:8px;padding:3px 7px;cursor:pointer">🧑‍🤝‍🧑</button>`); $('admNpc').addEventListener('click', e => { e.stopPropagation(); npcAdmOpen(!$('npcAdm').classList.contains('on')); }); } catch (e) {}
+}
+function npcMgrTick(dt) {   // bekleyen modeller yüklenince takılır · model pozları
+  if (NPCM.pend.length) for (let i = NPCM.pend.length - 1; i >= 0; i--) { const p = NPCM.pend[i], M = VRMS[p.kind === 'girl' ? 'girl' : p.kind]; if (M && M.state === 'ready') { NPCM.pend.splice(i, 1); if (p.n.mkind === p.kind) npcModelSet(p.n, p.kind); } else if (!M || M.state === 'error') NPCM.pend.splice(i, 1); }
+  for (const n of npcs) if (n.mdl && n !== POSS.n && n !== PRIDE.n && n.holder.visible) { n.holder.updateMatrixWorld(true); npcModelPose(n); }
+  if ((NPCM.uiT = (NPCM.uiT || 0) + dt) > 1.5) { NPCM.uiT = 0; npcAdmUI(); }
+  try { dwTick(dt); } catch (e) { sftErr(e); }
+  possUI();
+}
+
+/* =====================================================================
+   🗄️ MASA ODASI (admin → 🗄️): kocaman bir masa; üstünde kalemlik, kurmalı oyuncaklar (tekerlekli kutu robotlar, örümcek robot,
+   oyuncak araba — insana benzemez), zarlar, misketler, kâğıt top. Sürükle = iki parmakla tut-taşı · dokun / sağ tık = fiske ·
+   kalemliğe at = puan · boyut ayarı · kendi GLB oyuncağını yükle (sert oyuncak olarak) · 📷 elinle oyna (el takibi: çimdik / yumruk
+   tut, aç bırak, işaret parmağını hızla aç = fiske).
+   ===================================================================== */
+AREAS.desk = { cx: 15000, cz: 15000, r: 6, box: { hx: 3.1, hz: 2.3 }, bg: 0x2b2420, fog: [30, 90], sky: 0xfff3e0, gnd: 0x6d4c41, sunC: 0xfff0dc, sunI: .8 };
+const DESK = { on: false, g: null, toys: [], top: .755, W: 1.6, D: .8, cz: -.25, hold: { x: .48, z: -.42, R: .045, H: .11 }, score: 0, k: (() => { try { const v = +localStorage.getItem('sftMasaK'); return v >= .5 && v <= 3 ? v : 1; } catch (e) { return 1; } })(),
+  cam: { yaw: 0, pitch: .78, dist: .95 }, drag: null, orbit: null, pinch: 0, back: null, hands: {} };
+const DV = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+function deskW(x, y, z, out = new THREE.Vector3()) { return out.set(AREAS.desk.cx + x, y, AREAS.desk.cz + z); }
+function deskBuild() {
+  if (DESK.g) return; const A = AREAS.desk, g = DESK.g = new THREE.Group(); g.position.set(A.cx, 0, A.cz);
+  const add = (geo, mat, x, y, z, par = g, sh = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = sh; m.receiveShadow = true; par.add(m); return m; };
+  const wood = (() => { try { const t = plankTexture(); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 3); return t; } catch (e) { return null; } })();
+  add(new THREE.PlaneGeometry(6.4, 4.8).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xb08860, map: wood, roughness: .8 }), 0, .001, 0, g, false);
+  const wallM = new THREE.MeshStandardMaterial({ color: 0xe8dcc8, roughness: .95 });
+  for (const [w, x, z, ry] of [[6.4, 0, -2.4, 0], [6.4, 0, 2.4, Math.PI], [4.8, -3.2, 0, Math.PI / 2], [4.8, 3.2, 0, -Math.PI / 2]]) { const m = add(new THREE.PlaneGeometry(w, 2.8), wallM, x, 1.4, z, g, false); m.rotation.y = ry; }
+  add(new THREE.PlaneGeometry(6.4, 4.8).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xf5f0e6 }), 0, 2.8, 0, g, false);
+  add(new THREE.PlaneGeometry(1.6, 1).translate(0, 0, 0), new THREE.MeshBasicMaterial({ color: 0xbfe3ff }), -.6, 1.6, -2.39, g, false);   // pencere
+  // masa
+  const deskM = new THREE.MeshStandardMaterial({ color: 0x8d5a34, roughness: .55 }), legM = new THREE.MeshStandardMaterial({ color: 0x5d3a22, roughness: .6 });
+  add(new THREE.BoxGeometry(DESK.W, .05, DESK.D), deskM, 0, DESK.top - .025, DESK.cz);
+  for (const [x, z] of [[-.74, -.34], [.74, -.34], [-.74, .34], [.74, .34]]) add(new THREE.BoxGeometry(.05, DESK.top - .05, .05), legM, x, (DESK.top - .05) / 2, DESK.cz + z);
+  // kalemlik, kalemler, kitaplar, defter, lamba, kupa
+  const H = DESK.hold, hm = new THREE.MeshStandardMaterial({ color: 0x3a86ff, roughness: .45, metalness: .1, side: THREE.DoubleSide });
+  add(new THREE.CylinderGeometry(H.R, H.R, H.H, 28, 1, true), hm, H.x, DESK.top + H.H / 2, H.z); add(new THREE.CircleGeometry(H.R, 28).rotateX(-Math.PI / 2), hm, H.x, DESK.top + .002, H.z);
+  add(new THREE.TorusGeometry(H.R, .003, 6, 28).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xffd166 }), H.x, DESK.top + H.H, H.z);
+  [0xe63946, 0x06d6a0, 0xffd166, 0x8338ec].forEach((c, i) => { const p = add(new THREE.CylinderGeometry(.0035, .0035, .17, 6), new THREE.MeshStandardMaterial({ color: c }), H.x + Math.cos(i * 1.6) * .022, DESK.top + .085, H.z + Math.sin(i * 1.6) * .022); p.rotation.set(Math.sin(i * 1.6) * .25, 0, -Math.cos(i * 1.6) * .25); });
+  [[0x264653, .03], [0x2a9d8f, .028], [0xe76f51, .025]].reduce((y, [c, h]) => { add(new THREE.BoxGeometry(.22, h, .16), new THREE.MeshStandardMaterial({ color: c, roughness: .8 }), -.58, y + h / 2, DESK.cz - .2); return y + h; }, DESK.top);
+  add(new THREE.BoxGeometry(.21, .008, .29), new THREE.MeshStandardMaterial({ color: 0xfafafa }), -.18, DESK.top + .004, DESK.cz + .12).rotation.y = .15;
+  add(new THREE.CylinderGeometry(.06, .07, .02, 20), legM, .62, DESK.top + .01, DESK.cz - .25); add(new THREE.CylinderGeometry(.008, .008, .32, 8), legM, .62, DESK.top + .17, DESK.cz - .25);
+  add(new THREE.ConeGeometry(.08, .1, 20, 1, true), new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0xffc04d, emissiveIntensity: .6, side: THREE.DoubleSide }), .62, DESK.top + .34, DESK.cz - .22);
+  add(new THREE.CylinderGeometry(.035, .03, .09, 20), new THREE.MeshStandardMaterial({ color: 0xf4a261, roughness: .4 }), .2, DESK.top + .045, DESK.cz - .26);
+  // oyuncaklar
+  deskToys();
+}
+function deskToyMesh(kind) {
+  const g = new THREE.Group(), M2 = (c, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .45, metalness: .15 }, o)), add = (geo, m, x = 0, y = 0, z = 0, par = g) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; par.add(o); return o; };
+  const P = (x, y, z, par = g) => { const o = new THREE.Group(); o.position.set(x, y, z); par.add(o); return o; }, J = {};
+  if (kind === 'bot') {   // tekerlekli kutu robot (kurmalı oyuncak)
+    const body = M2(cyPick([0xe63946, 0x3a86ff, 0xffd166, 0x06d6a0])), grey = M2(0x9aa3ad, { metalness: .6 }), dark = M2(0x222831);
+    add(new THREE.BoxGeometry(.044, .04, .034), body, 0, .033, 0); J.head = P(0, .053, 0); add(new THREE.BoxGeometry(.032, .024, .028), grey, 0, .012, 0, J.head);
+    for (const s of [-1, 1]) add(new THREE.SphereGeometry(.004, 8, 6), M2(0x9ff7ff, { emissive: 0x39d0ff, emissiveIntensity: 1.4 }), s * .008, .014, .0142, J.head);
+    J.ant = P(0, .024, 0, J.head); add(new THREE.CylinderGeometry(.001, .001, .016, 4), dark, 0, .008, 0, J.ant); add(new THREE.SphereGeometry(.003, 8, 6), M2(0xff4d6d, { emissive: 0xff2050, emissiveIntensity: 1 }), 0, .017, 0, J.ant);
+    J.arms = [-1, 1].map(s => { const a = P(s * .025, .045, 0); add(new THREE.BoxGeometry(.006, .026, .008), grey, 0, -.012, 0, a); return a; });
+    J.wheels = [-1, 1].map(s => { const w = P(s * .024, .012, 0); add(new THREE.CylinderGeometry(.012, .012, .007, 14).rotateZ(Math.PI / 2), dark, 0, 0, 0, w); return w; });
+    return { g, J, r: .03, h: .068 };
+  }
+  if (kind === 'spider') {   // örümcek robot: altı bacak
+    const body = M2(0x6c757d, { metalness: .7, roughness: .3 }), eye = M2(0xff3b30, { emissive: 0xff1a10, emissiveIntensity: 1.2 });
+    add(new THREE.SphereGeometry(.018, 16, 10).scale(1, .55, 1.25), body, 0, .022, 0); add(new THREE.SphereGeometry(.004, 8, 6), eye, -.006, .027, .02); add(new THREE.SphereGeometry(.004, 8, 6), eye, .006, .027, .02);
+    J.legs = []; for (let i = 0; i < 6; i++) { const s = i < 3 ? -1 : 1, k = i % 3, hip = P(s * .012, .022, (k - 1) * .012); hip.rotation.y = s * (Math.PI / 2) + (k - 1) * .5 * s; const up = P(0, 0, 0, hip); add(new THREE.CylinderGeometry(.0017, .0017, .02, 5).rotateZ(Math.PI / 2).translate(.01 * 1, 0, 0), body, 0, 0, 0, up); up.rotation.z = .5; const kn = P(.02, 0, 0, up); add(new THREE.CylinderGeometry(.0015, .0012, .026, 5).translate(0, -.013, 0), body, 0, 0, 0, kn); kn.rotation.z = -.9; J.legs.push({ hip, up, kn, s, ph: (i % 2) * Math.PI }); }
+    return { g, J, r: .03, h: .04 };
+  }
+  if (kind === 'car') {   // kurmalı oyuncak araba
+    const body = M2(cyPick([0xff6b35, 0x8338ec, 0x2ec4b6])), dark = M2(0x1b1b1b), glass = M2(0x9ad1ff, { metalness: .5, roughness: .1 });
+    add(new THREE.BoxGeometry(.04, .016, .072), body, 0, .018, 0); add(new THREE.BoxGeometry(.032, .013, .034), glass, 0, .032, -.004);
+    J.wheels = [[-.021, .022], [.021, .022], [-.021, -.022], [.021, -.022]].map(([x, z]) => { const w = P(x, .009, z); add(new THREE.CylinderGeometry(.009, .009, .006, 12).rotateZ(Math.PI / 2), dark, 0, 0, 0, w); return w; });
+    J.key = P(0, .03, -.03); add(new THREE.TorusGeometry(.006, .0015, 6, 12), M2(0xffd166, { metalness: .8 }), 0, .006, 0, J.key);
+    return { g, J, r: .034, h: .04 };
+  }
+  if (kind === 'die') {
+    const tex = canvasTex(64, 64, c => { c.fillStyle = '#fff'; c.fillRect(0, 0, 64, 64); c.fillStyle = '#d00'; c.beginPath(); c.arc(32, 32, 9, 0, 7); c.fill(); });
+    add(new THREE.BoxGeometry(.02, .02, .02), new THREE.MeshStandardMaterial({ color: 0xffffff, map: tex, roughness: .35 }), 0, .01, 0); return { g, J, r: .012, h: .02, die: true };
+  }
+  if (kind === 'marble') { add(new THREE.SphereGeometry(.008, 16, 12), M2(cyPick([0x4cc9f0, 0xf72585, 0x80ed99, 0xffd166]), { roughness: .05, metalness: .2, transparent: true, opacity: .85 }), 0, .008, 0); return { g, J, r: .008, h: .016, ball: true }; }
+  add(new THREE.IcosahedronGeometry(.015, 1), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 1, flatShading: true }), 0, .015, 0); return { g, J, r: .015, h: .03, ball: true };   // kâğıt top
+}
+function deskToyAdd(kind, x, z, mesh) {
+  const m = mesh || deskToyMesh(kind), t = { kind, g: m.g, J: m.J, r0: m.r, h0: m.h, die: m.die, ball: m.ball, p: new THREE.Vector3(x, DESK.top, z), v: new THREE.Vector3(), q: new THREE.Quaternion(), w: new THREE.Vector3(), yaw: Math.random() * 6.283, st: 'rest', run: 0, idle: Math.random() * 2, t: Math.random() * 9, inH: false };
+  t.g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); DESK.g.add(t.g); DESK.toys.push(t); deskToyScale(t); t.p.y = DESK.top; return t;
+}
+function deskToyScale(t) { const k = DESK.k * (t.k || 1); t.r = t.r0 * k; t.h = t.h0 * k; t.g.scale.setScalar(k); }
+function deskToys() {
+  for (const t of DESK.toys) if (t.g.parent) t.g.parent.remove(t.g); DESK.toys.length = 0; DESK.score = 0;
+  const c = DESK.cz; deskToyAdd('bot', -.25, c + .05); deskToyAdd('bot', .05, c + .2); deskToyAdd('spider', .3, c + .1); deskToyAdd('car', -.05, c - .15);
+  deskToyAdd('die', .18, c + .25); deskToyAdd('die', .22, c + .22); for (let i = 0; i < 3; i++) deskToyAdd('marble', -.35 + i * .03, c + .28); deskToyAdd('paper', .35, c + .25);
+  for (const g of DESK.glb || []) deskToyAdd('glb', (Math.random() - .5) * .8, c + (Math.random() - .5) * .4, g.mk());
+}
+// ---------- fizik ----------
+function deskFloor(t, was = t.p.y) { if (t.inH) return DESK.top + .003; return deskSurf(t.p.x, t.p.z) && Math.max(was, t.p.y) >= DESK.top - .012 ? DESK.top : 0; }
+function deskSurf(x, z) { const W = DESK.W / 2, D = DESK.D / 2; return Math.abs(x) < W && Math.abs(z - DESK.cz) < D ? DESK.top : 0; }
+function deskStep(t, dt) {
+  const H = DESK.hold, top = DESK.top + H.H, r = t.r;
+  if (t.st === 'held') return;
+  const was = t.p.y; t.v.y -= 9.8 * dt; t.p.addScaledVector(t.v, dt);
+  // kalemlik
+  const dx = t.p.x - H.x, dz = t.p.z - H.z, dh = Math.hypot(dx, dz);
+  if (!t.inH && dh < H.R - r * .4 && was - r * .2 >= top - .002 && t.p.y - r * .2 < top && t.v.y < 0) { t.inH = true; DESK.score++; play('pop', { gain: .7 }); showMsg(`🎯 ${adT('Kalemliğe girdi!')} (${DESK.score})`, 1.2); deskHud(); }
+  if (t.inH) { const lim = Math.max(.002, H.R - r * .9); if (dh > lim) { t.p.x = H.x + dx / dh * lim; t.p.z = H.z + dz / dh * lim; t.v.x *= -.3; t.v.z *= -.3; } if (t.p.y > top + r * 2) t.inH = false; }
+  else if (dh < H.R + r && t.p.y < top && t.p.y > DESK.top - .01 && dh > 1e-5) { t.p.x = H.x + dx / dh * (H.R + r); t.p.z = H.z + dz / dh * (H.R + r); const nx = dx / dh, nz = dz / dh, vn = t.v.x * nx + t.v.z * nz; if (vn < 0) { t.v.x -= 1.5 * vn * nx; t.v.z -= 1.5 * vn * nz; } }
+  // zemin: masanın üstündeyse masa, değilse (kenardan düştüyse ya da masanın altındaysa) oda zemini
+  const fl = deskFloor(t, was);
+  if (t.p.y < fl) { t.p.y = fl; if (t.v.y < -.6) { t.v.y *= -.32; play('hit', { gain: Math.min(.5, -t.v.y * .2) }); } else t.v.y = 0; const fr = t.ball ? 1.2 : 5; t.v.x *= Math.exp(-fr * dt); t.v.z *= Math.exp(-fr * dt); }
+  // oda duvarları
+  const B = AREAS.desk.box; for (const [k, L] of [['x', B.hx - r], ['z', B.hz - r]]) if (Math.abs(t.p[k]) > L) { t.p[k] = Math.sign(t.p[k]) * L; t.v[k] *= -.4; }
+  const onS = t.p.y <= fl + .0005, sp = Math.hypot(t.v.x, t.v.z);
+  // dönme: havada takla, yerde dik durur (zar rastgele yüzünde, misket yuvarlanır)
+  if (!onS) { const qa = new THREE.Quaternion().setFromEuler(new THREE.Euler(t.w.x * dt, t.w.y * dt, t.w.z * dt)); t.q.premultiply(qa).normalize(); t.st = 'fly'; }
+  else if (t.ball) { if (sp > 1e-4) { const ax = new THREE.Vector3(t.v.z, 0, -t.v.x).normalize(); t.q.premultiply(new THREE.Quaternion().setFromAxisAngle(ax, sp * dt / Math.max(.002, r))); } if (sp < .01) { t.v.x = t.v.z = 0; t.st = 'rest'; } }
+  else { const up = t.die ? deskDieSnap(t.q) : new THREE.Quaternion().setFromAxisAngle(Y_AX, t.yaw); t.q.slerp(up, 1 - Math.exp(-10 * dt)); if (sp < .02 && !t.run) { t.v.x = t.v.z = 0; t.st = 'rest'; } t.w.set(0, 0, 0); }
+}
+function deskDieSnap(q) { const e = new THREE.Euler().setFromQuaternion(q, 'YXZ'), s = a => Math.round(a / (Math.PI / 2)) * (Math.PI / 2); return new THREE.Quaternion().setFromEuler(new THREE.Euler(s(e.x), e.y, s(e.z), 'YXZ')); }
+function deskCollide() {
+  const T = DESK.toys; for (let i = 0; i < T.length; i++) for (let j = i + 1; j < T.length; j++) { const a = T[i], b = T[j]; if (a.st === 'held' || b.st === 'held') continue;
+    const d = DV[0].subVectors(b.p, a.p), L = d.length(), m = a.r + b.r; if (L < m && L > 1e-6) { d.divideScalar(L); const o = (m - L) / 2; a.p.addScaledVector(d, -o); b.p.addScaledVector(d, o);
+      const rv = DV[1].subVectors(b.v, a.v).dot(d); if (rv < 0) { const im = -1.4 * rv / 2; a.v.addScaledVector(d, -im); b.v.addScaledVector(d, im); if (a.st === 'rest') a.st = 'fly'; if (b.st === 'rest') b.st = 'fly'; } } }
+}
+// kurmalı oyuncaklar kendi kendine gezer
+function deskAI(t, dt) {
+  if (!['bot', 'spider', 'car'].includes(t.kind) || t.st === 'held' || t.p.y > deskFloor(t) + .002 || t.inH) { t.run = 0; return; }
+  t.idle -= dt; if (t.idle > 0) { t.run = 0; return; }
+  const spd = (t.kind === 'car' ? .16 : t.kind === 'spider' ? .07 : .06) * DESK.k;
+  t.runT = (t.runT || 0) - dt; if (t.runT <= 0) { if (Math.random() < .35) { t.idle = 1 + Math.random() * 2.5; t.runT = 0; return; } t.runT = 2 + Math.random() * 4; t.turn = (Math.random() - .5) * 1.6; }
+  t.yaw += t.turn * dt; const fx = Math.sin(t.yaw), fz = Math.cos(t.yaw), nx = t.p.x + fx * (.06 + t.r), nz = t.p.z + fz * (.06 + t.r);
+  const H = DESK.hold, onDesk = t.p.y > .1;
+  if (onDesk && (Math.abs(nx) > DESK.W / 2 - .02 || Math.abs(nz - DESK.cz) > DESK.D / 2 - .02 || Math.hypot(nx - H.x, nz - H.z) < H.R + t.r + .01)) { t.yaw += 2.2 + Math.random(); return; }   // kenara gelince döner
+  t.v.x = fx * spd; t.v.z = fz * spd; t.run = spd; t.st = 'fly';
+}
+function deskAnim(t, dt) {
+  t.t += dt; const J = t.J, sp = Math.hypot(t.v.x, t.v.z) / DESK.k;
+  if (t.kind === 'bot') { for (const w of J.wheels) w.rotation.x += sp * dt / .012; J.arms.forEach((a, i) => a.rotation.x = Math.sin(t.t * 8 + i * Math.PI) * (sp > .01 ? .6 : .08)); J.head.rotation.y = Math.sin(t.t * 1.3) * .5; J.ant.rotation.z = Math.sin(t.t * 9) * .15; }
+  if (t.kind === 'car') { for (const w of J.wheels) w.rotation.x += sp * dt / .009; J.key.rotation.z += dt * (sp > .01 ? 12 : 1); }
+  if (t.kind === 'spider') for (const L of J.legs) { const ph = t.t * (sp > .01 ? 14 : 2) + L.ph; L.up.rotation.z = .5 + Math.max(0, Math.sin(ph)) * (sp > .01 ? .35 : .05); L.hip.rotation.y = L.s * (Math.PI / 2) + Math.cos(ph) * (sp > .01 ? .25 : .02) + (L.hip.userData.y0 ??= L.hip.rotation.y) * 0; }
+}
+function deskTick(dt) {
+  if (!DESK.on || !DESK.g || dt <= 0) return; dt = Math.min(dt, .04);
+  for (const t of DESK.toys) { deskAI(t, dt); const n = 3; for (let i = 0; i < n; i++) deskStep(t, dt / n); deskAnim(t, dt); }
+  deskCollide();
+  for (const t of DESK.toys) { t.g.position.set(t.p.x, t.p.y, t.p.z); t.g.quaternion.copy(t.q); if (t.st !== 'held' && !t.die && !t.ball && t.st === 'rest') t.q.setFromAxisAngle(Y_AX, t.yaw); }
+  deskHandsTick(dt);
+}
+// ---------- kamera ve dokunma / fare ----------
+function deskCam() {
+  const C = DESK.cam, A = AREAS.desk, T = DV[2].set(A.cx, DESK.top + .02, A.cz + DESK.cz), cp = Math.cos(C.pitch);
+  camera.position.set(T.x + Math.sin(C.yaw) * cp * C.dist, T.y + Math.sin(C.pitch) * C.dist, T.z + Math.cos(C.yaw) * cp * C.dist); camera.lookAt(T);
+  if (camera.near !== .004 || camera.far !== 40) { camera.near = .004; camera.far = 40; camera.updateProjectionMatrix(); }
+}
+function deskLate(dt) {
+  if (!DESK.on) return; deskCam(); charHolder.visible = false; if (document.pointerLockElement && !paused) try { document.exitPointerLock(); } catch (e) {} const p = $('prompt'); if (p) p.style.display = 'none';
+  const A = AREAS.desk; player.position.set(A.cx, 0, A.cz + 1.2); vel.set(0, 0, 0); vy = 0;
+}
+function deskRay(e) { const rc = DESK.rc || (DESK.rc = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), camera); return rc.ray; }
+function deskPick(ray) { let best = null, bt = 1e9; const A = AREAS.desk; for (const t of DESK.toys) { const c = deskW(t.p.x, t.p.y + t.h * .5, t.p.z, DV[0]), R = Math.max(.02, t.r * 1.5); const oc = DV[1].subVectors(c, ray.origin), tt = oc.dot(ray.direction); if (tt < 0) continue; const d2 = oc.lengthSq() - tt * tt; if (d2 < R * R && tt < bt) { bt = tt; best = t; } } return best; }
+function deskPlane(ray, y) { const A = AREAS.desk; if (Math.abs(ray.direction.y) < 1e-5) return null; const t = (y - ray.origin.y) / ray.direction.y; if (t < 0) return null; const P = ray.origin.clone().addScaledVector(ray.direction, t); return new THREE.Vector3(P.x - A.cx, y, P.z - A.cz); }
+function deskFlick(t, dir) { t.st = 'fly'; t.inH = false; const k = Math.sqrt(DESK.k); t.v.set(dir.x * 1.5 * k, .9 * k, dir.z * 1.5 * k); t.w.set((Math.random() - .5) * 30, (Math.random() - .5) * 20, (Math.random() - .5) * 30); t.idle = 1.5; play('swing', { gain: .45 }); }
+const deskCamFwd = () => { const d = camera.getWorldDirection(new THREE.Vector3()); d.y = 0; return d.normalize(); };
+{
+  const cv = renderer.domElement, on = () => DESK.on && !paused && !teleporting;
+  cv.addEventListener('pointerdown', e => { if (!on()) return; e.stopImmediatePropagation(); e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (x) {}
+    DESK.ptrs = DESK.ptrs || new Map(); DESK.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (DESK.ptrs.size === 2) { const [a, b] = [...DESK.ptrs.values()]; DESK.pinch = Math.hypot(a.x - b.x, a.y - b.y); DESK.orbit = null; if (DESK.drag) { DESK.drag.t.st = 'fly'; DESK.drag = null; } return; }
+    const ray = deskRay(e), t = deskPick(ray);
+    if (t && e.button === 2) { deskFlick(t, deskCamFwd()); return; }
+    if (t) { t.st = 'held'; t.inH = false; DESK.drag = { t, id: e.pointerId, t0: performance.now(), x0: e.clientX, y0: e.clientY, last: t.p.clone(), lt: performance.now(), v: new THREE.Vector3() }; t.idle = 2; play('pop', { gain: .3 }); }
+    else DESK.orbit = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  }, true);
+  cv.addEventListener('pointermove', e => { if (!on()) return; e.stopImmediatePropagation(); const P = DESK.ptrs && DESK.ptrs.get(e.pointerId); if (P) { P.x = e.clientX; P.y = e.clientY; }
+    if (DESK.ptrs && DESK.ptrs.size === 2) { const [a, b] = [...DESK.ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y); DESK.cam.dist = THREE.MathUtils.clamp(DESK.cam.dist * (DESK.pinch / Math.max(1, d)), .35, 2.4); DESK.pinch = d; return; }
+    const D = DESK.drag; if (D && D.id === e.pointerId) { const ray = deskRay(e), y = Math.max(DESK.top, deskSurf(D.t.p.x, D.t.p.z)) + .05 * DESK.k, Q = deskPlane(ray, y); if (Q) { const now = performance.now(), dtm = Math.max(.008, (now - D.lt) / 1000); D.v.lerp(DV[0].subVectors(Q, D.last).divideScalar(dtm), .5); D.last.copy(Q); D.lt = now; D.t.p.copy(Q); D.t.q.setFromAxisAngle(Y_AX, D.t.yaw); } return; }
+    const O = DESK.orbit; if (O && O.id === e.pointerId) { DESK.cam.yaw -= (e.clientX - O.x) * .006; DESK.cam.pitch = THREE.MathUtils.clamp(DESK.cam.pitch + (e.clientY - O.y) * .004, .25, 1.45); O.x = e.clientX; O.y = e.clientY; }
+  }, true);
+  const up = e => { if (!DESK.on) return; if (DESK.ptrs) DESK.ptrs.delete(e.pointerId); const D = DESK.drag; if (D && D.id === e.pointerId) { const t = D.t; DESK.drag = null; const quick = performance.now() - D.t0 < 220 && Math.hypot(e.clientX - D.x0, e.clientY - D.y0) < 10;
+      if (quick) deskFlick(t, deskCamFwd()); else { t.st = 'fly'; t.v.copy(D.v); if (t.v.length() > 4) t.v.setLength(4); t.w.set(t.v.z * 20, 0, -t.v.x * 20); } }
+    if (DESK.orbit && DESK.orbit.id === e.pointerId) DESK.orbit = null; };
+  cv.addEventListener('pointerup', up, true); cv.addEventListener('pointercancel', up, true);
+  for (const ev of ['mousedown', 'click', 'touchstart']) cv.addEventListener(ev, e => { if (on()) { e.stopImmediatePropagation(); if (ev !== 'touchstart') e.preventDefault(); } }, { capture: true, passive: false });
+  addEventListener('wheel', e => { if (!on()) return; e.stopImmediatePropagation(); DESK.cam.dist = THREE.MathUtils.clamp(DESK.cam.dist * (1 + e.deltaY * .001), .35, 2.4); }, { capture: true, passive: true });
+}
+// ---------- el takibi: çimdik / yumruk tut, aç bırak, işaret parmağını hızla aç = fiske ----------
+function deskHand(side, H, lm, r) {
+  const back = HT.cam === 'environment', fx = q => (back !== !!HT.mirror) ? q : 1 - q, mx = fx(H.c.x), my = H.c.y;
+  const rr = H.size / (HT.s0[side] || H.size), Dh = DESK.hands[side] || (DESK.hands[side] = { p: new THREE.Vector3(), v: new THREE.Vector3(), held: null, c1: 0, c1t: 0, hand: null, seen: 0 });
+  const yaw = DESK.cam.yaw, rx = Math.cos(yaw), rz = -Math.sin(yaw), fx2 = -Math.sin(yaw), fz2 = -Math.cos(yaw);   // ekranın sağı ve ilerisi (masa düzleminde)
+  const sx = (mx - .5) * 1.5, sy = (.5 - my) * .9, x = sx * rx + sy * fx2, z = DESK.cz + sx * rz + sy * fz2, y = DESK.top + THREE.MathUtils.clamp(.05 + (1 - rr) * .25, .012, .3);
+  const P = new THREE.Vector3(THREE.MathUtils.clamp(x, -1.2, 1.2), y, THREE.MathUtils.clamp(z, DESK.cz - .7, DESK.cz + .7)), now = performance.now();
+  if (Dh.seen) Dh.v.lerp(DV[0].subVectors(P, Dh.p).divideScalar(Math.max(.012, (now - Dh.seen) / 1000)), .5); Dh.p.lerp(P, .6); Dh.seen = now; Dh.curl = H.curl.slice();
+  const avg = (H.curl[1] + H.curl[2] + H.curl[3] + H.curl[4]) / 4, pin = htPinch(lm, r, H), grip = avg > .62 || pin;
+  if (!Dh.held && grip && !Dh.g0) { let best = null, bd = .07 * Math.max(1, DESK.k); for (const t of DESK.toys) { if (t.st === 'held') continue; const d = Math.hypot(t.p.x - Dh.p.x, t.p.y + t.h * .5 - Dh.p.y, t.p.z - Dh.p.z); if (d < bd) { bd = d; best = t; } } if (best) { Dh.held = best; best.st = 'held'; best.inH = false; play('pop', { gain: .3 }); htMsg('🤏 ' + adT('Tuttun')); } }
+  if (Dh.held && !grip && avg < .45) { const t = Dh.held; Dh.held = null; t.st = 'fly'; t.v.copy(Dh.v); if (t.v.length() > 4) t.v.setLength(4); htMsg('✋ ' + adT('Bıraktın')); }
+  Dh.g0 = grip;
+  if (Dh.held) { const t = Dh.held; t.p.set(Dh.p.x, Dh.p.y - t.h * .5, Dh.p.z); }
+  // fiske: işaret parmağı bükülüyken hızla açılır, parmak ucunun önündeki oyuncak fırlar
+  const c1 = H.curl[1]; if (c1 > .55) { Dh.c1 = c1; Dh.c1t = now; }
+  else if (Dh.c1 > .55 && c1 < .2 && now - Dh.c1t < 180 && !Dh.held) { Dh.c1 = 0; const tip = DV[1].set(Dh.p.x + fx2 * .05, Dh.p.y, Dh.p.z + fz2 * .05); let best = null, bd = .08; for (const t of DESK.toys) { if (t.st === 'held') continue; const d = Math.hypot(t.p.x - tip.x, t.p.z - tip.z); if (d < bd && Math.abs(t.p.y - tip.y) < .12) { bd = d; best = t; } } if (best) { deskFlick(best, new THREE.Vector3(fx2, 0, fz2)); htMsg('👉 ' + adT('Fiske!')); } }
+}
+function deskHandsTick(dt) {
+  for (const s of ['R', 'L']) { const Dh = DESK.hands[s]; if (!Dh) continue; const vis = HT.on && performance.now() - Dh.seen < 400;
+    if (!Dh.hand) { try { if (!HR.built) hrBuild(); hrSkin(); Dh.hand = hrBuildHand(); } catch (e) { continue; } }
+    const h = Dh.hand; h.root.visible = vis; if (!vis) { if (Dh.held) { Dh.held.st = 'fly'; Dh.held = null; } continue; }
+    const yaw = DESK.cam.yaw, F = new THREE.Vector3(-Math.sin(yaw), -.35, -Math.cos(yaw)).normalize(), Z = new THREE.Vector3(0, 1, 0);
+    h.root.position.copy(deskW(Dh.p.x, Dh.p.y, Dh.p.z)).addScaledVector(F, -.08); hrBasisQ(h.root.quaternion, F, Z); h.root.scale.set(s === 'L' ? -1 : 1, 1, 1);
+    const c = Dh.curl || [.2, .2, .2, .2, .2]; for (let i = 0; i < 4; i++) { const j = h.F[i], cc = c[i + 1]; j[0].rotation.set(-cc * 1.5, 0, HR_SPR[i] * .6); j[1].rotation.x = -cc * 1.7; j[2].rotation.x = -cc * 1.2; }
+    h.T[0].rotation.x = -c[0] * .3; h.T[1].rotation.x = -c[0] * .8; h.T[2].rotation.x = -c[0];
+  }
+}
+// ---------- kendi GLB oyuncağın (sert oyuncak olarak) ----------
+function deskGlbPick() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.glb,.gltf,model/gltf-binary';
+  inp.onchange = () => { const f = inp.files && inp.files[0]; if (!f) return; f.arrayBuffer().then(buf => new GLTFLoader().parse(buf, '', gl => {
+    const src = gl.scene; src.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(src), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), mx = Math.max(sz.x, sz.y, sz.z) || 1, k = .065 / mx;
+    const mk = () => { const g = new THREE.Group(), o = src.clone(true); o.position.set(-c.x * k, -bb.min.y * k, -c.z * k); o.scale.setScalar(k); g.add(o); return { g, J: {}, r: Math.max(.012, Math.max(sz.x, sz.z) * k * .5), h: sz.y * k }; };
+    (DESK.glb ||= []).push({ mk, name: f.name }); deskToyAdd('glb', (Math.random() - .5) * .5, DESK.cz + .1, mk()); showMsg('📦 ' + adT('Oyuncağın masada') + ': ' + f.name, 1.8);
+  }, err => showMsg('⚠️ ' + adT('GLB açılamadı'), 1.8))); };
+  inp.click();
+}
+// ---------- giriş / çıkış ve üst çubuk ----------
+document.head.insertAdjacentHTML('beforeend', '<style>body.deskOn #touchUI,body.deskOn #joy,body.deskOn #prompt,body.deskOn #dwarfBox,body.deskOn #giant{display:none!important}</style>');
+document.body.insertAdjacentHTML('beforeend', `<div id="deskHud" style="position:fixed;left:50%;top:calc(8px + env(safe-area-inset-top));transform:translateX(-50%);z-index:31;display:none;background:rgba(20,16,12,.86);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:6px 8px;font:600 12px system-ui,sans-serif;max-width:96vw">
+  <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;justify-content:center"><b id="dkScore"></b><button data-dk="hand">📷 ${adT('Elimle oyna')}</button><button data-dk="glb">📦 ${adT('GLB oyuncak')}</button><button data-dk="reset">🔄 ${adT('Topla')}</button><span>📏<input type="range" id="dkSize" min="0.5" max="3" step="0.05" style="width:80px;vertical-align:middle"></span><button data-dk="x">🚪 ${adT('Çık')}</button></div>
+  <div style="font-weight:400;opacity:.75;font-size:11px;margin-top:3px;text-align:center">${adT('Sürükle: tut-taşı · dokun / sağ tık: fiske · boşlukta sürükle: dön · tekerlek / iki parmak: yakınlaş · kalemliğe at!')}</div></div>`);
+{
+  const h = $('deskHud'); for (const b of h.querySelectorAll('button')) b.style.cssText = 'background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:9px;padding:4px 8px;font:inherit;cursor:pointer';
+  for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'wheel']) h.addEventListener(ev, e => e.stopPropagation(), { passive: true });
+  h.addEventListener('click', e => { const b = e.target.closest('[data-dk]'); if (!b) return; e.stopPropagation(); play('ui'); const k = b.dataset.dk;
+    if (k === 'x') deskExit(); else if (k === 'reset') deskToys(); else if (k === 'glb') deskGlbPick();
+    else if (k === 'hand') { if (HT.on) htStop(); else { HT.ok = true; htStart(); } } deskHud(); });
+  $('dkSize').addEventListener('input', () => { DESK.k = +$('dkSize').value; try { localStorage.setItem('sftMasaK', DESK.k); } catch (x) {} for (const t of DESK.toys) deskToyScale(t); });
+}
+function deskHud() { const h = $('deskHud'); h.style.display = DESK.on ? 'block' : 'none'; $('dkScore').textContent = `🎯 ${DESK.score}`; $('dkSize').value = DESK.k; const b = h.querySelector('[data-dk=hand]'); if (b) b.textContent = HT.on ? '⏹ ' + adT('El takibini kapat') : '📷 ' + adT('Elimle oyna'); }
+function deskGo() {
+  if (DESK.on) return; const busy = typeof admBusy === 'function' ? admBusy() : null; if (busy) { showMsg(busy, 1.8); return; }
+  if (RIDE.on) { try { rideExit(); } catch (e) {} } if (POSS.n) possEnd(true); if (PRIDE.n) prideEnd(true); if (giant) giantReq = true;
+  DESK.back = { key: curKey, x: player.position.x, z: player.position.z, f: facing };
+  const A = AREAS.desk; deskBuild(); try { $('admin').classList.remove('on'); } catch (e) {} resumeGame();
+  teleportTo('desk', A.cx, A.cz + 1.2, Math.PI, '🗄️ ' + adT('Masa odası — oyuncakları tut, fiskele, kalemliğe at!'));
+}
+function deskExit() { if (!DESK.on) return; if (HT.on && HT.ok) htStop(true); HT.ok = false; const b = DESK.back; if (b && b.key && b.key !== 'desk' && AREAS[b.key]) teleportTo(b.key, b.x, b.z, b.f, null); else teleportTo('hub', 0, 7.5, 0, adT('🏡 Köye döndün')); }
+function deskArea() {
+  const on = curKey === 'desk'; if (on === DESK.on) return; DESK.on = on; document.body.classList.toggle('deskOn', on);
+  if (on) { deskBuild(); if (!DESK.g.parent) scene.add(DESK.g); DESK.g.visible = true; DESK.cam.yaw = 0; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) {} }
+  else { if (DESK.g) DESK.g.visible = false; charHolder.visible = true; for (const s in DESK.hands) { const Dh = DESK.hands[s]; if (Dh.hand) Dh.hand.root.visible = false; Dh.held = null; } if (HT.ok && !GV.on) { if (HT.on) htStop(true); HT.ok = false; } camera.near = .1; camera.updateProjectionMatrix(); }
+  deskHud();
+}
+try { $('admX').insertAdjacentHTML('beforebegin', `<button id="admDesk" title="${adT('Masa odası')}" style="background:#8d5a34;border:1px solid #ffcc80;color:#fff;border-radius:8px;padding:3px 7px;cursor:pointer">🗄️</button>`); $('admDesk').addEventListener('click', e => { e.stopPropagation(); deskGo(); }); } catch (e) {}
+
 /* ---------- 🏷️ herkesin etiketi: bir kişiye sol tıkla / dokun → adı, yaşı, işi (köy, şehir, Ankara; okulda da) ---------- */
 const NPCL = { list: [] };
 function npcLblText(n) {
@@ -27115,6 +27604,8 @@ renderer.setAnimationLoop(() => {
   try { gpLate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }
   try { const dd = paused || photoMode ? 0 : dt; gvLate(dd); gpExtraLate(dd); gpLeftLate(dd); gpShoulderTick(dd); gpHeldPoseTick(); } catch (e) { sftErr(e); }
   try { lockLate(paused || photoMode ? 0 : dt); } catch (e) {}
+  try { npcMgrTick(paused || photoMode ? 0 : dt); possLate(); } catch (e) { sftErr(e); }
+  try { deskTick(paused ? 0 : dt); deskLate(dt); } catch (e) { sftErr(e); }
   try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); if (window.__mp) window.__mp.tick(dt); npcLblTick(paused ? 0 : dt); if (curKey !== 'ankara') ankDebrisTick(paused || photoMode ? 0 : dt); cyUltraTick(); gvDualLate(); if (inCity && CITY.built) { cyVariety(); cyVarietySync(); } } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
   try { buddyUpdate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🤝 arkadaş: senin pozunu kopyalar
   updateDay(paused || photoMode || ADM.freeze ? 0 : dt * (ADM.daySpeed ? 40 : 1));
