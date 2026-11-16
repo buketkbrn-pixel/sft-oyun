@@ -344,7 +344,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-u</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-v</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -9287,15 +9287,30 @@ function updateAura(dt) {
 /* ---------- Fizik yardımcıları ---------- */
 const STEP = .35;              // kendiliğinden çıkılabilen basamak yüksekliği
 // Oyuncunun altındaki zemin yüksekliği (kayaların tepesi dahil)
+// 🧱 şehir engelleri ızgarada: şehir büyüyünce (binlerce bina) çarpışma ve zemin aramaları yine hızlı
+const OBG = { on: false, cell: 40, m: new Map(), st: 0 };
+const obgKey = (i, j) => (i + 2000) * 5000 + (j + 2000);
+function obgBuild(list) {
+  OBG.m.clear(); const c = OBG.cell;
+  for (const o of list) { o.cg = true; const r = (o.box ? Math.hypot(o.hx, o.hz) : (o.r || 0)) + 2;
+    for (let i = Math.floor((o.x - r) / c); i <= Math.floor((o.x + r) / c); i++) for (let j = Math.floor((o.z - r) / c); j <= Math.floor((o.z + r) / c); j++) { const k = obgKey(i, j); let L = OBG.m.get(k); if (!L) OBG.m.set(k, L = []); L.push(o); } }
+  OBG.on = true;
+}
+function obgEach(x, z, R, fn) {
+  const c = OBG.cell, st = ++OBG.st;
+  for (let i = Math.floor((x - R) / c); i <= Math.floor((x + R) / c); i++) for (let j = Math.floor((z - R) / c); j <= Math.floor((z + R) / c); j++) { const L = OBG.m.get(obgKey(i, j)); if (!L) continue; for (const o of L) { if (o._st === st) continue; o._st = st; fn(o); } }
+}
 function groundAt(x, z, y) {   // her eşyanın üstünde durulabilir (ağaçlarda yaprakların üstünde)
   let g = terrH(x, z);
-  for (const o of obstacles) {
-    if (o.pass) continue;
+  const one = o => {
+    if (o.pass) return;
     const top = o.stand ? o.h : o.top;
-    if (!(top < 400) || top > y + STEP || top <= g) continue;
+    if (!(top < 400) || top > y + STEP || top <= g) return;
     const rr = o.canopy ? Math.max(o.r, o.canopy * .8) : o.r;
     if (o.box ? Math.abs(x - o.x) < o.hx && Math.abs(z - o.z) < o.hz : Math.hypot(x - o.x, z - o.z) < rr + .2) g = top;
-  }
+  };
+  for (const o of obstacles) { if (o.cg && OBG.on) continue; one(o); }
+  if (OBG.on) obgEach(x, z, 1, one);
   if (inRoyale && BR.builds.length) g = brRampAt(x, z, y, g);
   if (ADM.brb && ADM.brb.length) g = admRampAt(x, z, y, g);
   return g;
@@ -9303,18 +9318,20 @@ function groundAt(x, z, y) {   // her eşyanın üstünde durulabilir (ağaçlar
 // Engellerden itme (çalı ve portalın içinden geçilir, kayanın tepesindeysek itme yok) + bölge sınırı
 let collideHit = null;   // oyuncunun bu karede dayandığı eşya (tırmanma için)
 function collideObstacles(pos, rad = .35, minTop = 0) {
-  for (const o of obstacles) {
-    if (o.pass || o.slab || o.top < minTop || pos.y >= o.top || (o.stand && pos.y >= o.h - STEP)) continue;
-    if (o.y0 !== undefined && pos.y + 1.7 < o.y0) continue;      // üst kattaki duvar: altından geçilir
+  const one = o => {
+    if (o.pass || o.slab || o.top < minTop || pos.y >= o.top || (o.stand && pos.y >= o.h - STEP)) return;
+    if (o.y0 !== undefined && pos.y + 1.7 < o.y0) return;      // üst kattaki duvar: altından geçilir
     if (o.box) {   // dikdörtgen engel (stadyum tribünleri)
       const bx = pos.x - o.x, bz = pos.z - o.z, px = o.hx + rad - Math.abs(bx), pz = o.hz + rad - Math.abs(bz);
       if (px > 0 && pz > 0) { if (px < pz) pos.x += Math.sign(bx || 1) * px; else pos.z += Math.sign(bz || 1) * pz; collideHit = o; }
-      continue;
+      return;
     }
     const dx = pos.x - o.x, dz = pos.z - o.z;
     const d = Math.hypot(dx, dz), min = o.r + rad;
     if (d < min && d > 1e-4) { pos.x = o.x + dx / d * min; pos.z = o.z + dz / d * min; collideHit = o; }
-  }
+  };
+  for (const o of obstacles) { if (o.cg && OBG.on) continue; one(o); }
+  if (OBG.on) obgEach(pos.x, pos.z, rad + 1, one);
   if (curArea.box) {   // ev içi: dikdörtgen oda
     pos.x = THREE.MathUtils.clamp(pos.x, curArea.cx - curArea.box.hx, curArea.cx + curArea.box.hx);
     pos.z = THREE.MathUtils.clamp(pos.z, curArea.cz - curArea.box.hz, curArea.cz + curArea.box.hz);
@@ -9418,7 +9435,9 @@ function updateNPC(n, dt) {
   if (window.__mp && window.__mp.npc(n, dt)) return;   // 👥 ev sahibinin NPC'si
   if (n.state === 'held' || n.state === 'thrown') {   // devin elinde ya da havada: bacaklar sallanır
     n.rig.look.rotation.y = 0;
-    if (n.anim) { n.anim.mixer.update(dt); playAnim(n.anim, 'jump'); }
+    const up = n.state === 'held' && (n.lockP || (typeof HOLDUP !== 'undefined' && HOLDUP.on));   // 🧍 dimdik tutulur (sallanmaz)
+    if (n.anim) { n.anim.mixer.update(dt); playAnim(n.anim, up ? 'idle' : 'jump'); }
+    else if (up) animateStick(n.rig, dt, { speed: 0 });
     else { animateStick(n.rig, dt, { speed: 0, airborne: true, vy: 1 }); if (n.state === 'held' && !(GP.on && carried && carried.ref === n) && !GPL.list.includes(n)) dangle(n.rig, n.holder, dt, n); }
     return;
   }
@@ -21248,7 +21267,10 @@ document.head.insertAdjacentHTML('beforeend', '<style>#tbPalm{width:58px;height:
    ===================================================================== */
 var inCity = false;
 AREAS.city = { cx: -9000, cz: 9000, r: Math.round(430 * Math.sqrt(40)) - 30, bg: 0xb4cde6, fog: [170, 720], sky: 0xd9e8f6, gnd: 0x6b6f75, sunC: 0xfff1de, sunI: 2.3, sunVis: 0xfff3d6 };
-const CG = 8, CB = 56, CR = 14, CS = CG * CB + (CG + 1) * CR;
+// 🏙️ şehir boyutu: 1–20 kat (alan) · yeşil arazi aynı kalır · ızgara her zaman çift (özel yerler ortada kalsın)
+let CITY_K = (() => { try { const v = +localStorage.getItem('sftSehirK'); return v >= 1 && v <= 20 ? Math.round(v) : 1; } catch (e) { return 1; } })();
+const cyGridFor = K => 8 + 2 * Math.round((8 * Math.sqrt(K) - 8) / 2);
+const CB = 56, CR = 14; let CG = cyGridFor(CITY_K), CS = CG * CB + (CG + 1) * CR;
 const CITY = { built: false, g: null, obs: [], lots: {}, peds: [], cars: [], nodes: [], wanted: 0, calm: 99, decT: 0, job: null, act: null, ev: null, evT: 50, news: [], pr: null, talk: null, menu: null, plane: null,
   rw: { x: CS / 2 + 64, zA: 72, zB: -72 }, homeFrom: false, uNight: { value: 0 }, bub: [], marker: null, mk: null, fires: [], deb: [], t: 0, chatT: 3, hudS: '', evCd: 0, policeT: 0,
   sav: { fame: 10, skills: {}, done: 0, deaths: 0, friends: {}, kills: 0, arrests: 0 } };
@@ -21257,14 +21279,14 @@ const cySave = () => { try { localStorage.setItem('sftSehir', JSON.stringify(CIT
 const cyW = (lx, lz, out = new THREE.Vector3()) => out.set(AREAS.city.cx + lx, 0, AREAS.city.cz + lz);
 const cyRoad = k => -CS / 2 + CR / 2 + k * (CB + CR);
 const cyBlk = i => -CS / 2 + CR + i * (CB + CR);
-const cyRnd = (() => { let s = 1234567; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+let CY_SEED = 1234567; const cyRnd = () => (CY_SEED = (CY_SEED * 16807) % 2147483647) / 2147483647;   // şehir her kurulduğunda aynı (çok oyunculuda herkeste aynı şehir)
 const cyPick = a => a[Math.floor(Math.random() * a.length)];
 function cySpend(n) { if (PROG.coins < n) { showMsg(adT('💸 Yeterli paran yok'), 1.4); return false; } PROG.coins -= n; progSave(); progHud(true); play('coin', { gain: .4 }); return true; }
 function cyFame(d, why) { CITY.sav.fame = THREE.MathUtils.clamp(CITY.sav.fame + d, 0, 100); cySave(); if (why) cyNews(why); }
 function cyNews(t) { CITY.news.unshift(t); CITY.news.length = Math.min(CITY.news.length, 6); const el = $('cyNews'); if (el) { el.innerHTML = '📰 ' + CITY.news.map(x => `<span>${x}</span>`).join(' · '); el.classList.remove('fl'); void el.offsetWidth; el.classList.add('fl'); } }
 
 /* ---------- özel yerler (blok -> ne var) ---------- */
-const CY_LOTS = { '3,3': 'pond', '4,3': 'stage', '3,4': 'court', '4,4': 'plaza', '2,3': 'rest1', '5,4': 'rest2', '3,2': 'home', '4,2': 'jobs', '2,4': 'police', '5,3': 'hospital', '4,5': 'bank', '3,5': 'gym', '2,2': 'club', '5,2': 'art', '5,5': 'garage', '2,5': 'build' };
+let CYL = null; const CY_LOTS = { '3,3': 'pond', '4,3': 'stage', '3,4': 'court', '4,4': 'plaza', '2,3': 'rest1', '5,4': 'rest2', '3,2': 'home', '4,2': 'jobs', '2,4': 'police', '5,3': 'hospital', '4,5': 'bank', '3,5': 'gym', '2,2': 'club', '5,2': 'art', '5,5': 'garage', '2,5': 'build' };
 const CY_INFO = {
   rest1: ['🍔 Lezzet Durağı', '#ffd166'], rest2: ['🍕 Pizza Sokak', '#ffb3a1'], home: ['🏠 Senin dairen', '#b9f6ca'], jobs: ['💼 İş Merkezi', '#a0c4ff'], police: ['👮 Polis Merkezi', '#9bb8ff'], hospital: ['🏥 Hastane', '#ffadad'],
   bank: ['🏦 Banka', '#fdffb6'], gym: ['🏋️ Spor Salonu', '#caffbf'], club: ['💃 Dans Kulübü', '#ffc6ff'], art: ['🎨 Resim Atölyesi', '#ffd6a5'], garage: ['🚕 Garaj', '#fff3b0'], build: ['🏗️ İnşaat', '#ffd166'],
@@ -21412,10 +21434,13 @@ function cyLabel(text, col, x, y, z, h = 1.6) { const s = qLabel(text, col, h); 
 /* ---------- şehri kur ---------- */
 function cityBuild() {
   if (CITY.built) return; CITY.built = true;
+  CG = cyGridFor(CITY_K); CS = CG * CB + (CG + 1) * CR; CY_SEED = 1234567; CITY.rad = Math.round(CS / 2 * Math.SQRT2 + 64);
+  CITY.rw.x = CS / 2 + 64; CYB.z0 = CS / 2 + 16; CYB.zW = CS / 2 + 72;
+  { const off = (CG - 8) / 2; CYL = {}; for (const [k, t] of Object.entries(CY_LOTS)) { const [i, j] = k.split(',').map(Number); CYL[(i + off) + ',' + (j + off)] = t; } }   // özel yerler şehrin ortasında
   const A = AREAS.city, g = CITY.g = new THREE.Group(); g.position.set(A.cx, 0, A.cz);
   const add = (geo, mat, x, y, z, par = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.receiveShadow = true; par.add(m); return m; };
   // zemin: asfalt, kaldırım blokları, yol çizgileri, yaya geçitleri
-  add(new THREE.CircleGeometry(470, 64).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3d4045, roughness: .95 }), 0, 0, 0);
+  add(new THREE.CircleGeometry(CITY.rad, 96).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3d4045, roughness: .95 }), 0, 0, 0);
   try { cyGreen(g); } catch (e) { sftErr(e); }   // 🌳 çevresinde kocaman yeşil arazi
   const slabM = new THREE.MeshStandardMaterial({ color: 0xb8b4ac, roughness: .9 }), grassM = new THREE.MeshStandardMaterial({ color: 0x5f9e45, roughness: 1 });
   const slabs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, .08, 1), slabM, CG * CG), Mx = new THREE.Matrix4(), Q0 = new THREE.Quaternion(), S = new THREE.Vector3(), Pv = new THREE.Vector3();
@@ -21436,15 +21461,15 @@ function cityBuild() {
   const B = [], pal = [0xd9d4c7, 0xc9b8a0, 0xa8b5c4, 0xe0c9b3, 0x9aa3ad, 0xd4c1a5, 0xbfc7cf, 0xcfa98a, 0x8f9aa6, 0xe8e2d6, 0xb6a48f, 0x7f8c99];
   for (let i = 0; i < CG; i++) for (let j = 0; j < CG; j++) {
     const key = i + ',' + j, x0 = cyBlk(i), z0 = cyBlk(j), dc = Math.hypot(x0 + CB / 2, z0 + CB / 2);
-    CITY.lots[key] = CY_LOTS[key] || 'bld';
-    if (CY_LOTS[key]) continue;
+    CITY.lots[key] = CYL[key] || 'bld';
+    if (CYL[key]) continue;
     const hmax = 18 + 70 * Math.max(0, 1 - dc / 270), big = cyRnd() < .22 && dc < 200;
     if (big) { const h = Math.round((30 + cyRnd() * hmax) / 3.4) * 3.4; B.push([x0 + CB / 2, z0 + CB / 2, 44, 44, h]); }
     else for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const h = Math.round((8 + cyRnd() * hmax) / 3.4) * 3.4 + 3.4; B.push([x0 + 15 + a * 26, z0 + 15 + b * 26, 21 + cyRnd() * 2, 21 + cyRnd() * 2, h]); }
   }
   // özel binalar (aynı gövdede): daire, iş merkezi, polis, hastane, banka
   const SB = { home: [21, 21, 61.2], jobs: [34, 26, 30.6], police: [30, 22, 13.6], hospital: [38, 26, 23.8], bank: [30, 24, 17] };
-  for (const [key, t] of Object.entries(CY_LOTS)) if (SB[t]) { const [i, j] = key.split(',').map(Number), s = SB[t]; B.push([cyBlk(i) + CB / 2, cyBlk(j) + CB / 2 + 4, s[0], s[1], s[2], t]); }
+  for (const [key, t] of Object.entries(CYL)) if (SB[t]) { const [i, j] = key.split(',').map(Number), s = SB[t]; B.push([cyBlk(i) + CB / 2, cyBlk(j) + CB / 2 + 4, s[0], s[1], s[2], t]); }
   const bm = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cyBuildingMat(), B.length), col = new THREE.Color();
   const SC = { home: 0xa5d6a7, jobs: 0x90caf9, police: 0x5c7cfa, hospital: 0xf5f5f5, bank: 0xf2e6b6 };
   B.forEach(([x, z, w, d, h, sp], k) => { Mx.compose(Pv.set(x, h / 2, z), Q0, S.set(w, h, d)); bm.setMatrixAt(k, Mx); bm.setColorAt(k, col.setHex(SC[sp] || pal[k % pal.length])); cyObs(x, z, w / 2, d / 2, h); });
@@ -21464,13 +21489,13 @@ function cityBuild() {
   const lp = new THREE.InstancedMesh(new THREE.CylinderGeometry(.1, .13, 6, 6), new THREE.MeshStandardMaterial({ color: 0x37474f, metalness: .5, roughness: .4 }), lamps.length), lh = new THREE.InstancedMesh(new THREE.BoxGeometry(.9, .2, .4), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff1c4, emissiveIntensity: .6 }), lamps.length);
   lamps.forEach(([x, z], k) => { Mx.compose(Pv.set(x, 3, z), Q0, S.set(1, 1, 1)); lp.setMatrixAt(k, Mx); Mx.compose(Pv.set(x, 6, z), Q0, S.set(1, 1, 1)); lh.setMatrixAt(k, Mx); }); g.add(lp, lh); CITY.lampM = lh.material;
   // özel yerler
-  for (const [key, t] of Object.entries(CY_LOTS)) cyLot(t, ...key.split(',').map(Number));
+  for (const [key, t] of Object.entries(CYL)) cyLot(t, ...key.split(',').map(Number));
   // havalimanı pisti ve uçak
   const rw = CITY.rw; add(new THREE.BoxGeometry(24, .05, rw.zA - rw.zB + 30), new THREE.MeshStandardMaterial({ color: 0x2b2d31, roughness: .9 }), rw.x, .025, (rw.zA + rw.zB) / 2);
   for (let z = rw.zB; z < rw.zA; z += 10) add(new THREE.BoxGeometry(.5, .03, 5), lineM, rw.x, .06, z);
   cyLabel(adT('✈️ Şehir Havalimanı'), '#cfe8ff', rw.x - 16, 6, rw.zB + 76, 2);
   scene.add(g);
-  try { CITY.plane = makePlaneHolder(); planePose(CITY.plane, A.cx + rw.x, 0, A.cz + rw.zB + 76, 0, 0, 0, true); } catch (e) { sftErr(e); }
+  try { if (!CITY.plane) CITY.plane = makePlaneHolder(); planePose(CITY.plane, A.cx + rw.x, 0, A.cz + rw.zB + 76, 0, 0, 0, true); } catch (e) { sftErr(e); }
   // yaya ağı: her bloğun dört köşesi (kaldırımda), komşu köşeler ve karşıdaki bloğun köşesi
   const N = CITY.nodes, inset = 1.8;
   for (let i = 0; i < CG; i++) for (let j = 0; j < CG; j++) { const x0 = cyBlk(i) + inset, z0 = cyBlk(j) + inset, x1 = cyBlk(i) + CB - inset, z1 = cyBlk(j) + CB - inset; N.push({ x: x0, z: z0, i, j, k: 0 }, { x: x1, z: z0, i, j, k: 1 }, { x: x1, z: z1, i, j, k: 2 }, { x: x0, z: z1, i, j, k: 3 }); }
@@ -21479,7 +21504,7 @@ function cityBuild() {
     const cx = k === 1 || k === 2 ? 1 : -1, cz = k >= 2 ? 1 : -1;   // köşenin dışa bakan yönleri
     n.nb.push(id(i + cx, j, cx > 0 ? (k === 1 ? 0 : 3) : (k === 0 ? 1 : 2)), id(i, j + cz, cz > 0 ? (k === 2 ? 1 : 0) : (k === 1 ? 2 : 3)));
     n.nb = n.nb.filter(v => v >= 0); }
-  cityPeople(); cityTraffic(); try { cityDetails(); cityBalconies(); cityBeach(); } catch (e) { sftErr(e); }
+  if (!CITY.peds.length) cityPeople(); if (!CITY.cars.length) cityTraffic(); try { cityDetails(); cityBalconies(); cityBeach(); } catch (e) { sftErr(e); }
 }
 function cyLot(t, i, j) {
   const g = CITY.g, x0 = cyBlk(i), z0 = cyBlk(j), cx = x0 + CB / 2, cz = z0 + CB / 2, L = CITY.lots[t] = { t, x: cx, z: cz, i, j };
@@ -21979,8 +22004,8 @@ function cyEvTick(dt) {
 function cyTalkNear(r = 2.8) { if (!inCity) return null; const P = player.position; let b = null, bd = r; for (const n of CITY.peds) { if (n.dead || !n.holder.visible || !npcSolid(n)) continue; const d = Math.hypot(n.holder.position.x - P.x, n.holder.position.z - P.z); if (d < bd) { bd = d; b = n; } } return b; }
 function cyObsIn(on) {
   if (on === !!CITY.obsIn) return; CITY.obsIn = on;
-  if (on) { for (const o of CITY.obs) obstacles.push(o); for (const c of CITY.cars) { c.g.userData.obs.cityB = true; obstacles.push(c.g.userData.obs); } }
-  else for (let i = obstacles.length - 1; i >= 0; i--) if (obstacles[i].cityB) obstacles.splice(i, 1);
+  if (on) { for (const o of CITY.obs) obstacles.push(o); obgBuild(CITY.obs); for (const c of CITY.cars) { c.g.userData.obs.cityB = true; obstacles.push(c.g.userData.obs); } }
+  else { OBG.on = false; OBG.m.clear(); for (let i = obstacles.length - 1; i >= 0; i--) if (obstacles[i].cityB) obstacles.splice(i, 1); }
 }
 function cityArea() {
   if (inCity) {
@@ -22682,7 +22707,7 @@ function cityDetails() {
   // 🪑 bank, 🗑️ çöp kutusu, 🚒 yangın musluğu, 🚌 durak — kaldırımlarda
   const bench = [], bin = [], hyd = [], stops = [];
   for (let i = 0; i < CG; i++) for (let j = 0; j < CG; j++) {
-    const x0 = cyBlk(i), z0 = cyBlk(j), key = i + ',' + j; if (CY_LOTS[key] === 'pond' || CY_LOTS[key] === 'plaza') continue;
+    const x0 = cyBlk(i), z0 = cyBlk(j), key = i + ',' + j; if (CYL[key] === 'pond' || CYL[key] === 'plaza') continue;
     bench.push([x0 + 16, .35, z0 + 1.2, 0], [x0 + CB - 16, .35, z0 + CB - 1.2, Math.PI]); bin.push([x0 + 4.5, .45, z0 + 1.1], [x0 + CB - 4.5, .45, z0 + CB - 1.1]); hyd.push([x0 + 1.1, .4, z0 + CB / 2]);
     if ((i + j) % 3 === 0) stops.push([x0 + CB / 2, 0, z0 + 1.3]);
   }
@@ -23393,6 +23418,7 @@ function cityBeach() {
   CITY.lots.beach = { t: 'beach', x: 0, z: z0 + 30, spot: { x: 12, z: z0 + 24, k: 'sun' }, swim: { x: 0, z: zW + 4, k: 'swim' } };
   // plaj insanları: güneşlenen, yüzen, top oynayan, gezen
   const A = AREAS.city;
+  if (CITY.peds.some(n => n.beach)) return;   // şehir yeniden kurulurken plajdakiler zaten var
   for (let i = 0; i < 12; i++) {
     const task = i < 5 ? 'sun' : i < 8 ? 'swim' : i < 10 ? 'ball' : null, x = (cyRnd() - .5) * (xw * 2 - 40), z = task === 'swim' ? zW + 6 + cyRnd() * 18 : task === 'ball' ? z0 + 36 + (i === 8 ? -4 : 4) : z0 + 14 + cyRnd() * 30;
     spawnNPC(A.cx + (task === 'ball' ? 60 : x), A.cz + z, A.cx + x, A.cz + z, 0xffffff); const n = npcs[npcs.length - 1];
@@ -23922,6 +23948,7 @@ function htSqueeze(side, H) {
 }
 function htRelease(side, vel) {
   const h = htHeld(side); if (!h) return;
+  try { if (lockTryHand(side)) return; } catch (e) {}   // 📌 elini omzuna / başına götürüp açtın: oraya kilitlenir
   if (vel.length() > 2.2 * giantS) {   // savurup açtın: fırlat
     let f; if (side === 'L') { const n = GPL.list.shift(); f = { type: 'npc', ref: n }; } else { f = { ...carried }; if (GP.on) gpOff(); carried = null; }
     const sp = THREE.MathUtils.clamp(vel.length() * 3.2, 16, 46); const d = vel.clone().normalize();
@@ -23947,14 +23974,15 @@ function htSlam(side) {   // yumruğu hızla indir: altını ezer
   fmCrush(fp); htMsg(adT('👊 Ezdin!'));
 }
 function htTick(dt) {
-  if (!HT.on) return; if (!GV.on && !(GV3.on && GV3.mode === 'n') && !HT.ok) { htStop(true); return; }
+  if (!HT.on) { if (V4.on) try { htVrmHands(); } catch (e) {} return; } if (!GV.on && !(GV3.on && GV3.mode === 'n') && !HT.ok) { htStop(true); return; }
   const v = $('htVid'), now = performance.now();
   if (HT.st !== 'run' || !v || v.readyState < 2) return;
   try { htVrmHands(); } catch (e) {}   // 🔄 elini çevirince karakterin eli de döner
   if (v.requestVideoFrameCallback) {   // kameradan yeni kare geldikçe (saniyede 30-60) tanı; aradaki karelerde eli tahminle yürüt
     if (!HT.rv) { HT.rv = true; const cb = () => { HT.nf = true; if (HT.on) v.requestVideoFrameCallback(cb); else HT.rv = false; }; v.requestVideoFrameCallback(cb); }
     if (!HT.nf) { htPredict(dt); return; } HT.nf = false;
-  } else if (now - HT.lastDet < 16) { htPredict(dt); return; }
+    if (now - (HT.lastDet || 0) < 1000 / SENS.fps - 1) { htPredict(dt); return; }   // ⚡ algılama hızı ayarı
+  } else if (now - HT.lastDet < Math.max(4, 1000 / SENS.fps)) { htPredict(dt); return; }
   HT.dd = THREE.MathUtils.clamp((now - (HT.lastDet || now - 33)) / 1000, .012, .1); HT.lastDet = now; HT.fpsN = (HT.fpsN || 0) + 1; if (now - (HT.fpsT || 0) > 1000) { HT.fps = HT.fpsN; HT.fpsN = 0; HT.fpsT = now; } let res; try { res = htDetect(v, now); } catch (e) { return; }
   if ((GV3.on || HT.ok) && (HT.bf = (HT.bf || 0) + 1) % 3 === 0) try { htBody(v, now + .5); } catch (e) {}   // 🧍 eğilme / baş yönü
   const cv = $('htCv'), g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height);
@@ -24045,7 +24073,7 @@ document.body.insertAdjacentHTML('beforeend', `<div id="v3Bar"><button data-v3="
 /* ---------- 📷 ortak ön kamera: en geniş açı (4:3 tam sensör, yakınlaştırma en az, varsa geniş açılı ön kamera) ---------- */
 async function camOpen(facing = 'user') {
   const md = navigator.mediaDevices; if (!md || !md.getUserMedia) throw Object.assign(new Error('nomd'), { name: 'NoMediaDevices' });
-  const base = { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 }, aspectRatio: { ideal: 4 / 3 }, frameRate: { ideal: 60, max: 60 } };   // 4:3 tam açı · küçük kare = kamera 60 kare verebilir, tanıma daha hızlı (el takibi akıcı)
+  const base = { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 }, aspectRatio: { ideal: 4 / 3 }, frameRate: { ideal: Math.min(240, Math.max(30, SENS.fps)), max: Math.max(60, Math.min(500, SENS.fps)) } };   // 4:3 tam açı · küçük kare = kamera 60 kare verebilir, tanıma daha hızlı (el takibi akıcı)
   let st; try { st = await md.getUserMedia({ video: base, audio: false }); }
   catch (e1) { if (e1 && (e1.name === 'OverconstrainedError' || e1.name === 'NotFoundError' || e1.name === 'NotReadableError')) st = await md.getUserMedia({ video: true, audio: false }); else throw e1; }
   try {   // birden çok ön kamera varsa geniş açılı olanı seç
@@ -24111,7 +24139,8 @@ function v4Pre(dt) {   // animasyondan sonra: algıla, iskelete uygula
   let fresh = false;
   if (V4.st === 'run' && v && v.readyState >= 2) {   // kameradan her yeni kare gelince tanı (saniyede 30-60)
     if (v.requestVideoFrameCallback) { if (!V4.rv) { V4.rv = true; const cb = () => { V4.nf = true; if (V4.on) v.requestVideoFrameCallback(cb); else V4.rv = false; }; v.requestVideoFrameCallback(cb); } if (V4.nf) { V4.nf = false; fresh = true; } }
-    else fresh = now - V4.last > 16;
+    else fresh = now - V4.last > Math.max(4, 1000 / SENS.fps);
+    if (fresh && now - (V4.last || 0) < 1000 / SENS.fps - 1) fresh = false;   // ⚡ algılama hızı ayarı
   }
   if (fresh) {
     V4.fpsN = (V4.fpsN || 0) + 1; if (now - (V4.fpsT || 0) > 1000) { V4.fps = V4.fpsN; V4.fpsN = 0; V4.fpsT = now; }
@@ -24167,8 +24196,10 @@ function v4Hands(v, ts, dt) {   // 🖐️ VR 4 tüm vücut + eller: her el en y
   let res; try { res = HT.lm.detectForVideo(v, ts); } catch (e) { return; } const lms = res.landmarks || [], P = V4.P, L2 = V4.L2; if (!P || !L2) return;
   const aL = P[11].x >= P[12].x ? 15 : 16, aR = aL === 15 ? 16 : 15, seen = [], hd = Math.max(.016, (V4.hdT ? (performance.now() - V4.hdT) / 1000 : .033)); V4.hdT = performance.now();
   const cv = $('htCv'), g = cv.getContext('2d');
-  lms.forEach(lm => {
+  charHolder.updateMatrixWorld(true); const Qc = charHolder.getWorldQuaternion(new THREE.Quaternion()), cX = new THREE.Vector3(V4.mirror ? -1 : 1, 0, 0).applyQuaternion(Qc), cY = new THREE.Vector3(0, 1, 0).applyQuaternion(Qc), cZ = new THREE.Vector3(0, 0, -1).applyQuaternion(Qc);
+  lms.forEach((lm, li) => {
     const w = lm[0], dL = Math.hypot(w.x - L2[aL].x, w.y - L2[aL].y), dR = Math.hypot(w.x - L2[aR].x, w.y - L2[aR].y), side = dL <= dR ? 'L' : 'R'; if (seen.includes(side)) return; seen.push(side);
+    { const wl = res.worldLandmarks && res.worldLandmarks[li]; if (wl) try { htHandRot(side, wl, true, cX, cY, cZ, 1); } catch (e) {} }   // 🔄 elin dönüşü karakterin eline
     const r = htRead(lm), H = V4.hd[side] || (V4.hd[side] = { curl: r.curl.slice(), fist: false, P: null, vel: new THREE.Vector3(), cd: 0, seen: 0 });
     H.curl = H.curl.map((c0, j) => c0 + (r.curl[j] - c0) * .6); H.seen = elapsed; H.cd = Math.max(0, H.cd - hd);
     const hw = playerRig['arm' + side].el.localToWorld(new THREE.Vector3(0, -.36, 0));
@@ -25447,7 +25478,7 @@ function mpHostConn(c) {
       if (MP.banned.includes(c.peer) || MP.banned.includes((m.name || '').toLowerCase())) { c.send({ t: 'deny', why: adT('Bu odaya girmen yasaklandı') }); setTimeout(() => c.close(), 300); return; }
       const used = ids.map(i => MP.players[i].slot); let slot = 0; while (used.includes(slot)) slot++;
       const pl = MP.players[c.peer] = mpNewPlayer(c.peer, String(m.name || '').slice(0, 16), slot, false); pl.admin = !!m.adm; MP.conns[c.peer] = c;
-      c.send({ t: 'welcome', id: c.peer, slot, code: MP.code, started: MP.started, region: MP.region, regHint: MP.regHint, set: MP.set, houses: MP.houses, players: mpList() });
+      c.send({ t: 'welcome', id: c.peer, slot, code: MP.code, started: MP.started, region: MP.region, regHint: MP.regHint, set: MP.set, houses: MP.houses, players: mpList(), cs: CITY_K });
       mpBroadcast({ t: 'pls', players: mpList() }); mpNote(`👋 ${pl.name} ${adT('odaya katıldı')}`); mpUI();
       return;
     }
@@ -25511,7 +25542,7 @@ function mpLeave(why) {
 function mpOnMsg(m) {
   const f = m.f, pl = MP.players[f];
   switch (m.t) {
-    case 'welcome': MP.on = true; MP.me.id = m.id; MP.me.slot = m.slot; MP.started = m.started; MP.region = m.region; MP.regHint = m.regHint; MP.set = m.set; MP.houses = m.houses || []; mpSetPlayers(m.players);
+    case 'welcome': if (m.cs && m.cs !== CITY_K) try { cityResize(m.cs, true, true); } catch (e) {} MP.on = true; MP.me.id = m.id; MP.me.slot = m.slot; MP.started = m.started; MP.region = m.region; MP.regHint = m.regHint; MP.set = m.set; MP.houses = m.houses || []; mpSetPlayers(m.players);
       mpEnter(); mpStatus(`${adT('✅ Odaya girdin')} · ${adT('kod')}: ${MP.code}`); mpNote(`🔗 ${adT('Odaya girdin')}: ${MP.code}`);
       if (MP.started) mpGoRegion({ key: MP.region, hint: MP.regHint }, true); break;
     case 'deny': mpStatus('⛔ ' + m.why); mpNote('⛔ ' + m.why, 4); setTimeout(() => mpLeave(), 200); break;
@@ -25617,8 +25648,8 @@ function mpTpGate(key, x, z, face, msg, onArrive) {   // teleportTo başında: b
   mpSend({ t: 'vs', key, x, z, face, msg: msg || '', hint }); return true;
 }
 function mpVoteOpen(m) {   // ev sahibi
-  if (MP.vote) return; const V = MP.vote = { id: Math.random().toString(36).slice(2, 8), key: m.key, by: m.f, yes: [m.f], no: [], until: performance.now() + 15000, p: { key: m.key, x: m.x, z: m.z, face: m.face, msg: m.msg, hint: m.hint } };
-  const s = { t: 'vs', id: V.id, key: V.key, by: V.by, n: Object.keys(MP.players).length }; mpBroadcast(s); mpVoteShow(s); mpVoteCheck();
+  if (MP.vote) return; const V = MP.vote = { id: Math.random().toString(36).slice(2, 8), key: m.key, by: m.f, yes: [m.f], no: [], until: performance.now() + 15000, p: { key: m.key, x: m.x, z: m.z, face: m.face, msg: m.msg, hint: m.hint, cs: m.cs } };
+  const s = { t: 'vs', id: V.id, key: V.key, by: V.by, n: Object.keys(MP.players).length, cs: m.cs }; mpBroadcast(s); mpVoteShow(s); mpVoteCheck();
 }
 function mpVoteCheck() {
   const V = MP.vote; if (!V || !MP.host) return; const n = Object.keys(MP.players).length, y = V.yes.filter(i => MP.players[i]).length, no = V.no.filter(i => MP.players[i]).length;
@@ -25626,12 +25657,12 @@ function mpVoteCheck() {
 }
 function mpVoteEnd(ok) {
   const V = MP.vote; if (!V) return; MP.vote = null; const m = { t: 'vr', id: V.id, ok, by: V.by, p: V.p, y: V.yes.length, n: Object.keys(MP.players).length };
-  if (ok) { MP.region = V.p.key; MP.regHint = V.p.hint || null; } mpBroadcast(m); mpVoteResult(m);
+  if (ok && !V.p.cs) { MP.region = V.p.key; MP.regHint = V.p.hint || null; } mpBroadcast(m); mpVoteResult(m);
 }
 function mpVoteShow(m) {
   MP.vote = MP.vote || { id: m.id, key: m.key, by: m.by }; MP.vote.id = m.id; MP.myVote = m.by === MP.me.id ? true : null;
   const b = $('mpVote'); b.style.display = 'block'; b.dataset.id = m.id; b.dataset.until = performance.now() + 15000;
-  b.querySelector('.vq').textContent = `🗳️ ${mpName(m.by)}: ${adT(MP_REGIONS[m.key] || m.key)} ${adT('bölgesine gidelim mi?')}`; mpVoteUpd(1, 0);
+  b.querySelector('.vq').textContent = m.cs ? `🗳️ ${mpName(m.by)}: ${adT('Şehir boyutu')} ${m.cs} ${adT('kat olsun mu?')}` : `🗳️ ${mpName(m.by)}: ${adT(MP_REGIONS[m.key] || m.key)} ${adT('bölgesine gidelim mi?')}`; mpVoteUpd(1, 0);
   b.querySelectorAll('button').forEach(x => x.classList.toggle('on', false)); if (MP.myVote) b.querySelector('[data-v="y"]').classList.add('on'); play('ui');
 }
 function mpVoteUpd(y, n) { const e = $('mpVote').querySelector('.vc'); if (e) e.textContent = `👍 ${y} · 👎 ${n} / ${Object.keys(MP.players).length}`; }
@@ -25639,6 +25670,7 @@ function mpVoteTick() { const b = $('mpVote'); if (b.style.display !== 'block') 
 function mpVoteCast(yes) { const b = $('mpVote'); if (b.style.display !== 'block') return; MP.myVote = yes; b.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.v === (yes ? 'y' : 'n'))); mpSend({ t: 'vc', id: b.dataset.id, yes }); }
 function mpVoteResult(m) {
   $('mpVote').style.display = 'none'; MP.vote = null;
+  if (m.p && m.p.cs) { if (m.ok) { mpNote(`✅ ${adT('Oylama geçti')} — ${adT('şehir')} ${m.p.cs} ${adT('kat')}`, 3); cityResize(m.p.cs, false, false, true); } else mpNote(`🗳️ ${adT('Oylama geçmedi')} (${m.y}/${m.n}) — ${adT('şehir boyutu aynı kalıyor')}`, 3); return; }
   if (!m.ok) { mpNote(`🗳️ ${adT('Oylama geçmedi')} (${m.y}/${m.n}) — ${adT('gidilmiyor')}`, 3); if (m.by === MP.me.id) MP.pend = null; return; }
   MP.region = m.p.key; MP.regHint = m.p.hint || null; mpNote(`✅ ${adT('Oylama geçti')} — ${adT(MP_REGIONS[m.p.key] || m.p.key)}`, 3);
   if (m.by === MP.me.id && MP.pend && MP.pend.key === m.p.key) { const q = MP.pend; MP.pend = null; MP.allowTp = true; try { teleportTo(q.key, q.x, q.z, q.face, q.msg, q.onArrive); } finally { MP.allowTp = false; } return; }
@@ -26412,7 +26444,7 @@ function cyInLake(lx, lz) { return lz > CYB.zW - 2 && lz < CYB.zW + CYB.lakeL &&
 function cyGreen(g) {
   const R = CYG.R, rr = cyGreenRnd();
   // zemin: iki ölçekte çim dokusu + büyük açık / koyu çayır lekeleri (tekrar belli olmasın)
-  const geo = new THREE.RingGeometry(466, R, 180, 30).rotateX(-Math.PI / 2);
+  const geo = new THREE.RingGeometry(CITY.rad - 4, R, 180, 30).rotateX(-Math.PI / 2);
   const mat = new THREE.MeshStandardMaterial({ map: ground.material.map, roughness: .97, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 8 });
   mat.onBeforeCompile = sh => {
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vGL;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvGL = transformed.xz;');
@@ -26432,13 +26464,13 @@ function cyGreen(g) {
   const gm = new THREE.Mesh(geo, mat); gm.receiveShadow = true; g.add(gm); CYG.mesh = gm;
   const out = new THREE.Mesh(new THREE.RingGeometry(R - 20, 8200, 160, 10).rotateX(-Math.PI / 2), mat); out.position.y = -.4; g.add(out);   // sınırın ötesi de yeşil (ufka kadar)
   // ağaçlar: korular (kümeler) ve tek tük ağaçlar · yuvarlak yapraklı ve çam
-  const pts = [], ok = (x, z) => { const d = Math.hypot(x, z); return d > 520 && d < R - 40 && !cyInLake(x, z) && !(Math.abs(x - CITY.rw.x) < 40 && d < 700); };
+  const pts = [], CR0 = CITY.rad + 50, ok = (x, z) => { const d = Math.hypot(x, z); return d > CR0 && d < R - 40 && !cyInLake(x, z) && !(Math.abs(x - CITY.rw.x) < 40 && d < CITY.rad + 230); };
   const NT = IS_COARSE ? 1500 : 2800;
   for (let c = 0; c < 46 && pts.length < NT * .8; c++) {
-    const a = rr() * 6.283, d = 650 + rr() * (R - 800), cx = Math.cos(a) * d, cz = Math.sin(a) * d, sg = 40 + rr() * 110, n = 25 + (rr() * 70 | 0), pine = rr() < .45;
+    const a = rr() * 6.283, d = CR0 + 130 + rr() * Math.max(50, R - CR0 - 280), cx = Math.cos(a) * d, cz = Math.sin(a) * d, sg = 40 + rr() * 110, n = 25 + (rr() * 70 | 0), pine = rr() < .45;
     for (let i = 0; i < n; i++) { const u = rr() * 6.283, r = Math.sqrt(-2 * Math.log(1 - rr() * .98)) * sg * .6, x = cx + Math.cos(u) * r, z = cz + Math.sin(u) * r; if (ok(x, z)) pts.push([x, z, pine ? rr() < .85 : rr() < .15]); }
   }
-  while (pts.length < NT) { const a = rr() * 6.283, d = 520 + Math.sqrt(rr()) * (R - 560), x = Math.cos(a) * d, z = Math.sin(a) * d; if (ok(x, z)) pts.push([x, z, rr() < .35]); }
+  for (let guard = 0; pts.length < NT && guard < NT * 20; guard++) { const a = rr() * 6.283, d = CR0 + Math.sqrt(rr()) * (R - CR0 - 40), x = Math.cos(a) * d, z = Math.sin(a) * d; if (ok(x, z)) pts.push([x, z, rr() < .35]); }
   const nR = pts.filter(p => !p[2]).length, nP = pts.length - nR;
   const trunkM = new THREE.MeshStandardMaterial({ color: 0x6d4c41, roughness: 1 }), leafM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .9, flatShading: true }), pineM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .9, flatShading: true });
   const tk = CYG.tk = new THREE.InstancedMesh(new THREE.CylinderGeometry(.32, .5, 5, 6).translate(0, 2.5, 0), trunkM, pts.length);
@@ -26532,8 +26564,8 @@ function htDetect(v, now) {
   return { landmarks: L.map(lm => lm.map(p => ({ x: x0 + p.x * k, y: y0 + p.y * k, z: p.z * k, visibility: p.visibility }))), worldLandmarks: r.worldLandmarks, handedness: r.handedness || r.handednesses };
 }
 const HTR = { a: new THREE.Vector3(), f: new THREE.Vector3(), n: new THREE.Vector3(), b: new THREE.Vector3(), m: new THREE.Matrix4(), q: new THREE.Quaternion(), q2: new THREE.Quaternion() };
-function htHandRot(side, wl, back, rt, up, cf) {   // kameradaki elin yönü → oyun dünyasında (ön kamerada ayna gibi, arkada olduğu gibi)
-  const sx = back !== !!HT.mirror ? 1 : -1, sz = back ? 1 : -1;
+function htHandRot(side, wl, back, rt, up, cf, sxo) {   // kameradaki elin yönü → oyun dünyasında (ön kamerada ayna gibi, arkada olduğu gibi)
+  const sx = sxo ?? (back !== !!HT.mirror ? 1 : -1), sz = back ? 1 : -1;
   const map = (i, j, o) => o.set(0, 0, 0).addScaledVector(rt, sx * (wl[j].x - wl[i].x)).addScaledVector(up, -(wl[j].y - wl[i].y)).addScaledVector(cf, sz * (wl[j].z - wl[i].z));
   const f = map(0, 9, HTR.f), a = map(17, 5, HTR.a); if (f.lengthSq() < 1e-8 || a.lengthSq() < 1e-8) return; f.normalize(); a.normalize();
   const n = side === 'R' ? HTR.n.crossVectors(a, f) : HTR.n.crossVectors(f, a); n.addScaledVector(f, -n.dot(f)); if (n.lengthSq() < 1e-8) return; n.normalize();
@@ -26543,7 +26575,7 @@ function htHandRot(side, wl, back, rt, up, cf) {   // kameradaki elin yönü →
 }
 function htVrmHands() {   // anime / kendi modelinde: el kemiği senin elinin yönüne döner
   if (!HT.Q || !(VRMA && VRMA.state === 'ready' && VRMA.wrap && VRMA.wrap.visible)) return; const B = VRMA.bones;
-  for (const s of ['R', 'L']) { const e = HT.Q[s]; if (!e || elapsed - e.t > .5 || !htHas(s)) continue;
+  for (const s of ['R', 'L']) { const e = HT.Q[s]; if (!e || elapsed - e.t > .5 || !(htHas(s) || (V4.on && V4.hd[s] && elapsed - V4.hd[s].seen < .4))) continue;
     const S = s === 'R' ? 'right' : 'left', Hd = B[S + 'Hand'], Mp = B[S + 'MiddleProximal'], r = VRMA.rest[S + 'Hand']; if (!Hd || !Mp || !r || !Hd.parent) continue;
     if (!r.hb) { const Fl = Mp.position.clone().normalize(), Nl = new THREE.Vector3(0, -1, 0).applyQuaternion(r.rel.clone().invert()); Nl.addScaledVector(Fl, -Nl.dot(Fl)).normalize();
       r.hb = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(Fl, Nl, new THREE.Vector3().crossVectors(Fl, Nl))).invert(); }
@@ -26771,6 +26803,162 @@ function scApply(kind) {
 }
 try { scHairApply(); if (SCN.look && SCN.look.pati) patiColors(SCN.look.pati); } catch (e) {}
 
+/* =====================================================================
+   🏙️ ŞEHİR BOYUTU (Ayarlar → Şehir boyutu ya da durdurma menüsü): 1–20 kat (alan). Yeşil arazi hep aynı, şehir büyüyüp küçülür.
+   Çok oyunculuda oylamayla: çoğunluk evet derse herkesin şehri değişir. Şehirdeyken değişince şehir yeniden kurulur (meydana dönersin).
+   ===================================================================== */
+function cityResize(K, quiet, noSave, fromVote) {
+  K = THREE.MathUtils.clamp(Math.round(K) || 1, 1, 20); CITY_K = K; if (!noSave) try { localStorage.setItem('sftSehirK', K); } catch (e) {}
+  try { csUI(); } catch (e) {}
+  if (CITY.built && cyGridFor(K) !== CG) cityRebuild();
+  if (!quiet) showMsg(`🏙️ ${adT('Şehir boyutu')}: ${K} ${adT('kat')}` + (CITY.built ? '' : ' · ' + adT('şehre gidince kurulur')), 2);
+}
+function cityRebuild() {
+  const here = inCity, A = AREAS.city;
+  try { if (carried && carried.type === 'npc' && carried.ref.city) { if (GP.on) gpOff(); const n = carried.ref; carried = null; gpPutDown(n); } } catch (e) {}
+  try { for (const n of GPL.list.slice()) gpPutDown(n); } catch (e) {}
+  try { lockDropAll(true); } catch (e) {}
+  cyObsIn(false);
+  if (CITY.g && CITY.g.parent) CITY.g.parent.remove(CITY.g);
+  for (const o of CITY.chunks || []) if (o.parent && !(carried && carried.ref === o)) o.parent.remove(o);
+  for (const d of CITY.deb || []) if (d && d.m && d.m.parent) d.m.parent.remove(d.m);
+  if (CITY.marker && CITY.marker.parent) CITY.marker.parent.remove(CITY.marker);
+  for (const I of CITY.inc || []) if (I.lab && I.lab.parent) I.lab.parent.remove(I.lab);
+  for (const k of ['varG', 'gfix', 'ultraG', 'ulQ', 'ulT', 'ulH', 'det', 'chunks', 'bsty', 'col0', 'balc', 'sea', 'lampM', 'tower', 'stops', 'tlX', 'tlZ', 'beachOn', 'ball', 'vaH', 'vaT', 'obsIn', 'bld', 'marker', 'mk', 'rad']) delete CITY[k];
+  Object.assign(CITY, { built: false, g: null, obs: [], lots: {}, nodes: [], ev: null, act: null, job: null, pr: null, deb: [], inc: [], incT: 12, tl: 'x', tlT: 0 }); CITY.uBlk.value.set(0, 0, 0);
+  Object.assign(CYD, { bm: null, cache: null }); CYD.falling.length = 0; CYQ.q.length = 0;
+  Object.assign(CYG, { grid: new Map(), T: [], flat: [], tk: null, lf: null, pn: null, mesh: null });
+  cityBuild();
+  // şehirliler ve arabalar yeni sokaklara
+  for (const n of CITY.peds) { if (n.dead || n.state === 'held') continue;
+    if (n.beach) { const { z0, xw } = CYB; n.home.set(A.cx + (Math.random() - .5) * (xw * 2 - 40), 0, A.cz + z0 + 14 + Math.random() * 30); n.holder.position.copy(n.home); }
+    else { const k = Math.floor(Math.random() * CITY.nodes.length), nd = CITY.nodes[k]; n.node = k; n.holder.position.set(A.cx + nd.x, 0, A.cz + nd.z); n.home.copy(n.holder.position); }
+    n.state = 'idle'; n.timer = 1 + Math.random() * 2; n.stuck = false; n.vel.set(0, 0, 0); n.vy = 0;
+    const w = CY_ROLES[n.role] && CY_ROLES[n.role][2]; n.work = w && CITY.lots[w] && CITY.lots[w].work ? CITY.lots[w].work : null; }
+  for (const c of CITY.cars) if (!(carried && carried.ref === c.g)) cyCarPlace(c);
+  if (here) { CITY.g.visible = true; cyObsIn(true); const L = CITY.lots.plaza; if (L && !giant) { player.position.set(A.cx + L.x, 0, A.cz + L.z + 14); vel.set(0, 0, 0); } }
+  else CITY.g.visible = false;
+}
+document.head.insertAdjacentHTML('beforeend', `<style>
+#csBox{position:fixed;inset:0;z-index:118;display:none;align-items:center;justify-content:center;background:rgba(6,10,20,.6);font:14px system-ui,sans-serif;color:#fff}
+#csBox .csIn{width:min(420px,92vw);background:linear-gradient(160deg,#16213a,#0f1626);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:14px 16px}
+#csBox input[type=range]{width:100%;margin:10px 0 4px}#csBox .csV{font-size:22px;font-weight:700;text-align:center}
+#csBox .csN{font-size:12px;opacity:.8;line-height:1.45;margin-top:6px}#csBox .csB{display:flex;gap:8px;margin-top:12px}#csBox .csB button{flex:1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:12px;padding:9px;font:inherit}
+#csBox .csB .go{background:linear-gradient(135deg,#06d6a0,#118ab2);border:none;font-weight:600}
+</style>`);
+document.body.insertAdjacentHTML('beforeend', `<div id="csBox"><div class="csIn"><b>🏙️ ${adT('Şehir boyutu')}</b>
+  <input type="range" id="csK" min="1" max="20" step="1" aria-label="${adT('Şehir boyutu')}"><div class="csV" id="csV"></div>
+  <div class="csN">${adT('1 kat = şimdiki şehir, 20 kat = 20 kat büyük alan. Çevredeki yeşil arazi hep aynı kalır. Büyük şehir telefonu yorabilir.')}<br><span id="csMp"></span></div>
+  <div class="csB"><button class="go" data-cs="ok">✓ ${adT('Uygula')}</button><button data-cs="x">✕ ${adT('Kapat')}</button></div></div></div>`);
+function csUI() { const k = $('csK'), b = $('pCity'), r = $('sCityBtn'); if (k && document.activeElement !== k) { k.value = CITY_K; $('csV').textContent = CITY_K + ' ' + adT('kat'); } if (b) b.innerHTML = `🏙️ ${adT('Şehir boyutu')}: ${CITY_K} ${adT('kat')} <small>${adT('yeşil arazi aynı, şehir 1–20 kat')}</small>`; if (r) r.textContent = `${CITY_K} ${adT('kat')} · ${adT('değiştir')}`; }
+function csOpen() { $('csBox').style.display = 'flex'; $('csK').value = CITY_K; $('csV').textContent = CITY_K + ' ' + adT('kat'); $('csMp').textContent = typeof MP !== 'undefined' && MP.on && MP.started ? '🗳️ ' + adT('Çok oyunculuda Uygula = oylama başlar; çoğunluk evet derse herkesin şehri değişir.') : ''; }
+{
+  const box = $('csBox'); for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'keydown', 'wheel']) box.addEventListener(ev, e => e.stopPropagation(), { passive: true });
+  $('csK').addEventListener('input', () => { $('csV').textContent = $('csK').value + ' ' + adT('kat'); });
+  box.addEventListener('click', e => { const b = e.target.closest('[data-cs]'); if (!b) return; play('ui'); const K = +$('csK').value;
+    if (b.dataset.cs === 'ok') {
+      if (typeof MP !== 'undefined' && MP.on && MP.started) { if (K === CITY_K) { box.style.display = 'none'; return; } if (MP.vote) { showMsg('🗳️ ' + adT('Zaten bir oylama sürüyor'), 1.6); return; } mpSend({ t: 'vs', key: 'citySize', cs: K }); showMsg('🗳️ ' + adT('Oylama başladı'), 1.6); }
+      else cityResize(K);
+    }
+    box.style.display = 'none'; });
+  const ws = $('sWeather') && $('sWeather').closest('details');
+  if (ws) ws.insertAdjacentHTML('afterend', `<details class="sec"><summary>🏙️ ${adT('Şehir boyutu')}</summary><div class="setRow"><span>🏙️ ${adT('Şehir')}</span><button class="btn" id="sCityBtn"></button></div><div class="hint">${adT('Şehir 1 ile 20 kat arasında büyür; çevresindeki kocaman yeşil arazi hep aynı kalır. Çok oyunculuda oylamayla değişir.')}</div></details>`);
+  if ($('sCityBtn')) $('sCityBtn').addEventListener('click', () => csOpen());
+  const pb = $('pBlank'); if (pb) { pb.insertAdjacentHTML('afterend', '<button id="pCity"></button>'); $('pCity').addEventListener('click', () => csOpen()); }
+  csUI();
+}
+
+/* =====================================================================
+   📷 HAREKET ALGILAMA HIZI (Ayarlar → Hareket algılama): el ve vücut takibi saniyede kaç kez baksın (1–500 fps).
+   Kameranın verdiğinden hızlı olamaz (çoğu telefon 30–60, bazıları 120–240); aradaki kareler tahminle akıcı yürür.
+   ===================================================================== */
+const SENS = { fps: (() => { try { const v = +localStorage.getItem('sftAlgiFps'); return v >= 1 && v <= 500 ? v : 60; } catch (e) { return 60; } })() };
+const sensT = v => Math.round(1000 * Math.log(v) / Math.log(500)), sensV = t => Math.max(1, Math.round(Math.pow(500, t / 1000)));
+function sensCamRate() { for (const st of [HT.stream, V4.stream]) { const t = st && st.getVideoTracks()[0]; if (t) { try { return Math.round(t.getSettings().frameRate || 0); } catch (e) {} } } return 0; }
+function sensApply() {
+  try { localStorage.setItem('sftAlgiFps', SENS.fps); } catch (e) {}
+  for (const st of [HT.stream, V4.stream]) { const t = st && st.getVideoTracks()[0]; if (t && t.applyConstraints) t.applyConstraints({ frameRate: { ideal: Math.min(240, Math.max(30, SENS.fps)), max: Math.max(60, Math.min(500, SENS.fps)) } }).catch(() => {}); }
+}
+{
+  const kt = $('ctrlList') && $('ctrlList').closest('details');
+  if (kt) kt.insertAdjacentHTML('beforebegin', `<details class="sec"><summary>📷 ${adT('Hareket algılama hızı')}</summary>
+    <div class="sl big"><span>⚡ ${adT('Algılama')}</span><input type="range" id="sSens" min="0" max="1000" step="1" aria-label="${adT('Hareket algılama hızı')}"><b id="sSensV"></b></div>
+    <div class="hint" id="sSensNow"></div>
+    <div class="hint">${adT('El takibi, VR 3, VR 4 ve tarama kameranı saniyede bu kadar kez okur. Düşük = telefon az yorulur, yüksek = hareketler daha hızlı yakalanır. Kameranın verdiğinden hızlı olamaz (çoğu telefon 30–60, bazıları 120–240 kare); aradaki kareler tahminle akıcı yürür.')}</div></details>`);
+  const sl = $('sSens');
+  if (sl) { const show = () => { $('sSensV').textContent = SENS.fps + ' fps'; }; sl.value = sensT(SENS.fps); show();
+    sl.addEventListener('input', () => { SENS.fps = sensV(+sl.value); show(); }); sl.addEventListener('change', () => sensApply());
+    setInterval(() => { const n = $('sSensNow'); if (!n || n.offsetParent === null) return; const on = HT.on || V4.on; const cam = sensCamRate(), real = V4.on ? V4.fps : HT.fps;
+      n.textContent = on ? `${adT('Şu an')}: ${real || 0} fps · ${adT('kameran')}: ${cam || '?'} fps` + (SENS.fps > cam && cam ? ' — ' + adT('kameran bundan hızlı kare vermiyor') : '') : adT('Kamera kapalı · el takibini ya da VR 4ü açınca burada gerçek hız görünür'); }, 1000); }
+}
+
+/* =====================================================================
+   🧍 TUTULANLAR DİMDİK + 📌 KİLİTLEME: devken elindeki kişiyi omzuna ya da başının üstüne koyarsın, orada dimdik durur, seninle gezer.
+   Elinle (el takibi / VR 4) omzuna ya da başının üstüne götürüp elini açınca oraya kilitlenir. Fareyle: Dev panelindeki 📌 düğmesi.
+   ===================================================================== */
+const HOLDUP = { on: (() => { try { return localStorage.getItem('sftDikTut') !== '0'; } catch (e) { return true; } })() };
+const LOCK = { list: [] }, LOCK_PTS = ['shR', 'shL', 'head'], LOCK_NM = { shR: 'sağ omzuna', shL: 'sol omzuna', head: 'başının üstüne' };
+function lockPoint(pt, out) {
+  const S = giantS, vrm = VRMA && VRMA.state === 'ready' && VRMA.wrap && VRMA.wrap.visible;
+  if (vrm) { const B = VRMA.bones, b = pt === 'head' ? B.head : pt === 'shR' ? (B.rightUpperArm || B.rightShoulder) : (B.leftUpperArm || B.leftShoulder);
+    if (b) { b.getWorldPosition(out); if (pt === 'head') out.y += .24 * S; else { const nk = (B.neck || B.head).getWorldPosition(new THREE.Vector3()); out.lerp(nk, .25); out.y += .06 * S; } return out; } }
+  const r = HERO.on && HERO.rig ? HERO.rig : playerRig;
+  if (pt === 'head') { r.head.getWorldPosition(out); out.y += (HERO.on ? .26 : .17 * (BODY.head || 1) + .02) * S; return out; }
+  const a = pt === 'shR' ? r.armR : r.armL; a.sh.getWorldPosition(out); const t = r.torso.getWorldPosition(new THREE.Vector3()), d = new THREE.Vector3(out.x - t.x, 0, out.z - t.z);
+  if (d.lengthSq() > 1e-8) out.addScaledVector(d.normalize(), (HERO.on ? .04 : .07 * (BODY.torsoW || 1)) * S); out.y += (HERO.on ? .06 : .05) * S; return out;
+}
+const lockFree = () => LOCK_PTS.filter(p => !LOCK.list.some(L => L.pt === p));
+function lockPut(n, pt) {
+  if (!n || !pt) return false; if (carried && carried.ref === n) { if (GP.on) gpOff(); carried = null; } { const i = GPL.list.indexOf(n); if (i >= 0) GPL.list.splice(i, 1); }
+  n.state = 'held'; n.vel.set(0, 0, 0); n.vy = 0; n.lockP = pt; LOCK.list.push({ n, pt }); play('pop', { gain: .5 });
+  showMsg(`📌 ${n.name || adT('Kişi')} ${adT(LOCK_NM[pt])} ${adT('kilitlendi — dimdik duruyor')}`, 1.8); if (n.city && Math.random() < .7) cySay(n, cyPick([adT('Manzara harika!'), adT('Buradan her yer görünüyor!'), adT('Sıkı tutun beni!')]), 2);
+  return true;
+}
+function lockHeldNpc() {   // elindeki / avucundaki kişi
+  if (carried && carried.type === 'npc') return carried.ref; if (GPL.list.length) return GPL.list[0]; return null;
+}
+function lockBtn() {
+  if (!giant) { showMsg(adT('📌 Önce dev ol (B)'), 1.4); return; }
+  const n = lockHeldNpc(), free = lockFree(); if (!n) { showMsg(adT('📌 Önce birini tut, sonra omzuna ya da başına koy'), 1.8); return; }
+  if (!free.length) { showMsg(adT('📌 Omuzların ve başın dolu — önce birini indir'), 1.6); return; }
+  lockPut(n, free[0]);
+}
+function lockTryHand(side) {   // elle seç: elini omzuna / başına götürüp aç
+  const h = htHeld(side); if (!h || h.type !== 'npc' || !giant) return false; const T = HT.T[side], P = new THREE.Vector3(); let best = null, bd = .55 * giantS;
+  for (const pt of lockFree()) { const d = lockPoint(pt, P).distanceTo(T); if (d < bd) { bd = d; best = pt; } }
+  if (!best) return false; if (side === 'L') { const n = GPL.list[0]; return lockPut(n, best); } return lockPut(h.ref, best);
+}
+function lockDropAll(quiet) {
+  for (const L of LOCK.list.splice(0)) { const n = L.n; n.lockP = null; if (n.dead) continue; try { gpPutDown(n); n.state = 'idle'; n.timer = 1; } catch (e) {} }
+  if (!quiet) showMsg(adT('⬇️ Omuzdakileri ve baştakini indirdin'), 1.4);
+}
+function lockLate(dt) {
+  if (!LOCK.list.length) return; const P = new THREE.Vector3();
+  for (let i = LOCK.list.length - 1; i >= 0; i--) { const L = LOCK.list[i], n = L.n;
+    if (n.dead || n.state !== 'held' || n.lockP !== L.pt || (carried && carried.ref === n) || GPL.list.includes(n) || !giant) {
+      LOCK.list.splice(i, 1); if (n.lockP === L.pt) n.lockP = null; if (!giant && !n.dead && n.state === 'held') { try { gpPutDown(n); n.state = 'idle'; } catch (e) {} } continue; }
+    lockPoint(L.pt, P); n.holder.position.copy(P); n.holder.rotation.set(0, facing, 0); n.holder.quaternion.setFromEuler(n.holder.rotation); n.body.rotation.set(0, 0, 0); n.body.position.y = 0; n.facing = facing; }
+}
+{
+  const g = $('giant'); if (g) { g.querySelector('.gtop').insertAdjacentHTML('afterend', `<div class="gBtns" style="display:flex;gap:5px;flex-wrap:wrap;margin:5px 0 3px"><button id="gUp" style="flex:1"></button><button id="gLock" style="flex:1">📌 ${adT('Omza / başa koy')}</button><button id="gUnlock" style="flex:1">⬇️ ${adT('İndir')}</button></div>`);
+    for (const b of g.querySelectorAll('.gBtns button')) { b.style.cssText += ';background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:9px;padding:4px 6px;font:600 11px system-ui,sans-serif;cursor:pointer'; for (const ev of ['pointerdown', 'mousedown', 'touchstart']) b.addEventListener(ev, e => e.stopPropagation(), { passive: true }); }
+    const upUI = () => { $('gUp').textContent = HOLDUP.on ? '🧍 ' + adT('Dimdik tut: açık') : '🙆 ' + adT('Dimdik tut: kapalı (sarkar)'); };
+    $('gUp').addEventListener('click', e => { e.stopPropagation(); HOLDUP.on = !HOLDUP.on; try { localStorage.setItem('sftDikTut', HOLDUP.on ? '1' : '0'); } catch (x) {} upUI(); play('ui'); });
+    $('gLock').addEventListener('click', e => { e.stopPropagation(); lockBtn(); });
+    $('gUnlock').addEventListener('click', e => { e.stopPropagation(); if (LOCK.list.length) lockDropAll(); else showMsg(adT('📌 Kilitli kimse yok'), 1.2); });
+    upUI(); }
+}
+
+/* ---------- 🧍 VR 4: sağ tık = sağ elinle tut / bırak (devken kişi, eşya, araba; normal boyda yakındaki eşya) · el dönüşü karakterin eline geçer ---------- */
+function v4RightGrab() {
+  const hw = playerRig.armR.el.localToWorld(new THREE.Vector3(0, -.36, 0)); if (!V4.hd.R || elapsed - V4.hd.R.seen > .3) HT.T.R.copy(hw);
+  if (giant) {
+    if (htHeld('R')) { const H = V4.hd.R; htRelease('R', H ? H.vel.clone() : new THREE.Vector3()); }
+    else { GV.c = null; htGrab('R'); showMsg(htHeld('R') ? '✊ ' + adT('Tuttun — sağ tık: bırak (omzuna götürüp bırakırsan oraya kilitlenir)') : '✋ ' + adT('Elinin önünde tutulacak bir şey yok'), 1.6); }
+  } else gtGrab();
+}
+canvas.addEventListener('mousedown', e => { if (!V4.on || e.button !== 2 || paused) return; e.stopImmediatePropagation(); e.preventDefault(); v4RightGrab(); }, true);
+
 /* ---------- 🏷️ herkesin etiketi: bir kişiye sol tıkla / dokun → adı, yaşı, işi (köy, şehir, Ankara; okulda da) ---------- */
 const NPCL = { list: [] };
 function npcLblText(n) {
@@ -26926,6 +27114,7 @@ renderer.setAnimationLoop(() => {
   if (VRMA.state === 'ready' && VRMA.wrap.visible) { player.updateMatrixWorld(true); vrmUpdate(paused || photoMode ? 0 : dt); } vrmItemHold();   // anime kız modeli (menüde de duruşu doğru kalır)
   try { gpLate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }
   try { const dd = paused || photoMode ? 0 : dt; gvLate(dd); gpExtraLate(dd); gpLeftLate(dd); gpShoulderTick(dd); gpHeldPoseTick(); } catch (e) { sftErr(e); }
+  try { lockLate(paused || photoMode ? 0 : dt); } catch (e) {}
   try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); if (window.__mp) window.__mp.tick(dt); npcLblTick(paused ? 0 : dt); if (curKey !== 'ankara') ankDebrisTick(paused || photoMode ? 0 : dt); cyUltraTick(); gvDualLate(); if (inCity && CITY.built) { cyVariety(); cyVarietySync(); } } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
   try { buddyUpdate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🤝 arkadaş: senin pozunu kopyalar
   updateDay(paused || photoMode || ADM.freeze ? 0 : dt * (ADM.daySpeed ? 40 : 1));
