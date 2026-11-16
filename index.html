@@ -4471,7 +4471,7 @@ three/build/three.module.js:
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-o</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-p</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -27939,14 +27939,15 @@ function gv3UI() { const vb = $('v3Bar'); if (vb) vb.style.display = GV3.on && G
    ✋ elini aç: bırakır · hızlı savurup aç: fırlatır · açık eli hızla kameraya it: önündekileri iter · yumruğu hızla indir: ezer.
    İnsanlar ezilmez: son anda kaçar / düşer. (claude.ai bağlantısında kamera kapalıdır — indirilen dosyada çalışır.)
    ===================================================================== */
-const HT = { on: false, st: 'off', lm: null, hands: {}, T: { R: new THREE.Vector3(), L: new THREE.Vector3() }, lastDet: 0, s0: { R: 0, L: 0 } };
+const HT = { on: false, st: 'off', lm: null, hands: {}, T: { R: new THREE.Vector3(), L: new THREE.Vector3() }, lastDet: 0, s0: { R: 0, L: 0 }, mirror: (() => { try { return localStorage.getItem('sftHtMir') === '1'; } catch (e) { return false; } })() };
 const HT_VER = '0.10.14', HT_CDN = 'https://cdn.' + 'jsdelivr.net/npm/@mediapipe/tasks-vision@' + HT_VER;   // el tanıma kütüphanesi yalnızca açılınca indirilir
 const htHas = side => HT.st === 'run' && (GV.on || (GV3.on && GV3.mode === 'n') || HT.ok) && HT.hands[side] && elapsed - HT.hands[side].seen < .35;
 function htCurl(side) { return htHas(side) ? HT.hands[side].curl : null; }
-function htMsg(t) { const e = $('htSt'); if (e) e.textContent = t + (HT.fps && HT.st === 'run' ? ` · ${HT.fps} fps` : ''); }
+function htMsg(t) { const e = $('htSt'); if (!e) return; let f = HT.fps && HT.st === 'run' ? ` · ${HT.fps} fps` : ''; if (!f) try { if (V4.on && V4.fps) f = ` · ${V4.fps} fps`; } catch (x) {} e.textContent = t + f; }
 function htUI() {
   const p = $('htBox'); if (p) p.style.display = HT.on || V4.on || window.__v5on ? 'block' : 'none';
   document.querySelectorAll('[data-ht]').forEach(b => { b.classList.toggle('on', HT.on); b.textContent = HT.on ? '📷 ' + adT('El takibi açık') : '📷 ' + adT('Elimle oyna'); });
+  try { mirUI(); } catch (e) {}
 }
 function htFail(kind, e) {
   console.warn('HT', kind, e); htStop(true);
@@ -27970,7 +27971,7 @@ async function htStart() {
     if (V4.on) v4Stop(true);
     const st = await camOpen(HT.cam);   // en geniş görüş açısı
     if (!HT.on) { st.getTracks().forEach(t => t.stop()); return; }
-    HT.stream = st; const v = $('htVid'); v.srcObject = st; await v.play();
+    HT.stream = st; const v = $('htVid'); v.style.transform = HT.cam === 'environment' ? 'none' : ''; v.srcObject = st; await v.play();
   } catch (e) { htFail('cam', e); return; }
   HT.st = 'model'; htMsg(adT('🧠 El tanıma yükleniyor…'));
   try {
@@ -28060,7 +28061,7 @@ function htTick(dt) {
   const eye = camera.position.clone(), seen = [];
   (res.landmarks || []).forEach((lm, i) => {
     const lab = res.handedness && res.handedness[i] && res.handedness[i][0] ? res.handedness[i][0].categoryName : (lm[0].x < .5 ? 'Left' : 'Right');
-    const fx = q => HT.cam === 'environment' ? q : 1 - q, two = (res.landmarks || []).length > 1, side = two ? (fx(lm[0].x) >= fx(res.landmarks[1 - i][0].x) ? 'R' : 'L') : (lab === 'Left' ? 'L' : 'R'); if (seen.includes(side)) return; seen.push(side);   // iki el: ekranın sağındaki sağ el
+    const fv = q => HT.cam === 'environment' ? q : 1 - q, fx = q => (HT.cam === 'environment') !== !!HT.mirror ? q : 1 - q, two = (res.landmarks || []).length > 1, side = two ? (fx(lm[0].x) >= fx(res.landmarks[1 - i][0].x) ? 'R' : 'L') : ((lab === 'Left') !== !!HT.mirror ? 'R' : 'L'); if (seen.includes(side)) return; seen.push(side);   // iki el: ekranın sağındaki sağ el · tek el: MediaPipe aynalı görüntü varsayar → etiket ters çevrilir
     const r = htRead(lm), H = HT.hands[side] || (HT.hands[side] = { c: { ...r.c }, size: r.size, curl: r.curl.slice(), seen: 0, fist: false, P: null, vel: new THREE.Vector3(), sqT: 0, cd: 0, hist: [] });
     const k = THREE.MathUtils.clamp(.3 + Math.hypot(r.c.x - H.c.x, r.c.y - H.c.y) * 8, .3, .85); H.c.x += (r.c.x - H.c.x) * k; H.c.y += (r.c.y - H.c.y) * k; H.size += (r.size - H.size) * k; H.curl = H.curl.map((c0, j) => c0 + (r.curl[j] - c0) * .6); H.seen = elapsed;
     HT.s0[side] = HT.s0[side] ? HT.s0[side] + (H.size - HT.s0[side]) * .01 : H.size;   // ortalama el boyu (derinlik referansı)
@@ -28086,7 +28087,7 @@ function htTick(dt) {
     }
     // önizlemede iskelet (aynalı)
     g.strokeStyle = side === 'R' ? '#69f0ae' : '#ffd166'; g.lineWidth = 2; g.beginPath();
-    for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [0, 17], [17, 18], [18, 19], [19, 20]]) { g.moveTo(fx(lm[a].x) * cv.width, lm[a].y * cv.height); g.lineTo(fx(lm[b].x) * cv.width, lm[b].y * cv.height); }
+    for (const [a, b] of [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [0, 17], [17, 18], [18, 19], [19, 20]]) { g.moveTo(fv(lm[a].x) * cv.width, lm[a].y * cv.height); g.lineTo(fv(lm[b].x) * cv.width, lm[b].y * cv.height); }
     g.stroke();
   });
   if (giant) try { htTwoHand(); } catch (e) {}
@@ -28142,7 +28143,7 @@ document.body.insertAdjacentHTML('beforeend', `<div id="v3Bar"><button data-v3="
 /* ---------- 📷 ortak ön kamera: en geniş açı (4:3 tam sensör, yakınlaştırma en az, varsa geniş açılı ön kamera) ---------- */
 async function camOpen(facing = 'user') {
   const md = navigator.mediaDevices; if (!md || !md.getUserMedia) throw Object.assign(new Error('nomd'), { name: 'NoMediaDevices' });
-  const base = { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 960 }, aspectRatio: { ideal: 4 / 3 }, frameRate: { ideal: 60, max: 60 } };   // 4:3 tam açı · daha çok kare (el takibi akıcı)
+  const base = { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 }, aspectRatio: { ideal: 4 / 3 }, frameRate: { ideal: 60, max: 60 } };   // 4:3 tam açı · küçük kare = kamera 60 kare verebilir, tanıma daha hızlı (el takibi akıcı)
   let st; try { st = await md.getUserMedia({ video: base, audio: false }); }
   catch (e1) { if (e1 && (e1.name === 'OverconstrainedError' || e1.name === 'NotFoundError' || e1.name === 'NotReadableError')) st = await md.getUserMedia({ video: true, audio: false }); else throw e1; }
   try {   // birden çok ön kamera varsa geniş açılı olanı seç
@@ -28169,12 +28170,13 @@ function gvCrossPos(hr) { const c = $('gvCross'); if (!c) return; if (hr) { c.st
    kollar, dirsekler, gövde eğilmesi / dönmesi, baş, bacaklar ve dizler. Ayna gibi (sağ elini kaldırınca ekranda aynı taraftaki el kalkar).
    Dev iken de çalışır. Bacakların görünmüyorsa karakterin bacakları normal hareket eder. (Kamera claude.ai bağlantısında kapalıdır.)
    ===================================================================== */
-const V4 = { on: false, st: 'off', pl: null, P: null, vis: null, sv: [], hy: null, last: 0, mirror: true, legs: false };
+const V4 = { on: false, st: 'off', pl: null, P: null, vis: null, sv: [], hy: null, last: 0, mirror: (() => { try { return localStorage.getItem('sftV4Mir') === '1'; } catch (e) { return false; } })(), legs: false, hands: false, hd: {} };
 function v4UI() {
   document.querySelectorAll('[data-v4]').forEach(b => { b.classList.toggle('on', V4.on); b.textContent = V4.on ? '🧍 VR 4 ' + adT('açık') : '🧍 VR 4 (' + adT('tüm vücut') + ')'; });
   const bx = $('htBox'); if (bx) { bx.style.display = HT.on || V4.on || window.__v5on ? 'block' : 'none'; bx.classList.toggle('v4', V4.on); } document.body.classList.toggle('v4mode', V4.on);
-  const m = $('v4Mir'); if (m) { m.style.display = V4.on ? '' : 'none'; m.textContent = V4.mirror ? '🪞 ' + adT('Ayna: açık') : '🪞 ' + adT('Ayna: kapalı'); }
+  mirUI();
 }
+function mirUI() { const m = $('v4Mir'); if (!m) return; const on = V4.on ? V4.mirror : HT.mirror; m.style.display = V4.on || HT.on ? '' : 'none'; m.textContent = '🪞 ' + (on ? adT('Ayna: açık (ters)') : adT('Ayna: kapalı (düz)')); }
 async function v4Start() {
   if (dead || RIDE.on) { showMsg(adT('🧍 Önce araçtan in'), 1.4); return; }
   if (HT.on) htStop(true); if (GV3.on) gv3Set(false); if (GV.on) gvToggle(false); if (FM.on) fmToggle(FM.mode); if (window.__v5on) v5Stop(true);
@@ -28187,12 +28189,14 @@ async function v4Start() {
       try { V4.pl = await V.PoseLandmarker.createFromOptions(fs, opt('GPU')); } catch (x) { V4.pl = await V.PoseLandmarker.createFromOptions(fs, opt('CPU')); } }
   } catch (e) { v4Stop(true); htFail('model', e); return; }
   if (!V4.on) return;
+  try { await htModel(); V4.hands = !!HT.lm; } catch (e) { V4.hands = false; }   // 🖐️ tüm vücutta parmaklar da: yumruk / iki parmak = tut, aç = bırak
+  if (!V4.on) return;
   V4.st = 'run'; htMsg(adT('🧍 Telefonu yere / masaya dik koy, tüm bedenin görünecek kadar uzaklaş'));
   showMsg(adT('🧍 VR 4: karakter senin yaptığını yapar · sol tık basılı = baktığın yöne yürü · tekerlek = sağa / sola dön'), 4);
 }
 function v4Stop(quiet) {
   if (V4.setW) { keys.KeyW = false; V4.setW = false; } V4.walk = false;
-  V4.on = false; V4.st = 'off'; V4.P = null;
+  V4.on = false; V4.st = 'off'; V4.P = null; V4.hd = {};
   if (V4.stream) { V4.stream.getTracks().forEach(t => t.stop()); V4.stream = null; }
   if (!HT.on) { const v = $('htVid'); if (v) v.srcObject = null; }
   v4UI(); if (!quiet) showMsg(adT('🧍 VR 4 kapandı'), 1.2);
@@ -28202,7 +28206,13 @@ function v4Pre(dt) {   // animasyondan sonra: algıla, iskelete uygula
   if (!V4.on) return; if (dead || RIDE.on) { v4Stop(true); return; }
   if (V4.walk) { keys.KeyW = true; V4.setW = true; } else if (V4.setW) { keys.KeyW = false; V4.setW = false; }   // sol tık basılı: baktığın yöne yürü
   const v = $('htVid'), now = performance.now();
-  if (V4.st === 'run' && v && v.readyState >= 2 && now - V4.last > 40) {
+  let fresh = false;
+  if (V4.st === 'run' && v && v.readyState >= 2) {   // kameradan her yeni kare gelince tanı (saniyede 30-60)
+    if (v.requestVideoFrameCallback) { if (!V4.rv) { V4.rv = true; const cb = () => { V4.nf = true; if (V4.on) v.requestVideoFrameCallback(cb); else V4.rv = false; }; v.requestVideoFrameCallback(cb); } if (V4.nf) { V4.nf = false; fresh = true; } }
+    else fresh = now - V4.last > 16;
+  }
+  if (fresh) {
+    V4.fpsN = (V4.fpsN || 0) + 1; if (now - (V4.fpsT || 0) > 1000) { V4.fps = V4.fpsN; V4.fpsN = 0; V4.fpsT = now; }
     V4.last = now; let res; try { res = V4.pl.detectForVideo(v, now); } catch (e) { res = null; }
     const W = res && res.worldLandmarks && res.worldLandmarks[0], L2 = res && res.landmarks && res.landmarks[0];
     const cv = $('htCv'), g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height);
@@ -28210,7 +28220,7 @@ function v4Pre(dt) {   // animasyondan sonra: algıla, iskelete uygula
       const sx = V4.mirror ? -1 : 1, P = W.map(p => new THREE.Vector3(sx * p.x, -p.y, -p.z));   // karakter uzayı: +X sol, +Y yukarı, +Z ileri (kameraya doğru)
       if (!V4.P) V4.P = P; else V4.P.forEach((q, i) => q.lerp(P[i], THREE.MathUtils.clamp(.25 + q.distanceTo(P[i]) * 6, .25, .9)));
       { const hy = (L2[23].y + L2[24].y) / 2, J = V4.jy || (V4.jy = { y: hy, t: now, cd: 0 }); if (now - J.t > 60) { const vy = (hy - J.y) / ((now - J.t) / 1000); if (vy < -.9 && now > J.cd && L2[27].visibility > .4) { J.cd = now + 700; keys.Space = true; keyAction('Space'); setTimeout(() => { keys.Space = false; keyRelease('Space'); }, 160); htMsg('🦘 ' + adT('Zıpla!')); } J.y = hy; J.t = now; } }
-      V4.vis = L2.map(p => p.visibility ?? 1); V4.seen = elapsed;
+      V4.vis = L2.map(p => p.visibility ?? 1); V4.seen = elapsed; V4.L2 = L2;
       g.strokeStyle = '#80deea'; g.lineWidth = 2; g.beginPath();
       for (const [a, b] of [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28], [0, 11], [0, 12]]) { g.moveTo((1 - L2[a].x) * cv.width, L2[a].y * cv.height); g.lineTo((1 - L2[b].x) * cv.width, L2[b].y * cv.height); }
       g.stroke(); htMsg(V4.vis[27] > .5 && V4.vis[28] > .5 ? adT('🧍 Tüm vücut görünüyor') : adT('🧍 Üst beden görünüyor · bacaklar için biraz uzaklaş'));
@@ -28243,11 +28253,38 @@ function v4Pre(dt) {   // animasyondan sonra: algıla, iskelete uygula
     if (drop > 1e-4) { V4.hy = r.hips.position.y; r.hips.position.y -= drop; r.hips.updateMatrixWorld(true); }
   }
   try { v4Gestures(P, dt); } catch (e) {}
+  if (V4.hands && fresh && (V4.hf = (V4.hf || 0) + 1) % 2 === 0) try { v4Hands(v, now + .5, dt); } catch (e) {}   // 🖐️ iki karede bir parmaklar
+}
+async function htModel() {   // el tanıma modeli (bir kez yüklenir)
+  if (HT.lm) return HT.lm; const { V, fs } = await htVision();
+  const opt = d => ({ baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', delegate: d }, runningMode: 'VIDEO', numHands: 2, minHandDetectionConfidence: .5, minHandPresenceConfidence: .5, minTrackingConfidence: .5 });
+  try { HT.lm = await V.HandLandmarker.createFromOptions(fs, opt('GPU')); } catch (x) { HT.lm = await V.HandLandmarker.createFromOptions(fs, opt('CPU')); }
+  return HT.lm;
+}
+function v4Hands(v, ts, dt) {   // 🖐️ VR 4 tüm vücut + eller: her el en yakın bileğin koluna bağlanır; yumruk / iki parmak = tut, aç = bırak, savurup aç = fırlat
+  let res; try { res = HT.lm.detectForVideo(v, ts); } catch (e) { return; } const lms = res.landmarks || [], P = V4.P, L2 = V4.L2; if (!P || !L2) return;
+  const aL = P[11].x >= P[12].x ? 15 : 16, aR = aL === 15 ? 16 : 15, seen = [], hd = Math.max(.016, (V4.hdT ? (performance.now() - V4.hdT) / 1000 : .033)); V4.hdT = performance.now();
+  const cv = $('htCv'), g = cv.getContext('2d');
+  lms.forEach(lm => {
+    const w = lm[0], dL = Math.hypot(w.x - L2[aL].x, w.y - L2[aL].y), dR = Math.hypot(w.x - L2[aR].x, w.y - L2[aR].y), side = dL <= dR ? 'L' : 'R'; if (seen.includes(side)) return; seen.push(side);
+    const r = htRead(lm), H = V4.hd[side] || (V4.hd[side] = { curl: r.curl.slice(), fist: false, P: null, vel: new THREE.Vector3(), cd: 0, seen: 0 });
+    H.curl = H.curl.map((c0, j) => c0 + (r.curl[j] - c0) * .6); H.seen = elapsed; H.cd = Math.max(0, H.cd - hd);
+    const hw = playerRig['arm' + side].el.localToWorld(new THREE.Vector3(0, -.36, 0));
+    if (H.P) H.vel.lerp(hw.clone().sub(H.P).divideScalar(hd), .5); H.P = hw.clone(); HT.T[side].copy(hw);
+    const avg = (H.curl[1] + H.curl[2] + H.curl[3] + H.curl[4]) / 4, pin = htPinch(lm, r, H);
+    if (typeof VRMA !== 'undefined' && VRMA && VRMA.state === 'ready' && VRMA.wrap.visible) gpVrmFingers(side === 'R' ? 'right' : 'left', H.curl, .15);
+    if (giant) {
+      const holding = !!htHeld(side);
+      if (!H.fist && (avg > .62 || pin)) { H.fist = true; H.byPin = pin && avg <= .62; if (!holding) { GV.c = null; htGrab(side); if (htHeld(side)) htMsg((H.byPin ? '🤏 ' : '✊ ') + adT('Tuttun')); } }
+      else if (H.fist && (H.byPin ? !pin && avg < .55 : avg < .32 && !pin)) { H.fist = false; H.byPin = false; if (holding) htRelease(side, H.vel.clone()); }
+    } else htNormal(side, H, avg);
+    g.fillStyle = side === 'R' ? '#69f0ae' : '#ffd166'; for (const i of [4, 8, 12, 16, 20]) { g.beginPath(); g.arc((1 - lm[i].x) * cv.width, lm[i].y * cv.height, 2.5, 0, 6.283); g.fill(); }
+  });
 }
 document.head.insertAdjacentHTML('beforeend', '<style>#htBox.v4{width:190px}#htBox.v4 .hv{width:180px;height:135px}body.v4mode #prompt,body.v4mode #gHelp{display:none!important}</style>');
 {
   $('htBox').querySelector('[data-hts]').insertAdjacentHTML('beforebegin', `<button id="v4Mir" style="display:none"></button>`);
-  $('v4Mir').addEventListener('click', e => { e.stopPropagation(); V4.mirror = !V4.mirror; V4.P = null; v4UI(); });
+  $('v4Mir').addEventListener('click', e => { e.stopPropagation(); if (V4.on) { V4.mirror = !V4.mirror; V4.P = null; try { localStorage.setItem('sftV4Mir', V4.mirror ? '1' : '0'); } catch (x) {} } else { HT.mirror = !HT.mirror; HT.hands = {}; try { localStorage.setItem('sftHtMir', HT.mirror ? '1' : '0'); } catch (x) {} } mirUI(); showMsg(adT('🪞 Sağ ve sol yer değiştirdi'), 1.2); });
   $('htBox').addEventListener('click', e => { if (e.target.closest('[data-hts]') && V4.on) v4Stop(); }, true);
   $('v3Bar').insertAdjacentHTML('beforeend', `<button data-v4="1">🧍 VR 4</button>`);
   $('gvPanel').querySelector('.gvbody .gvr').insertAdjacentHTML('beforeend', `<button data-v4="1">🧍 VR 4</button>`);
