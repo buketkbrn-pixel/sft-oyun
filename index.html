@@ -344,7 +344,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-s</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-t</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -12636,7 +12636,7 @@ const VQ = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion
 const VV = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
 const TOON_GRAD = (() => { const d = new Uint8Array([120, 120, 120, 255, 205, 205, 205, 255, 255, 255, 255, 255]), t = new THREE.DataTexture(d, 3, 1); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
 function vrmLoad(M = VRMA) {
-  if (!M3D.on) { if (M.state === 'none') M3D.pend.add(M); return; }   // 🧩 3D modeller kapalı: açılınca yüklenir
+  if (!M3D.on && !M.force) { if (M.state === 'none') M3D.pend.add(M); return; }   // 🧩 3D modeller kapalı: açılınca yüklenir (çok oyunculuda arkadaşın modeli yine yüklenir)
   if (M.custom) { if (M.state === 'none') crigRestore(); return; }   // 🧩 kendi modelin: tarayıcıda saklanandan
   if (M.state !== 'none') return; M.state = 'loading';
   const parse = buf => new GLTFLoader().parse(buf, '', g => { try { vrmSetup(M, g); } catch (e) { console.warn('VRM', e); M.state = 'fail'; } }, () => { M.state = 'fail'; });
@@ -25442,7 +25442,7 @@ function mpSend(m) {   // herkese (ya da m.to kişisine) gönder; ev sahibi dağ
   m.f = MP.me.id; if (!MP.on) return;
   if (MP.host) mpRoute(m, MP.me.id); else if (MP.hc && MP.hc.open) try { MP.hc.send(m); } catch (e) {}
 }
-const MP_HOSTONLY = { rdy: 1, vs: 1, vc: 1, perm: 1, name: 1, room: 1, vote: 1, kick: 1, ban: 1, admf: 1, start: 0 };
+const MP_HOSTONLY = { rdy: 1, vs: 1, vc: 1, perm: 1, name: 1, room: 1, vote: 1, kick: 1, ban: 1, admf: 1, start: 0, gq: 1, gt: 1, gp: 1, gf: 1, gx: 1 };
 function mpRoute(m, from) {   // yalnızca ev sahibinde çalışır
   m.f = from;
   if (MP_HOSTONLY[m.t]) { mpHostDo(m); return; }
@@ -25456,6 +25456,7 @@ function mpHostDo(m) {
   else if (m.t === 'name') { pl.name = String(m.v || '').slice(0, 16) || pl.name; mpBroadcast({ t: 'pls', players: mpList() }); mpUI(); }
   else if (m.t === 'admf') { pl.admin = !!m.on; mpBroadcast({ t: 'pls', players: mpList() }); mpUI(); }
   else if (m.t === 'vs') mpVoteOpen(m);
+  else if (m.t === 'gq' || m.t === 'gt' || m.t === 'gp' || m.t === 'gf' || m.t === 'gx') mpGameHost(m);
   else if (m.t === 'vc') { const V = MP.vote; if (V && V.id === m.id) { V.yes = V.yes.filter(x => x !== m.f); V.no = V.no.filter(x => x !== m.f); (m.yes ? V.yes : V.no).push(m.f); mpBroadcast({ t: 'vu', id: V.id, y: V.yes.length, n: V.no.length }); mpVoteUpd(V.yes.length, V.no.length); mpVoteCheck(); } }
   else if (m.t === 'vote' && adm) { const V = MP.vote; if (V) mpVoteEnd(m.op === 'yes'); }
   else if (m.t === 'room' && adm) { Object.assign(MP.set, m.set || {}); mpBroadcast({ t: 'set', set: MP.set }); mpApplySet(); mpUI(); }
@@ -25483,7 +25484,7 @@ function mpLeave(why) {
   try { MP.peer && MP.peer.destroy(); } catch (e) {}
   Object.assign(MP, { on: false, host: false, code: '', peer: null, conns: {}, hc: null, players: {}, started: false, region: 'hub', vote: null, spec: null, ctlBy: null, ctlTgt: null, locked: false, plock: false, heldBy: null, holding: null, follow: null, calls: {}, auds: {}, myHouse: '', npcCtl: 0 });
   if (carried && carried.type === 'mp') carried = null;
-  mpClearHouses(); document.body.classList.remove('mpOn', 'mpCtl'); mpHud(false); $('mpVote').style.display = 'none'; $('mpCtlBan').style.display = 'none'; $('mpHeld').style.display = 'none';
+  mpClearHouses(); try { mpFunReset(); } catch (e) {} MP_LK.sig = ''; MP_LK.msg = null; document.body.classList.remove('mpOn', 'mpCtl'); mpHud(false); $('mpVote').style.display = 'none'; $('mpCtlBan').style.display = 'none'; $('mpHeld').style.display = 'none';
   if (why) mpNote(why, 4); mpStatus(why || adT('Odadan çıktın')); mpUI();
 }
 // ---------- gelen mesajlar ----------
@@ -25520,6 +25521,11 @@ function mpOnMsg(m) {
     case 'hit': if (MP.set.pvp && !dead) { damagePlayer(m.d || 12, new THREE.Vector3(m.x || 0, 0, m.z || 0)); mpNote(`💥 ${mpName(f)} ${adT('vurdu')}`, 1.5); } break;
     case 'npc': mpNpcRecv(m); break;
     case 'hl': MP.houseLocks = MP.houseLocks || {}; MP.houseLocks[f] = !!m.on; break;
+    case 'lk': mpLookRecv(f, m); break;
+    case 'lkq': if (MP_LK.msg) mpTo(f, Object.assign({}, MP_LK.msg)); break;
+    case 'fx': mpFx(m); break;
+    case 'gs': mpGameState(m); break;
+    case 'ge': mpGameEnd(m); break;
   }
 }
 function mpSetPlayers(list) {
@@ -25534,9 +25540,9 @@ function mpDropPeer(id) { const p = MP.players[id]; if (p && p.av) { scene.remov
 const mpJ = r => [r.hips, r.torso, r.neck, r.look, r.armL.sh, r.armL.el, r.armR.sh, r.armR.el, r.legL.hip, r.legL.kn, r.legR.hip, r.legR.kn];
 const MPV = new THREE.Vector3(), MPV2 = new THREE.Vector3(), r2 = v => Math.round(v * 100) / 100;
 function mpState() {
-  charHolder.updateMatrixWorld(true); const p = charHolder.getWorldPosition(MPV), s = charHolder.getWorldScale(MPV2).x, r = playerRig, j = [r2(r.hips.position.y)];
-  for (const o of mpJ(r)) j.push(r2(o.rotation.x), r2(o.rotation.y), r2(o.rotation.z));
-  const m = { t: 's', p: [r2(p.x), r2(p.y), r2(p.z)], ry: r2(charHolder.rotation.y), rx: r2(charHolder.rotation.x), rz: r2(charHolder.rotation.z), s: r2(s), a: curKey, h: inHouse ? MP.myHouse : '', j, tk: MP.talk ? 1 : 0, iv: ADM.invis ? 1 : 0, dd: dead ? 1 : 0 };
+  charHolder.updateMatrixWorld(true); const p = charHolder.getWorldPosition(MPV), s = charHolder.getWorldScale(MPV2).x, J = MP.lookJ || mpJ(playerRig), j = [r2(J[0].position.y)];
+  for (const o of J) j.push(r2(o.rotation.x), r2(o.rotation.y), r2(o.rotation.z));
+  const m = { t: 's', p: [r2(p.x), r2(p.y), r2(p.z)], ry: r2(charHolder.rotation.y), rx: r2(charHolder.rotation.x), rz: r2(charHolder.rotation.z), s: r2(s), a: curKey, h: inHouse ? MP.myHouse : '', j, lv: MP_LK.v, tk: MP.talk ? 1 : 0, iv: ADM.invis ? 1 : 0, dd: dead ? 1 : 0, tr: MPF.trail ? 1 : 0 };
   if (carried && carried.type === 'mp') { const o = carried.ref.av && carried.ref.av.holder; if (o) m.hp = [r2(o.position.x), r2(o.position.y), r2(o.position.z)]; }
   const ob = mpObjOut(); if (ob.length) m.ob = ob;
   return m;
@@ -25561,7 +25567,10 @@ function mpAvTick(p, dt) {
   const held = carried && carried.type === 'mp' && carried.ref === p, k = Math.min(1, dt * 12);
   if (!held) { H.position.x += (st.p[0] - H.position.x) * k; H.position.y += (st.p[1] - H.position.y) * k; H.position.z += (st.p[2] - H.position.z) * k; H.rotation.y += wrapAng(st.ry - H.rotation.y) * k; }
   H.rotation.x += (st.rx - H.rotation.x) * k; H.rotation.z += (st.rz - H.rotation.z) * k; const sc = H.scale.x + (st.s - H.scale.x) * k; H.scale.setScalar(sc); p.facing = H.rotation.y;
-  const j = st.j, r = av.rig; if (j && j.length >= 37) { r.hips.position.y += (j[0] - r.hips.position.y) * k; mpJ(r).forEach((o, i) => { o.rotation.x += (j[1 + i * 3] - o.rotation.x) * k; o.rotation.y += (j[2 + i * 3] - o.rotation.y) * k; o.rotation.z += (j[3 + i * 3] - o.rotation.z) * k; }); }
+  const j = st.j, J = av.jn || mpJ(av.rig); if (j && j.length > 3) { const n = Math.min(J.length, (j.length - 1) / 3 | 0); if (J[0]) J[0].position.y += (j[0] - J[0].position.y) * k; for (let i = 0; i < n; i++) { const o = J[i]; if (!o) continue; o.rotation.x += (j[1 + i * 3] - o.rotation.x) * k; o.rotation.y += (j[2 + i * 3] - o.rotation.y) * k; o.rotation.z += (j[3 + i * 3] - o.rotation.z) * k; } }
+  if (st.lv != null && st.lv !== p.lookV && elapsed - (p.lkq || -9) > 4) { p.lkq = elapsed; mpTo(p.id, { t: 'lkq' }); }
+  if (av.want && !av.vw) mpAvVrm(p); if (av.vw) { H.updateMatrixWorld(true); mpVrmPose(av); }
+  if (av.lab) av.lab.visible = !mpHideLabel(p);
   if (av.labTk !== p.talk) mpAvLabel(p);
   if (av.bub && (av.bubT -= dt) <= 0) { H.remove(av.bub); av.bub.material.map.dispose(); av.bub = null; }
   if (av.emo && (av.emoT -= dt) <= 0) { H.remove(av.emo); av.emo.material.map.dispose(); av.emo = null; }
@@ -25575,7 +25584,7 @@ function mpTick(dt) {
     MP.admChk = (MP.admChk || 0) - dt; if (MP.admChk <= 0) { MP.admChk = 1; const me = MP.players[MP.me.id]; if (me && me.admin !== mpIsAdm()) { me.admin = mpIsAdm(); mpSend({ t: 'admf', on: me.admin }); } }
     MP.sendT -= dt; if (MP.sendT <= 0) { MP.sendT = 1 / 12; mpSend(mpState()); }
     for (const id in MP.players) if (id !== MP.me.id) mpAvTick(MP.players[id], dt);
-    mpVoice(); mpHeldTick(); mpHoldTick(); mpCtlTick(dt); mpFollowTick(dt); mpCollide(); mpPvp(); mpEmoteTick(dt); mpVoteTick();
+    mpVoice(); mpHeldTick(); mpHoldTick(); mpCtlTick(dt); mpFollowTick(dt); mpCollide(); mpPvp(); mpEmoteTick(dt); mpVoteTick(); mpLookTick(dt); mpFunTick(dt);
     if (MP.host && MP.started) { MP.npcT -= dt; if (MP.npcT <= 0) { MP.npcT = .25; mpNpcSend(); } }
   } catch (e) { console.warn('mpTick', e); }
 }
@@ -25800,7 +25809,7 @@ function mpMachine() {   // köy meydanında ağ makinesi
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 160; const c = cv.getContext('2d'); c.fillStyle = '#0b1020'; c.fillRect(0, 0, 256, 160); c.fillStyle = '#69f0ae'; c.font = 'bold 54px system-ui'; c.textAlign = 'center'; c.fillText('👥', 128, 70); c.font = 'bold 30px system-ui'; c.fillText('AĞ', 128, 130);
   const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; const scr = new THREE.Mesh(new THREE.PlaneGeometry(.7, .44), new THREE.MeshStandardMaterial({ map: tx, emissive: 0xffffff, emissiveMap: tx, emissiveIntensity: .8 })); scr.position.set(0, 1.25, .31); g.add(scr);
   box(.5, .08, .25, M(0x263238), 0, .78, .38); for (let i = 0; i < 4; i++) box(.08, .04, .08, M([0xe53935, 0x43a047, 0xfdd835, 0x1e88e5][i]), -.18 + i * .12, .84, .38);
-  const lab = mpTxtSprite('👥 ' + adT('Ağ makinesi — çok oyunculu'), 'rgba(21,101,192,.92)'); lab.position.y = 2.2; g.add(lab);
+  const lab = mpTxtSprite('👥 ' + adT('Ağ makinesi'), 'rgba(21,101,192,.92)'); lab.material.depthTest = true; lab.scale.multiplyScalar(.55); lab.position.y = 2.05; g.add(lab);
   const x = 3.2, z = 4.2; g.position.set(x, terrH(x, z), z); g.rotation.y = Math.PI * .85; scene.add(g); MP.mach = g;
   obstacles.push({ x, z, r: .6, h: 1.8, top: 1.8, y0: 0, tb: 0, stand: true, pass: false });
 }
@@ -25858,10 +25867,10 @@ function mpCtlTick(dt) {
 }
 function mpFollowTick(dt) {
   if (!MP.follow) return; const p = MP.players[MP.follow]; if (!p || !p.av || !p.av.holder.visible) return; const P = player.position, H = p.av.holder.position, dx = H.x - P.x, dz = H.z - P.z, d = Math.hypot(dx, dz);
-  if (d > 2.6 * Math.max(1, giantS)) { const sp = Math.min(d, 7 * Math.max(1, giantS) * dt); P.x += dx / d * sp; P.z += dz / d * sp; facing = Math.atan2(dx, dz); }
+  if (d > (MPF.train ? 2.2 : 2.6) * Math.max(1, giantS)) { const sp = Math.min(d - (MPF.train ? 2 : 0), 7.5 * Math.max(1, giantS) * dt); P.x += dx / d * sp; P.z += dz / d * sp; facing = Math.atan2(dx, dz); }
 }
 // 📢 duyuru: seçilen ekranların ortasında büyük yazı
-function mpAnnounce(text, f) { const e = $('mpAnn'); e.innerHTML = `<small>📢 ${mpEsc(mpName(f))}</small>${mpEsc(text)}`; e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); clearTimeout(MP.annT); MP.annT = setTimeout(() => e.classList.remove('on'), 5500); play('magic', { gain: .4 }); }
+function mpAnnounce(text, f) { const e = $('mpAnn'); e.innerHTML = `${f && MP.players[f] ? `<small>📢 ${mpEsc(mpName(f))}</small>` : ''}${mpEsc(text)}`; e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); clearTimeout(MP.annT); MP.annT = setTimeout(() => e.classList.remove('on'), 5500); play('magic', { gain: .4 }); }
 // 👀 izleme ve 🗺️ harita kamerası (renderFrame'den)
 const MP_MAPCAM = new THREE.PerspectiveCamera(50, 1, 1, 4000);
 function mpCam() {
@@ -25898,23 +25907,23 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 #mpPanel .code{font-size:34px;font-weight:800;letter-spacing:6px;text-align:center;background:rgba(255,209,102,.15);border:1px dashed #ffd166;border-radius:12px;padding:8px;margin:6px 0}
 #mpPanel .pl{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,.05);margin:4px 0}#mpPanel .pl .dot{width:12px;height:12px;border-radius:50%}#mpPanel .pl .nm{flex:1}
 #mpPanel .pl button{padding:4px 7px;font-size:12px}#mpPanel .hint{opacity:.7;font-size:12px;margin:6px 0}#mpSt{min-height:18px;font-size:13px;opacity:.9;margin-top:6px}
-#mpHud{position:fixed;right:calc(10px + env(safe-area-inset-right));top:calc(54px + env(safe-area-inset-top));z-index:33;display:none;flex-direction:column;gap:6px}
-#mpHud button{width:46px;height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.25);background:rgba(14,20,34,.8);color:#fff;font-size:21px;cursor:pointer;touch-action:none;position:relative}
+#mpHud{position:fixed;left:50%;transform:translateX(-50%);top:calc(8px + env(safe-area-inset-top));z-index:33;display:none;flex-direction:row;gap:6px}
+#mpHud button{width:42px;height:42px;border-radius:13px;border:1px solid rgba(255,255,255,.25);background:rgba(14,20,34,.8);color:#fff;font-size:21px;cursor:pointer;touch-action:none;position:relative}
 #mpHud button.on{background:#c62828}#mpHud button.new::after{content:'';position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;background:#ffd166}
-#mpChat{position:fixed;right:calc(64px + env(safe-area-inset-right));top:calc(54px + env(safe-area-inset-top));z-index:34;width:min(330px,70vw);display:none;background:rgba(14,20,34,.9);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:8px;color:#fff;font:13px system-ui,sans-serif}
-#mpChat.on{display:block}#mpChatLog{max-height:34vh;overflow:auto;margin-bottom:6px}.mpcl{margin:2px 0;word-break:break-word}.mpcl.pv{background:rgba(142,36,170,.25);border-radius:6px;padding:1px 4px}
+#mpChat{position:fixed;left:50%;transform:translateX(-50%);top:calc(58px + env(safe-area-inset-top));z-index:34;width:min(360px,78vw);display:none;background:rgba(14,20,34,.9);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:8px;color:#fff;font:13px system-ui,sans-serif}
+#mpChat.on{display:block}#mpChatLog{max-height:min(34vh,180px);overflow:auto;margin-bottom:6px}.mpcl{margin:2px 0;word-break:break-word}.mpcl.pv{background:rgba(142,36,170,.25);border-radius:6px;padding:1px 4px}
 #mpChat .cr{display:flex;gap:4px}#mpChat input{flex:1;min-width:0;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:7px;font:inherit}#mpChat select{background:#1b2436;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;max-width:96px}
-#mpEmo{position:fixed;right:calc(64px + env(safe-area-inset-right));top:calc(110px + env(safe-area-inset-top));z-index:34;display:none;grid-template-columns:repeat(4,1fr);gap:5px;background:rgba(14,20,34,.92);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:8px;width:min(270px,70vw)}
+#mpEmo{position:fixed;left:50%;transform:translateX(-50%);top:calc(58px + env(safe-area-inset-top));z-index:34;display:none;grid-template-columns:repeat(6,1fr);gap:5px;background:rgba(14,20,34,.92);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:8px;width:min(400px,88vw)}
 #mpEmo.on{display:grid}#mpEmo button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:10px;color:#fff;font:11px system-ui;padding:6px 2px;cursor:pointer}#mpEmo button b{display:block;font-size:22px}
-#mpVote,#mpAsk,#mpHeld{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));transform:translateX(-50%);z-index:45;display:none;background:rgba(14,20,34,.94);border:1px solid #ffd166;border-radius:14px;padding:10px 14px;color:#fff;font:14px system-ui,sans-serif;text-align:center;min-width:250px}
+#mpVote,#mpAsk,#mpHeld{position:fixed;left:50%;top:calc(58px + env(safe-area-inset-top));transform:translateX(-50%);z-index:45;display:none;background:rgba(14,20,34,.94);border:1px solid #ffd166;border-radius:14px;padding:10px 14px;color:#fff;font:14px system-ui,sans-serif;text-align:center;min-width:250px}
 #mpVote button,#mpAsk button,#mpHeld button{margin:6px 4px 0;padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;font:inherit;font-size:16px;cursor:pointer}#mpVote button.on{background:#2e7d32}
 #mpVote .vc,#mpVote .vt{font-size:12px;opacity:.8;margin-top:4px}#mpAsk{top:calc(150px + env(safe-area-inset-top))}#mpHeld{top:auto;bottom:calc(120px + env(safe-area-inset-bottom));border-color:#ef5350}
-#mpNotes{position:fixed;left:50%;top:calc(118px + env(safe-area-inset-top));transform:translateX(-50%);z-index:44;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
+#mpNotes{position:fixed;left:50%;top:calc(108px + env(safe-area-inset-top));transform:translateX(-50%);z-index:44;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
 .mpn{background:rgba(14,20,34,.86);color:#fff;font:13px system-ui,sans-serif;padding:5px 12px;border-radius:999px;animation:mpn .25s ease}@keyframes mpn{from{opacity:0;transform:translateY(-6px)}}
 #mpAnn{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.8);z-index:58;opacity:0;pointer-events:none;text-align:center;color:#fff;font:800 clamp(26px,5vw,54px) system-ui,sans-serif;text-shadow:0 4px 18px rgba(0,0,0,.7);transition:all .3s;max-width:90vw}
 #mpAnn small{display:block;font-size:16px;font-weight:600;opacity:.85}#mpAnn.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
 #mpCtlBan{position:fixed;left:0;right:0;top:0;z-index:57;display:none;background:linear-gradient(90deg,#b71c1c,#4a148c);color:#fff;text-align:center;font:700 16px system-ui,sans-serif;padding:calc(8px + env(safe-area-inset-top)) 10px 8px}
-#mpAct{position:fixed;left:50%;bottom:calc(170px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:35;display:none;background:#1565c0;color:#fff;border:1px solid #90caf9;border-radius:999px;padding:10px 18px;font:700 15px system-ui,sans-serif;cursor:pointer}
+#mpAct{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:35;display:none;background:#1565c0;color:#fff;border:1px solid #90caf9;border-radius:999px;padding:10px 18px;font:700 15px system-ui,sans-serif;cursor:pointer}
 #mpAdm{position:fixed;left:calc(10px + env(safe-area-inset-left));top:calc(10px + env(safe-area-inset-top));z-index:61;width:min(420px,94vw);max-height:90vh;overflow:auto;display:none;background:rgba(14,20,34,.97);border:1px solid #ffd166;border-radius:14px;padding:10px;color:#fff;font:13px system-ui,sans-serif}
 #mpAdm.on{display:block}#mpAdm h4{margin:10px 0 5px;color:#ffd166}#mpAdm .g{display:grid;grid-template-columns:1fr 1fr;gap:5px}#mpAdm .g button{font-size:12px;padding:7px 5px;text-align:left}#mpAdm button.sel{background:#1565c0;border-color:#64b5f6}#mpAdm button.on{background:#2e7d32}
 #mpAdm .pls{display:flex;flex-wrap:wrap;gap:5px}#mpAdm input,#mpAdm select{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:6px;font:inherit}#mpAdm .se{display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px}#mpAdm .se label{display:flex;flex-direction:column;gap:2px}
@@ -25947,7 +25956,7 @@ function mpUI() {
         ${mine ? '' : `<button data-mp="perm" data-id="${p.id}" title="${adT('Beni tutabilir')}">${myPerm.includes(p.id) ? '🤚✅' : '🤚❌'}</button><button data-mp="mute" data-id="${p.id}">${MP.mutes[p.id] ? '🔇' : '🔊'}</button>`}${canKick ? `<button data-mp="kick" data-id="${p.id}">🚫</button>` : ''}</div>`; }).join('')}
     <div class="row">${MP.started ? '' : `<button class="b ${me && me.ready ? 'on' : 'pri'}" data-mp="ready" style="flex:1">${me && me.ready ? '✅ ' + adT('Hazırım') : '⏳ ' + adT('Hazır ol')}</button>`}
       <button class="b" data-mp="lockh">${MP.houseLock ? '🔒 ' + adT('Evim kilitli') : '🔓 ' + adT('Evim açık')}</button><button class="b" data-mp="leave">🚪 ${adT('Odadan çık')}</button></div>
-    <div class="hint">🤚 ${adT('= o oyuncu dev olunca seni tutabilir mi (sen izin verirsin)')} · 🔊 ${adT('= sesini kıs')} · ${iAmOwner ? '🏠 ' + adT('Oda sahibisin: 🚫 ile atabilirsin') : ''}${adm ? ' · 👑 ' + adT('Admin: Admin paneli → 👥 Çok oyunculu') : ''}</div>`;
+    <div class="hint">🤚 ${adT('= o oyuncu dev olunca seni tutabilir mi (sen izin verirsin)')} · 🔊 ${adT('= sesini kıs')} · ${iAmOwner ? '🏠 ' + adT('Oda sahibisin: 🚫 ile atabilirsin') : ''}${adm ? ' · 👑 ' + adT('Admin: Admin paneli → 👥 Çok oyunculu') : ''}</div>${mpFunUI()}`;
   const sel = $('mpChatTo'), cur = sel.value; sel.innerHTML = `<option value="">${adT('Herkes')}</option>` + ps.filter(p => p.id !== MP.me.id).map(p => `<option value="${p.id}">🔒 ${mpEsc(p.name)}</option>`).join(''); sel.value = cur;
   if ($('mpAdm').classList.contains('on')) mpAdmUI();
 }
@@ -26084,6 +26093,264 @@ $('mpMap').addEventListener('wheel', e => { if (!MP.map) return; MP.map.h = THRE
 }
 // odada GLB yasak
 { const _cp = crigPick; crigPick = function () { if (MP.on) { mpNote('🧩 ' + adT('Çok oyunculu odada kendi model (GLB) yasak'), 2.6); return; } return _cp(); }; }
+
+// ---------- 👤 görünüm: karşı taraf karakterini aynen görür (çöp adamın en son hali, anime karakter, Pati / Hamam böceği) ----------
+const MP_LK = { v: 0, sig: '', t: 0, msg: null, sent: new Set(), busy: false };
+function mpHeroJ() { const R = HERO.rig, out = [HERO.pivot]; for (const k of ['hips', 'torso', 'neck', 'head', 'armL', 'armR', 'legL', 'legR', 'tail', 'scarfTail']) { const v = R && R[k]; if (!v) continue; if (v.isObject3D) out.push(v); else for (const q of Object.values(v)) if (q && q.isObject3D) out.push(q); } return out.slice(0, 30); }
+function mpLookNow() {
+  if (HERO.on) return { type: 'snap', kind: 'hero:' + HERO.kind, root: HERO.root, J: mpHeroJ() };
+  if (ANIME.on && ANIME.kind !== 'custom' && VRMS[ANIME.kind]) return { type: 'vrm', kind: ANIME.kind, J: mpJ(playerRig) };
+  return { type: 'snap', kind: 'stick', root: playerRig.stick, J: mpJ(playerRig) };
+}
+const mpHash = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
+function mpLookSig(L) {
+  if (L.type === 'vrm') return 'vrm:' + L.kind; let s = '', n = 0;
+  L.root.traverse(o => { if (o.isMesh && o.visible) { n++; const m = Array.isArray(o.material) ? o.material[0] : o.material; s += o.geometry.id + ':' + (m && m.color ? m.color.getHex() : 0) + ':' + o.scale.x.toFixed(2) + ','; } });
+  return L.kind + ':' + n + ':' + mpHash(s);
+}
+async function mpLookBuild(L) {
+  const m = { t: 'lk', v: ++MP_LK.v, type: L.type, kind: L.kind };
+  if (L.type === 'snap') {
+    const old = L.J.map(o => o.name); L.J.forEach((o, i) => { o.name = 'mpj' + i; });
+    let js; try { const vis = L.root.visible; L.root.visible = true; js = JSON.stringify(L.root.toJSON()); L.root.visible = vis; } finally { L.J.forEach((o, i) => { o.name = old[i]; }); }
+    m.n = L.J.length;
+    if (window.CompressionStream) { const cs = new Blob([js]).stream().pipeThrough(new CompressionStream('gzip')); m.z = new Uint8Array(await new Response(cs).arrayBuffer()); } else m.s = js;
+  }
+  return m;
+}
+function mpLookTick(dt) {   // 1,5 sn'de bir: görünüm değiştiyse (kıyafet, renk, karakter) herkese yeni hali gider
+  if (!MP.lookJ) MP.lookJ = mpJ(playerRig);
+  MP_LK.t -= dt; if (MP_LK.t > 0 || MP_LK.busy) return; MP_LK.t = 1.5;
+  const L = mpLookNow(), sig = mpLookSig(L);
+  if (sig !== MP_LK.sig) {
+    MP_LK.busy = true;
+    mpLookBuild(L).then(m => { MP_LK.busy = false; MP_LK.sig = sig; MP_LK.msg = m; MP.lookJ = L.J; MP_LK.sent = new Set(Object.keys(MP.players)); mpSend(Object.assign({}, m)); })
+      .catch(e => { MP_LK.busy = false; MP_LK.sig = sig; console.warn('mp look', e); });
+    return;
+  }
+  if (MP_LK.msg) for (const id in MP.players) if (id !== MP.me.id && !MP_LK.sent.has(id)) { MP_LK.sent.add(id); mpTo(id, Object.assign({}, MP_LK.msg)); }
+}
+function mpDispose(o) { o.traverse(q => { if (q.geometry) q.geometry.dispose(); const ms = q.material ? (Array.isArray(q.material) ? q.material : [q.material]) : []; for (const m of ms) { if (m.map) m.map.dispose(); m.dispose(); } }); }
+function mpLookClear(av) {
+  if (av.snap) { av.body.remove(av.snap); mpDispose(av.snap); av.snap = null; } av.jn = null;
+  if (av.vw) { av.body.remove(av.vw); av.vw = null; av.vb = null; av.vm = null; } av.want = null; av.rig.stick.visible = true;
+}
+async function mpLookRecv(f, m) {
+  const p = MP.players[f]; if (!p) return; p.lookV = m.v; const av = p.av || mpAvatar(p);
+  if (m.type === 'vrm') { mpLookClear(av); av.want = m.kind; mpAvVrm(p); return; }
+  let js = m.s;
+  try { if (!js && m.z) { const ds = new Blob([m.z]).stream().pipeThrough(new DecompressionStream('gzip')); js = await new Response(ds).text(); } } catch (e) { console.warn('look unzip', e); return; }
+  if (!js || p.lookV !== m.v || !p.av) return;
+  let obj; try { obj = new THREE.ObjectLoader().parse(JSON.parse(js)); } catch (e) { console.warn('look parse', e); return; }
+  const jn = []; obj.traverse(o => { const q = /^mpj(\d+)$/.exec(o.name || ''); if (q) jn[+q[1]] = o; if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+  mpLookClear(av); av.snap = obj; av.jn = jn; av.rig.stick.visible = false; av.body.add(obj);
+}
+function mpAvVrm(p) {   // anime karakter: o model (3D modeller kapalı olsa bile) yüklenir, kopyası arkadaşın iskeletini izler
+  const av = p.av; if (!av || !av.want || av.vw) return; const M = VRMS[av.want]; if (!M) return;
+  if (M.state === 'none') { M.force = true; vrmLoad(M); return; }
+  if (M.state !== 'ready' || !M.wrap) return;
+  const src = [], dst = []; M.wrap.traverse(o => src.push(o)); const cl = SkeletonUtils.clone(M.wrap); cl.traverse(o => dst.push(o));
+  const vb = {}; for (const k in M.bones) { const i = src.indexOf(M.bones[k]); if (i >= 0) { vb[k] = dst[i]; vb[k].userData.vk = k; } }
+  cl.visible = true; cl.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
+  av.body.add(cl); av.vw = cl; av.vb = vb; av.vm = M; av.rig.stick.visible = false;
+}
+function mpAim(b, tw, R) { const r = R[b.userData.vk]; if (!r || !r.dir) return; const pq = b.parent.getWorldQuaternion(new THREE.Quaternion()), q2 = pq.clone().multiply(r.local), r0 = r.dir.clone().applyQuaternion(q2); const q3 = new THREE.Quaternion().setFromUnitVectors(r0, tw).multiply(q2); b.quaternion.copy(pq.invert()).multiply(q3); b.updateMatrixWorld(true); }
+function mpVrmPose(av) {   // (arkadaş sistemindeki eşlemenin her model için hali)
+  const Bn = av.vb, W = av.vw, r = av.rig, M = av.vm, R = M && M.rest; if (!Bn || !W || !Bn.hips || !R || !R.hips) return;
+  W.updateMatrixWorld(true);
+  const Rw = W.getWorldQuaternion(new THREE.Quaternion()), Ri = Rw.clone().invert();
+  const rel = o => Ri.clone().multiply(o.getWorldQuaternion(new THREE.Quaternion()));
+  const tgt = (k, q) => { if (Bn[k] && R[k]) vrmSetWorld(Bn[k], Rw.clone().multiply(q).multiply(R[k].rel)); };
+  const qh = rel(r.hips), qt = rel(r.torso);
+  tgt('hips', qh); Bn.hips.position.copy(R.hips.pos).add(new THREE.Vector3(r.hips.position.x, r.hips.position.y - 1, r.hips.position.z).multiplyScalar(1 / M.scale)); Bn.hips.updateMatrixWorld(true);
+  tgt('spine', qh.clone().slerp(qt, .5)); tgt('chest', qt); tgt('upperChest', qt); tgt('leftShoulder', qt); tgt('rightShoulder', qt); tgt('neck', rel(r.neck)); tgt('head', rel(r.look));
+  const wp = (o, y) => o.localToWorld(new THREE.Vector3(0, y, 0));
+  for (const [S, sd] of [['left', r.armL], ['right', r.armR]]) { const U = Bn[S + 'UpperArm'], Lo = Bn[S + 'LowerArm']; if (!U || !Lo || !R[S + 'UpperArm']) continue; const a = sd.sh.getWorldPosition(new THREE.Vector3()), e = sd.el.getWorldPosition(new THREE.Vector3()), h = wp(sd.el, -.32); mpAim(U, e.clone().sub(a).normalize(), R); mpAim(Lo, h.sub(e).normalize(), R); }
+  for (const [S, lg] of [['left', r.legL], ['right', r.legR]]) { const U = Bn[S + 'UpperLeg'], Lo = Bn[S + 'LowerLeg']; const a = lg.hip.getWorldPosition(new THREE.Vector3()), k = lg.kn.getWorldPosition(new THREE.Vector3()), f = wp(lg.kn, -.47); if (U && R[S + 'UpperLeg']) mpAim(U, k.clone().sub(a).normalize(), R); if (Lo && R[S + 'LowerLeg']) mpAim(Lo, f.sub(k).normalize(), R); }
+}
+// ---------- 🎉 eğlence: 10 özellik (👥 menüsünde) ----------
+const MPF = { compass: false, trail: false, train: false, trails: {}, fx: [], pings: [], photoT: 0, cmp: {} };
+const MP_FUN = [['ping', '📍', 'İşaret koy', 'baktığın yere herkesin göreceği işaret'], ['compass', '🧭', 'Arkadaş pusulası', 'ekran kenarında arkadaşlarının yönü ve uzaklığı'], ['trail', '🌈', 'Gökkuşağı iz', 'arkanda herkesin göreceği renkli iz'],
+  ['fw', '🎆', 'Havai fişek', 'herkesin gökyüzünde gösteri'], ['photo', '📸', 'Grup fotoğrafı', '3-2-1, herkes poz verir, fotoğraf iner'], ['sfx', '🔊', 'Ses panosu', 'herkese komik sesler'],
+  ['train', '🚂', 'Tren', 'herkes arka arkaya seni takip eder'], ['hide', '🙈', 'Saklambaç', 'bir ebe, herkes saklanır'], ['pot', '💣', 'Sıcak patates', 'dokunarak geçir, sende patlamasın'], ['race', '🏁', 'Yarış', 'uzaktaki bayrağa ilk varan kazanır']];
+const MP_SFX = [['goal', '🎉', 'Gol!'], ['laugh', '😂', 'Kahkaha'], ['whistle', '📯', 'Düdük'], ['bell', '🔔', 'Zil'], ['bark', '🐶', 'Hav'], ['boing', '🤪', 'Boing']];
+function mpFunUI() {
+  const g = MP.game;
+  return `<div class="hint" style="margin-top:10px;font-weight:700;opacity:1">🎉 ${adT('Eğlence')}</div><div class="mpfun">${MP_FUN.map(([k, ic, t, d]) => {
+    const on = (k === 'compass' && MPF.compass) || (k === 'trail' && MPF.trail) || (k === 'train' && MPF.train) || (g && g.g === k);
+    return `<button class="b${on ? ' on' : ''}" data-fun="${k}"><b>${ic}</b> ${adT(t)}<small>${on && g && g.g === k ? adT('⏹ bitirmek için dokun') : adT(d)}</small></button>`; }).join('')}</div>
+    <div class="mpsfx" id="mpSfxRow" style="display:none">${MP_SFX.map(([k, ic, t]) => `<button class="b" data-sfx="${k}">${ic}<small>${adT(t)}</small></button>`).join('')}</div>`;
+}
+function mpFunPress(k) {
+  if (k === 'compass') { MPF.compass = !MPF.compass; if (!MPF.compass) $('mpCmp').innerHTML = ''; mpNote(MPF.compass ? '🧭 ' + adT('Pusula açık') : adT('Pusula kapalı'), 1.4); mpUI(); return; }
+  if (k === 'trail') { MPF.trail = !MPF.trail; mpNote(MPF.trail ? '🌈 ' + adT('Gökkuşağı iz açık') : adT('İz kapalı'), 1.4); mpUI(); return; }
+  if (k === 'sfx') { const r = $('mpSfxRow'); r.style.display = r.style.display === 'none' ? 'grid' : 'none'; return; }
+  if (k === 'ping') { const p = mpLookPoint(); const m = { t: 'fx', k: 'ping', p: [r2(p.x), r2(p.y), r2(p.z)] }; mpSend(m); mpFx(Object.assign({ f: MP.me.id }, m)); mpPanel(false); return; }
+  if (k === 'fw') { const P = player.position, m = { t: 'fx', k: 'fw', p: [r2(P.x + Math.sin(facing) * 8 * Math.max(1, giantS)), r2(P.y), r2(P.z + Math.cos(facing) * 8 * Math.max(1, giantS))], seed: Math.random() * 1e6 | 0 }; mpSend(m); mpFx(Object.assign({ f: MP.me.id }, m)); mpPanel(false); return; }
+  if (k === 'photo') { const m = { t: 'fx', k: 'photo' }; mpSend(m); mpFx(Object.assign({ f: MP.me.id }, m)); mpPanel(false); return; }
+  if (k === 'train') { const m = { t: 'fx', k: 'train', on: !MPF.train, order: MPF.train ? null : [MP.me.id, ...Object.values(MP.players).filter(p => p.id !== MP.me.id).sort((a, b) => a.slot - b.slot).map(p => p.id)] }; mpSend(m); mpFx(Object.assign({ f: MP.me.id }, m)); mpUI(); return; }
+  if (k === 'hide' || k === 'pot' || k === 'race') { if (MP.game && MP.game.g === k) mpSend({ t: 'gx' }); else if (MP.game) mpNote('🎮 ' + adT('Önce süren oyunu bitirin'), 2); else { const P = player.position; mpSend({ t: 'gq', g: k, p: [r2(P.x), r2(P.y), r2(P.z)], a: curKey }); mpPanel(false); } }
+}
+function mpLookPoint() {   // baktığın yer (en fazla 70 m)
+  const dir = new THREE.Vector3(); camera.getWorldDirection(dir); const o = camera.position, P = player.position, S = Math.max(1, giantS);
+  for (let t = 2; t < 70 * S; t += .8 * S) { const x = o.x + dir.x * t, y = o.y + dir.y * t, z = o.z + dir.z * t, gy = curKey === 'hub' ? terrH(x, z) : P.y; if (y <= gy + .05) return new THREE.Vector3(x, gy, z); }
+  return new THREE.Vector3(P.x + Math.sin(facing) * 10 * S, P.y, P.z + Math.cos(facing) * 10 * S);
+}
+function mpFx(m) {
+  const P = MP.players[m.f], nm = P ? P.name : '?', col = P ? P.color : 0xffd166;
+  if (m.k === 'ping') { const g = new THREE.Group(), c = new THREE.Color(col); const beam = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, 40, 10, 1, true), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: .45, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.y = 20; g.add(beam); const ring = new THREE.Mesh(new THREE.RingGeometry(.7, 1.1, 32), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: .8, side: THREE.DoubleSide, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = .06; g.add(ring);
+    const lab = mpTxtSprite('📍 ' + nm, `#${c.getHexString()}`); lab.position.y = 3; lab.scale.multiplyScalar(1.2); g.add(lab); g.position.set(m.p[0], m.p[1], m.p[2]); g.userData.a = curKey; scene.add(g); MPF.pings.push({ g, t: 14, nm, ring }); play('ding', { gain: .5 }); mpNote(`📍 ${nm} ${adT('bir yer işaretledi')}`, 2); return; }
+  if (m.k === 'fw') { mpFireworks(new THREE.Vector3(m.p[0], m.p[1], m.p[2]), m.seed || 1); mpNote(`🎆 ${nm}`, 1.6); return; }
+  if (m.k === 'sfx') { play(m.id, { gain: .8 }); const e = MP_SFX.find(x => x[0] === m.id); mpNote(`🔊 ${nm}: ${e ? e[1] + ' ' + adT(e[2]) : ''}`, 1.6); if (P && P.av && m.f !== MP.me.id) mpEmoteShowIcon(P, e ? e[1] : '🔊'); return; }
+  if (m.k === 'photo') { MPF.photoT = 3.99; MPF.photoBy = nm; return; }
+  if (m.k === 'train') { MPF.train = !!m.on; MP.follow = null; if (m.on && m.order) { const i = m.order.indexOf(MP.me.id); if (i > 0) { MP.follow = m.order[i - 1]; mpNote(`🚂 ${adT('Trendesin! Önündeki')}: ${mpName(m.order[i - 1])}`, 2.6); } else if (i === 0) mpNote('🚂 ' + adT('Lokomotif sensin — herkes seni takip ediyor'), 2.6); } else mpNote('🚂 ' + adT('Tren dağıldı'), 1.8); mpUI(); return; }
+}
+function mpEmoteShowIcon(p, ic) { const av = p.av; if (!av) return; if (av.emo) { av.holder.remove(av.emo); av.emo.material.map.dispose(); } av.emo = mpTxtSprite(ic, 'rgba(0,0,0,0)', 256, 64); av.emo.scale.set(1.1, .75, 1); av.emo.position.y = 2.7; av.holder.add(av.emo); av.emoT = 2; }
+function mpFireworks(at, seed) {   // 4 roket yükselir, renkli patlar
+  let s = seed; const rnd2 = () => (s = (s * 16807) % 2147483647) / 2147483647, S = Math.max(1, giantS * .6);
+  for (let r = 0; r < 4; r++) {
+    const N = 90, geo = new THREE.BufferGeometry(), pos = new Float32Array(N * 3), colA = new Float32Array(N * 3), c = new THREE.Color().setHSL(rnd2(), .9, .6), c2 = new THREE.Color().setHSL(rnd2(), .9, .65);
+    for (let i = 0; i < N; i++) { const cc = i % 3 ? c : c2; colA.set([cc.r, cc.g, cc.b], i * 3); }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(colA, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: .5 * S, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true })); pts.frustumCulled = false; scene.add(pts);
+    const st = new THREE.Vector3(at.x + (rnd2() - .5) * 8 * S, at.y + .5, at.z + (rnd2() - .5) * 8 * S), vel = []; for (let i = 0; i < N; i++) { const th = rnd2() * Math.PI * 2, ph = Math.acos(rnd2() * 2 - 1), sp = (6 + rnd2() * 5) * S; vel.push(new THREE.Vector3(Math.sin(ph) * Math.cos(th) * sp, Math.cos(ph) * sp, Math.sin(ph) * Math.sin(th) * sp)); }
+    MPF.fx.push({ pts, pos, vel, st, h: (16 + rnd2() * 10) * S, t: -r * .45, ph: 0, S });
+  }
+  play('portal', { gain: .35 });
+}
+function mpTrailTick(dt) {
+  const want = {}; if (MPF.trail) want[MP.me.id] = { pos: charHolder.getWorldPosition(new THREE.Vector3()), col: (MP.players[MP.me.id] || {}).color || 0xffffff, s: giantS };
+  for (const id in MP.players) { const p = MP.players[id]; if (id !== MP.me.id && p.st && p.st.tr && p.av && p.av.holder.visible) want[id] = { pos: p.av.holder.position, col: p.color, s: p.av.holder.scale.x }; }
+  for (const id in MPF.trails) if (!want[id]) { scene.remove(MPF.trails[id].mesh); MPF.trails[id].mesh.geometry.dispose(); delete MPF.trails[id]; }
+  for (const id in want) {
+    let T = MPF.trails[id]; const W = want[id];
+    if (!T) { const N = 70, geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 2 * 3), 3)); geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 2 * 3), 3)); const idx = []; for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } geo.setIndex(idx);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .7, side: THREE.DoubleSide, depthWrite: false })); mesh.frustumCulled = false; scene.add(mesh); T = MPF.trails[id] = { mesh, pts: [], N, acc: 0 }; }
+    T.acc += dt; if (T.acc > .05) { T.acc = 0; const last = T.pts[T.pts.length - 1]; if (!last || last.distanceToSquared(W.pos) > .01) { T.pts.push(W.pos.clone()); if (T.pts.length > T.N) T.pts.shift(); } }
+    const pa = T.mesh.geometry.attributes.position, ca = T.mesh.geometry.attributes.color, n = T.pts.length, h = .9 * W.s, c = new THREE.Color();
+    for (let i = 0; i < T.N; i++) { const q = T.pts[Math.min(n - 1, Math.max(0, i - (T.N - n)))] || W.pos, f = i / (T.N - 1); c.setHSL((f * .9 + elapsed * .2) % 1, .9, .55).multiplyScalar(f); pa.setXYZ(i * 2, q.x, q.y + .15 * W.s, q.z); pa.setXYZ(i * 2 + 1, q.x, q.y + .15 * W.s + h * f, q.z); ca.setXYZ(i * 2, c.r, c.g, c.b); ca.setXYZ(i * 2 + 1, c.r, c.g, c.b); }
+    pa.needsUpdate = ca.needsUpdate = true;
+  }
+}
+function mpCompassTick() {
+  const box = $('mpCmp'); if (!MPF.compass && !(MP.game && MP.game.g === 'race')) { if (box.childElementCount) box.innerHTML = ''; return; }
+  const items = []; if (MPF.compass && !(MP.game && MP.game.g === 'hide')) for (const id in MP.players) { const p = MP.players[id]; if (id !== MP.me.id && p.av && p.av.holder.visible) items.push({ k: id, pos: p.av.holder.position.clone().add(new THREE.Vector3(0, 1.6 * p.av.holder.scale.x, 0)), txt: p.name, col: '#' + new THREE.Color(p.color).getHexString() }); }
+  for (const q of MPF.pings) if (q.g.userData.a === curKey) items.push({ k: 'pg' + q.nm, pos: q.g.position, txt: '📍 ' + q.nm, col: '#ffd166' });
+  if (MP.game && MP.game.g === 'race' && MP.game.p) items.push({ k: 'race', pos: new THREE.Vector3(MP.game.p[0], MP.game.p[1] + 3, MP.game.p[2]), txt: '🏁 ' + adT('Bitiş'), col: '#69f0ae' });
+  const W = innerWidth, H = innerHeight, mg = 34, seen = new Set(), P = player.position;
+  for (const it of items) {
+    seen.add(it.k); let e = MPF.cmp[it.k]; if (!e || !e.isConnected) { e = MPF.cmp[it.k] = document.createElement('div'); e.className = 'mpcp'; box.appendChild(e); }
+    const v = it.pos.clone().project(camera), behind = v.z > 1; let x = (v.x * .5 + .5) * W, y = (-v.y * .5 + .5) * H; if (behind) { x = W - x; y = H - y; }
+    const on = !behind && x > mg && x < W - mg && y > mg && y < H - mg, d = Math.round(it.pos.distanceTo(P) / Math.max(1, giantS));
+    if (on) { e.style.display = 'none'; continue; }
+    const cx = W / 2, cy = H / 2, dx = x - cx, dy = y - cy, k = Math.min((W / 2 - mg) / Math.abs(dx || 1e-3), (H / 2 - mg) / Math.abs(dy || 1e-3)), ax = cx + dx * k, ay = cy + dy * k, ang = Math.atan2(dy, dx);
+    e.style.display = 'block'; e.style.left = ax + 'px'; e.style.top = ay + 'px'; e.style.borderColor = it.col; e.innerHTML = `<i style="transform:rotate(${ang}rad);color:${it.col}">➤</i>${mpEsc(it.txt)} · ${d} m`;
+  }
+  for (const k in MPF.cmp) if (!seen.has(k)) { MPF.cmp[k].remove(); delete MPF.cmp[k]; }
+}
+function mpFunTick(dt) {
+  mpTrailTick(dt); mpCompassTick(); mpGameTick(dt);
+  for (let i = MPF.pings.length - 1; i >= 0; i--) { const q = MPF.pings[i]; q.t -= dt; q.g.visible = q.g.userData.a === curKey; q.ring.scale.setScalar(1 + .25 * Math.sin(elapsed * 6)); if (q.t <= 0) { scene.remove(q.g); mpDispose(q.g); MPF.pings.splice(i, 1); } }
+  for (let i = MPF.fx.length - 1; i >= 0; i--) { const F = MPF.fx[i]; F.t += dt; if (F.t < 0) continue; const N = F.vel.length;
+    if (F.ph === 0) { const y = F.st.y + Math.min(F.h, F.t * 22 * F.S); for (let j = 0; j < N; j++) F.pos.set([F.st.x + (Math.random() - .5) * .2, y - Math.random() * 1.5 * F.S, F.st.z + (Math.random() - .5) * .2], j * 3); if (y >= F.st.y + F.h) { F.ph = 1; F.t0 = F.t; F.c = new THREE.Vector3(F.st.x, y, F.st.z); play('slam', { gain: .25 }); } }
+    else { const tt = F.t - F.t0; for (let j = 0; j < N; j++) { const v = F.vel[j]; F.pos.set([F.c.x + v.x * tt, F.c.y + v.y * tt - 4.9 * tt * tt * F.S, F.c.z + v.z * tt], j * 3); } F.pts.material.opacity = Math.max(0, 1 - tt / 2.2); if (tt > 2.2) { scene.remove(F.pts); F.pts.geometry.dispose(); F.pts.material.dispose(); MPF.fx.splice(i, 1); continue; } }
+    F.pts.geometry.attributes.position.needsUpdate = true; }
+  if (MPF.photoT > 0) { const was = Math.ceil(MPF.photoT); MPF.photoT -= dt; const now = Math.ceil(MPF.photoT), e = $('mpBig');
+    if (now !== was || !e.classList.contains('on')) { e.textContent = now > 0 ? `📸 ${now}` : '😁'; e.classList.add('on'); if (now === 1) { MP.emote = { id: 'heart', t: 2.2 }; mpSend({ t: 'em', id: 'heart' }); } }
+    if (MPF.photoT <= 0) { e.classList.remove('on'); mpSnap(); } }
+}
+function mpSnap() {   // fotoğraf: o anki ekran (arayüz hariç)
+  try { renderFrame(); const url = renderer.domElement.toDataURL('image/jpeg', .9), w = $('mpPhoto'); w.querySelector('img').src = url; const a = w.querySelector('a'); a.href = url; a.download = `SFT-grup-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.jpg`; w.classList.add('on'); play('ding', { gain: .6 });
+    const fl = $('mpFlash'); fl.classList.remove('on'); void fl.offsetWidth; fl.classList.add('on'); } catch (e) { console.warn('photo', e); }
+}
+function mpFunReset() { for (const id in MPF.trails) { scene.remove(MPF.trails[id].mesh); } MPF.trails = {}; for (const q of MPF.pings) scene.remove(q.g); MPF.pings = []; for (const F of MPF.fx) scene.remove(F.pts); MPF.fx = []; MPF.train = false; MPF.trail = false; MP.game = null; mpGameHud(); if ($('mpCmp')) $('mpCmp').innerHTML = ''; MPF.cmp = {}; if (MPF.flag) { scene.remove(MPF.flag); MPF.flag = null; } }
+// ---------- 🎮 mini oyunlar: ev sahibi hakem ----------
+function mpGameHost(m) {
+  const G = MP.game, now = performance.now(), ids = Object.keys(MP.players);
+  if (m.t === 'gx') { if (G) mpGameFinish(G.g === 'hide' ? { g: 'hide', why: 'stop' } : { g: G.g, why: 'stop' }); return; }
+  if (m.t === 'gq') {
+    if (G || ids.length < 2) { mpTo(m.f, { t: 'note', text: ids.length < 2 ? '🎮 ' + adT('En az 2 kişi gerekir') : '🎮 ' + adT('Zaten bir oyun sürüyor') }); return; }
+    if (m.g === 'hide') { const seeker = ids[Math.random() * ids.length | 0]; MP.game = { g: 'hide', seeker, tagged: [], hideEnd: now + 20000, end: now + 140000 }; }
+    else if (m.g === 'pot') MP.game = { g: 'pot', holder: ids[Math.random() * ids.length | 0], end: now + 22000 + Math.random() * 14000, pass: 0 };
+    else if (m.g === 'race') { const a = Math.random() * Math.PI * 2, d = 70 + Math.random() * 70; let x = m.p[0] + Math.sin(a) * d, z = m.p[2] + Math.cos(a) * d; const A = AREAS[m.a]; if (A && A.r) { const dx = x - A.cx, dz = z - A.cz, L = Math.hypot(dx, dz); if (L > A.r * .8) { x = A.cx + dx / L * A.r * .8; z = A.cz + dz / L * A.r * .8; } } const y = m.a === 'hub' ? terrH(x, z) : m.p[1]; MP.game = { g: 'race', p: [r2(x), r2(y), r2(z)], a: m.a, go: now + 3600, end: now + 100000, fin: [] }; }
+    else return;
+    MP.game.by = m.f; mpGameBroadcast(); return;
+  }
+  if (!G) return;
+  if (m.t === 'gt' && G.g === 'hide' && m.f === G.seeker && now > G.hideEnd && !G.tagged.includes(m.id) && m.id !== G.seeker && MP.players[m.id]) { G.tagged.push(m.id); mpGameBroadcast(); mpBroadcast({ t: 'note', text: `🙈 ${mpName(m.id)} ${adT('yakalandı!')}` }); mpNote(`🙈 ${mpName(m.id)} ${adT('yakalandı!')}`); if (ids.filter(i => i !== G.seeker).every(i => G.tagged.includes(i))) mpGameFinish({ g: 'hide', why: 'all' }); }
+  if (m.t === 'gp' && G.g === 'pot' && m.f === G.holder && MP.players[m.id] && now - G.pass > 1200) { G.holder = m.id; G.pass = now; mpGameBroadcast(); }
+  if (m.t === 'gf' && G.g === 'race' && !G.fin.includes(m.f) && now > G.go) { G.fin.push(m.f); mpGameBroadcast(); const t = `🏁 ${G.fin.length}. ${mpName(m.f)}${G.fin.length === 1 ? ' — ' + adT('KAZANDI! 🏆') : ''}`; mpBroadcast({ t: 'note', text: t }); mpNote(t, 3); if (G.fin.length >= ids.length) mpGameFinish({ g: 'race', why: 'all' }); }
+}
+function mpGameBroadcast() { const G = MP.game, now = performance.now(), m = Object.assign({ t: 'gs' }, G); for (const k of ['hideEnd', 'end', 'go']) if (G[k] != null) m[k] = G[k] - now; delete m.pass; mpBroadcast(m); mpGameState(Object.assign({}, m, { f: MP.me.id })); }
+function mpGameFinish(r) { const G = MP.game; if (!G) return; const m = { t: 'ge', g: G.g, why: r.why, seeker: G.seeker, tagged: G.tagged, holder: G.holder, fin: G.fin }; MP.game = null; mpBroadcast(m); mpGameEnd(Object.assign({ f: MP.me.id }, m)); }
+function mpGameState(m) {   // herkes: süreler (ms) bu cihazın saatine çevrilir
+  const now = performance.now(), prev = MP.gameL; MP.gameL = Object.assign({}, m); const L = MP.gameL; for (const k of ['hideEnd', 'end', 'go']) if (m[k] != null) L[k] = now + m[k];
+  if (!MP.host) MP.game = L; else MP.game = Object.assign(MP.game || {}, {});
+  if (!prev || prev.g !== L.g) { const nm = { hide: '🙈 ' + adT('Saklambaç'), pot: '💣 ' + adT('Sıcak patates'), race: '🏁 ' + adT('Yarış') }[L.g]; mpAnnounce(nm + ' ' + adT('başladı!'), L.by); if (L.g === 'race') mpRaceFlag(L.p); }
+  if (L.g === 'pot' && prev && prev.holder !== L.holder && L.holder === MP.me.id) mpNote('💣 ' + adT('Patates sende! Birine dokun!'), 2.4);
+  mpGameHud();
+}
+function mpGameEnd(m) {
+  MP.gameL = null; if (!MP.host) MP.game = null; if (MPF.flag) { scene.remove(MPF.flag); mpDispose(MPF.flag); MPF.flag = null; } MPF.lockG = false;
+  let t = '';
+  if (m.why === 'stop') t = '⏹ ' + adT('Oyun bitirildi');
+  else if (m.g === 'hide') t = m.why === 'all' ? `🙈 ${mpName(m.seeker)} ${adT('herkesi buldu! Ebe kazandı 🏆')}` : `🙈 ${adT('Süre bitti — saklananlar kazandı 🏆')}`;
+  else if (m.g === 'pot') { t = `💥 ${adT('Patates')} ${mpName(m.holder)} ${adT('elinde patladı!')}`; if (m.holder === MP.me.id) { vy = 20; vel.set((Math.random() - .5) * 10, 0, (Math.random() - .5) * 10); onGround = false; const P = player.position; for (let i = 0; i < 26; i++) spawnDust(P.x, P.y + 1, P.z, .8, 1.4, (Math.random() - .5) * 6, (Math.random() - .5) * 6, i % 2 ? 0xff7043 : 0xffd54f); play('slam'); } }
+  else if (m.g === 'race') t = m.fin && m.fin.length ? `🏁 ${adT('Kazanan')}: ${mpName(m.fin[0])} 🏆` : '🏁 ' + adT('Yarış bitti');
+  mpAnnounce(t, ''); mpGameHud(); mpUI();
+}
+function mpRaceFlag(p) {
+  if (MPF.flag) { scene.remove(MPF.flag); mpDispose(MPF.flag); } const g = new THREE.Group(), S = Math.max(1, giantS * .7);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(.08 * S, .08 * S, 6 * S, 8), new THREE.MeshStandardMaterial({ color: 0xeeeeee })); pole.position.y = 3 * S; g.add(pole);
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 40; const c = cv.getContext('2d'); for (let y = 0; y < 5; y++) for (let x = 0; x < 8; x++) { c.fillStyle = (x + y) % 2 ? '#111' : '#fff'; c.fillRect(x * 8, y * 8, 8, 8); }
+  const tx = new THREE.CanvasTexture(cv); tx.magFilter = THREE.NearestFilter; const fl = new THREE.Mesh(new THREE.PlaneGeometry(2.2 * S, 1.4 * S), new THREE.MeshBasicMaterial({ map: tx, side: THREE.DoubleSide })); fl.position.set(1.1 * S, 5.2 * S, 0); g.add(fl);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(4 * S, 4 * S, 60 * S, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0x69f0ae, transparent: true, opacity: .18, side: THREE.DoubleSide, depthWrite: false })); beam.position.y = 30 * S; g.add(beam);
+  g.position.set(p[0], p[1], p[2]); scene.add(g); MPF.flag = g;
+}
+function mpGameHud() {
+  const e = $('mpGame'), G = MP.game; if (!G || !G.g) { e.style.display = 'none'; $('mpBlind').style.display = 'none'; return; } e.style.display = 'block';
+}
+function mpGameTick(dt) {
+  const G = MP.game, now = performance.now(); if (!G || !G.g) { if (MPF.lockG) MPF.lockG = false; return; }
+  if (MP.host && G.end && now > G.end) { if (G.g === 'pot') mpGameFinish({ g: 'pot', why: 'boom' }); else mpGameFinish({ g: G.g, why: 'time' }); return; }
+  const e = $('mpGame'), left = Math.max(0, Math.ceil(((G.end || now) - now) / 1000)), mm = `${left / 60 | 0}:${String(left % 60).padStart(2, '0')}`, P = player.position;
+  let txt = '', blind = false, lock = false;
+  if (G.g === 'hide') {
+    const hiding = now < G.hideEnd, sk = G.seeker === MP.me.id, caught = (G.tagged || []).includes(MP.me.id);
+    if (hiding) { const s = Math.ceil((G.hideEnd - now) / 1000); txt = sk ? `🙈 ${adT('Ebesin — gözlerin kapalı')}: ${s}` : `🏃 ${adT('Saklan!')} ${s} · ${adT('ebe')}: ${mpName(G.seeker)}`; blind = sk; lock = sk; }
+    else { txt = sk ? `🔎 ${adT('Ara ve dokun!')} ${(G.tagged || []).length}/${Object.keys(MP.players).length - 1} · ${mm}` : caught ? `😅 ${adT('Yakalandın')} · ${mm}` : `🤫 ${adT('Saklan — ebe arıyor')} · ${mm}`;
+      if (sk) for (const id in MP.players) { const p = MP.players[id]; if (id === MP.me.id || (G.tagged || []).includes(id) || !p.av || !p.av.holder.visible) continue; if (p.av.holder.position.distanceTo(P) < 2.2 * Math.max(1, giantS, p.av.holder.scale.x) && elapsed - (MPF.tagT || 0) > .5) { MPF.tagT = elapsed; mpSend({ t: 'gt', id }); } } }
+  } else if (G.g === 'pot') {
+    const mine = G.holder === MP.me.id; txt = mine ? `💣 ${adT('Patates sende! Birine dokun!')}` : `💣 ${adT('Patates')}: ${mpName(G.holder)} · ${adT('kaç!')}`;
+    for (const id in MP.players) { const p = MP.players[id]; if (!p.av) continue; const has = id === G.holder; if (has && !p.av.bomb) { p.av.bomb = mpTxtSprite('💣', 'rgba(0,0,0,0)', 256, 64); p.av.bomb.scale.set(1.2, .8, 1); p.av.bomb.position.y = 2.55; p.av.holder.add(p.av.bomb); } else if (!has && p.av.bomb) { p.av.holder.remove(p.av.bomb); p.av.bomb = null; } if (p.av.bomb) p.av.bomb.position.y = 2.55 + Math.abs(Math.sin(elapsed * 8)) * .2; }
+    if (mine && elapsed - (MPF.potT || 0) > .4) for (const id in MP.players) { const p = MP.players[id]; if (id === MP.me.id || !p.av || !p.av.holder.visible) continue; if (p.av.holder.position.distanceTo(P) < 2 * Math.max(1, giantS, p.av.holder.scale.x)) { MPF.potT = elapsed; mpSend({ t: 'gp', id }); break; } }
+  } else if (G.g === 'race') {
+    const toGo = (G.go || 0) - now, d = Math.round(Math.hypot(P.x - G.p[0], P.z - G.p[2]) / Math.max(1, giantS)), done = (G.fin || []).includes(MP.me.id);
+    if (toGo > 0) { const s = Math.ceil(toGo / 1000); txt = `🏁 ${adT('Hazır ol')}… ${s}`; lock = true; if (s !== MPF.rs) { MPF.rs = s; play('ding', { gain: .4 }); } }
+    else { if (MPF.rs) { MPF.rs = 0; mpNote('🏁 ' + adT('BAŞLA!'), 1.4); play('whistle'); } txt = done ? `🏁 ${(G.fin.indexOf(MP.me.id) + 1)}. ${adT('oldun!')} · ${mm}` : `🏁 ${adT('Bayrağa koş!')} ${d} m · ${mm}`;
+      if (!done && d < 4 && elapsed - (MPF.finT || 0) > 1) { MPF.finT = elapsed; mpSend({ t: 'gf' }); } }
+  }
+  e.textContent = txt; $('mpBlind').style.display = blind ? 'flex' : 'none'; if (blind) $('mpBlind').textContent = txt;
+  if (lock) { if (!MPF.lockP) MPF.lockP = P.clone(); P.x = MPF.lockP.x; P.z = MPF.lockP.z; vel.set(0, 0, 0); } else MPF.lockP = null;
+}
+function mpHideLabel(p) { const G = MP.game; return !!(G && G.g === 'hide' && G.seeker === MP.me.id && !(G.tagged || []).includes(p.id) && performance.now() > G.hideEnd); }
+// arayüz parçaları
+document.head.insertAdjacentHTML('beforeend', `<style>
+#mpPanel .mpfun{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}#mpPanel .mpfun button{text-align:left;padding:8px;font-size:13px}#mpPanel .mpfun button b{font-size:17px}#mpPanel .mpfun button small{display:block;opacity:.7;font-size:11px;margin-top:2px}
+#mpPanel .mpsfx{grid-template-columns:repeat(6,1fr);gap:5px;margin-top:6px}#mpPanel .mpsfx button{padding:6px 2px;font-size:20px}#mpPanel .mpsfx small{display:block;font-size:10px}
+#mpCmp{position:fixed;inset:0;pointer-events:none;z-index:32}.mpcp{position:absolute;transform:translate(-50%,-50%);background:rgba(14,20,34,.85);border:2px solid #fff;border-radius:999px;color:#fff;font:600 12px system-ui,sans-serif;padding:3px 9px 3px 6px;white-space:nowrap}.mpcp i{display:inline-block;font-style:normal;margin-right:4px}
+#mpGame{position:fixed;left:50%;transform:translateX(-50%);top:calc(56px + env(safe-area-inset-top));z-index:36;display:none;background:linear-gradient(90deg,#4a148c,#1565c0);color:#fff;font:700 15px system-ui,sans-serif;padding:7px 16px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.4);white-space:nowrap}
+#mpBlind{position:fixed;inset:0;z-index:56;display:none;align-items:center;justify-content:center;background:#05070d;color:#fff;font:800 clamp(22px,4vw,40px) system-ui,sans-serif;text-align:center;padding:20px}
+#mpBig{position:fixed;left:50%;top:45%;transform:translate(-50%,-50%) scale(.6);z-index:57;opacity:0;pointer-events:none;color:#fff;font:900 clamp(60px,14vw,140px) system-ui,sans-serif;text-shadow:0 6px 24px rgba(0,0,0,.6);transition:all .25s}#mpBig.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#mpFlash{position:fixed;inset:0;z-index:58;background:#fff;opacity:0;pointer-events:none}#mpFlash.on{animation:mpfl .6s ease}@keyframes mpfl{0%{opacity:.95}100%{opacity:0}}
+#mpPhoto{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:62;display:none;background:rgba(14,20,34,.97);border:1px solid #ffd166;border-radius:14px;padding:10px;text-align:center;width:min(520px,92vw)}#mpPhoto.on{display:block}
+#mpPhoto img{width:100%;border-radius:10px;display:block}#mpPhoto a,#mpPhoto button{display:inline-block;margin:8px 4px 0;padding:8px 14px;border-radius:10px;background:#1565c0;color:#fff;text-decoration:none;font:600 14px system-ui,sans-serif;border:0;cursor:pointer}#mpPhoto button{background:rgba(255,255,255,.12)}
+</style>`);
+document.body.insertAdjacentHTML('beforeend', `<div id="mpCmp"></div><div id="mpGame"></div><div id="mpBlind"></div><div id="mpBig"></div><div id="mpFlash"></div><div id="mpPhoto"><img alt=""><div><a>⬇️ ${adT('Fotoğrafı indir')}</a><button>✕ ${adT('Kapat')}</button></div></div>`);
+$('mpPhoto').querySelector('button').addEventListener('click', () => $('mpPhoto').classList.remove('on'));
+for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $('mpPhoto').addEventListener(ev, e => e.stopPropagation(), { passive: true });
+$('mpPanel').addEventListener('click', e => { const b = e.target.closest('[data-fun]'); if (b) { e.stopPropagation(); play('ui'); mpFunPress(b.dataset.fun); return; } const s = e.target.closest('[data-sfx]'); if (s) { e.stopPropagation(); const m = { t: 'fx', k: 'sfx', id: s.dataset.sfx }; mpSend(m); mpFx(Object.assign({ f: MP.me.id }, m)); } });
 
 function mpDropHook(throwIt) { const id = MP.holding; MP.holding = null; if (!id) return; const v = throwIt ? [r2(Math.sin(facing) * 22), 9, r2(Math.cos(facing) * 22)] : [0, 0, 0]; mpSend({ t: 'drop', to: id, v }); }
 window.__mp = { ui: () => $('mpPanel').classList.contains('on') || $('mpChat').classList.contains('on') || $('mpAdm').classList.contains('on') || $('mpEmo').classList.contains('on') || !!MP.map, gate: mpTpGate, grab: mpGrabCands, npc: mpNpcFollow, adm: mpAdmHook, world: mpWorldOut, drop: mpDropHook, cam: mpCam, tick: mpTick, hint: h => { MP.hint = h; } };
