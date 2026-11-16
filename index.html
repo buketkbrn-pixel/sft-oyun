@@ -4471,7 +4471,7 @@ three/build/three.module.js:
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-l</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-m</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -5772,7 +5772,7 @@ function staticPH(key, build, bakeMat = BAKED) {
   return g;
 }
 // Ev: taş temel, ahşap iskelet, üçgen çatı + kiremit, baca, kapı, çerçeveli ve kayıtlı (çizgili) camlar, çiçeklikler
-const HOUSE_VARIANTS = [{ wall: 0xf3e6cc, roof: 0xb5452f }, { wall: 0xdfe8ef, roof: 0x5b6b7c }, { wall: 0xf6e3a8, roof: 0x8a3b2b }, { wall: 0xf2d4cf, roof: 0x6d4c41 }];
+const HOUSE_VARIANTS = [{ wall: 0xf3e6cc, roof: 0xb5452f }, { wall: 0xdfe8ef, roof: 0x5b6b7c }, { wall: 0xf6e3a8, roof: 0x8a3b2b }, { wall: 0xf2d4cf, roof: 0x6d4c41 }, { wall: 0xe4ecd9, roof: 0x3f5e45 }, { wall: 0xfbf3ea, roof: 0x9c5b2e }];
 function buildHouse(v) {
   const g = new THREE.Group();
   const wall = M(v.wall), roof = M(v.roof, { flatShading: true }), wood = M(0x6b4423), stone = M(0x8c8a86, { flatShading: true });
@@ -5800,7 +5800,6 @@ function buildHouse(v) {
   g.add(mesh(new THREE.BoxGeometry(.7, .45, .02), doorDark, 0, .85, 1.775), mesh(new THREE.BoxGeometry(.7, .45, .02), doorDark, 0, 1.5, 1.775));
   g.add(mesh(new THREE.SphereGeometry(.045, 8, 8), knob, .32, 1.15, 1.79));
   g.add(mesh(new THREE.BoxGeometry(1.4, .18, .6), stone, 0, .09, 2.0));
-  const awn = mesh(new THREE.BoxGeometry(1.5, .08, .6), roof, 0, 2.38, 1.95); awn.rotation.x = .25; g.add(awn);
   // Pencereler: çerçeve + cam + artı şeklinde kayıtlar + denizlik (+ önde çiçeklik)
   const win = (x, z, ry, flowers) => {
     const w = new THREE.Group(); w.position.set(x, 1.75, z); w.rotation.y = ry; g.add(w);
@@ -5816,7 +5815,49 @@ function buildHouse(v) {
   win(-1.3, 1.71, 0, true); win(1.3, 1.71, 0, true);
   win(-1.25, -1.71, Math.PI, false); win(1.25, -1.71, Math.PI, false);
   win(2.01, 0, Math.PI / 2, false); win(-2.01, 0, -Math.PI / 2, false);
+  houseDetail(g, v, { wall, roof, wood, stone, white, glass, brick, dark, leaf, flower, th });
   return g;
+}
+// 🏡 ev ayrıntıları: kiremit sıraları, mahya, saçak tahtaları, oluk ve iniş boruları, panjurlar, lentolar, ahşap kaplama çizgileri,
+// sundurma (direkler + küçük çatı), iki basamak, paspas, kapı feneri, saksılar, posta kutusu, çatı penceresi, baca şapkası, temel menfezleri, odun yığını
+function houseDetail(g, v, m) {
+  const { wall, roof, wood, stone, white, glass, brick, dark, leaf, flower, th } = m;
+  const roof2 = M(new THREE.Color(v.roof).multiplyScalar(.78).getHex(), { flatShading: true }), siding = M(new THREE.Color(v.wall).multiplyScalar(.9).getHex());
+  const shut = M([0x2e5d3a, 0x2f4f6f, 0x6d2e2e, 0x4a4a4a, 0x7a5230, 0x2f6f6a][HOUSE_VARIANTS.indexOf(v) % 6] || 0x2e5d3a), metal = M(0x9aa3a8, { metalness: .6, roughness: .35 });
+  const lampM = M(0xfff3c4, { emissive: 0xffd27a, emissiveIntensity: .9 }), pot = M(0xb5652e), soil = M(0x4a3020);
+  const B = (w, h, d, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const o = mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z); o.rotation.set(rx, ry, rz); g.add(o); return o; };
+  // kiremit sıraları (iki yüzde, alternatif tonlar) + mahya
+  for (const sd of [1, -1]) for (let i = 0; i < 6; i++) { const u = -1.12 + i * .45, nOff = .085 + (i % 2) * .018, cy = 3.555 + nOff * Math.cos(th) - u * Math.sin(th), cz = sd * (1.095 + nOff * Math.sin(th) + u * Math.cos(th)); B(4.62, .05, .5, i % 2 ? roof : roof2, 0, cy, cz, sd * th);
+    const ue = u + .24, ly = 3.555 + (nOff + .04) * Math.cos(th) - ue * Math.sin(th), lz = sd * (1.095 + (nOff + .04) * Math.sin(th) + ue * Math.cos(th)); B(4.64, .045, .05, roof2, 0, ly, lz, sd * th); }
+  B(4.74, .12, .3, roof2, 0, 4.47, 0); for (let x = -2.2; x <= 2.21; x += .55) B(.06, .14, .32, dark, x, 4.5, 0);
+  // saçak tahtaları (üçgen alınların kenarı) ve ön-arka saçak
+  for (const sx of [2.31, -2.31]) for (const sd of [1, -1]) B(.06, .18, 2.75, white, sx, 3.6, sd * 1.09, sd * th);
+  for (const sd of [1, -1]) B(4.66, .14, .06, white, 0, 2.66, sd * 2.2);
+  // oluklar + iniş boruları
+  for (const sd of [1, -1]) { const gu = mesh(new THREE.CylinderGeometry(.07, .07, 4.6, 8).rotateZ(Math.PI / 2), metal, 0, 2.62, sd * 2.25); g.add(gu);
+    for (const sx of [2.17, -2.17]) { g.add(mesh(new THREE.CylinderGeometry(.045, .045, 2.1, 6), metal, sx, 1.25, sd * 1.86)); const el = mesh(new THREE.CylinderGeometry(.045, .045, .5, 6), metal, sx, 2.45, sd * 2.055); el.rotation.x = Math.atan2(sd * .39, .3); g.add(el); g.add(mesh(new THREE.BoxGeometry(.12, .06, .12), metal, sx, .22, sd * 1.9)); } }
+  // ahşap kaplama çizgileri (yanlar ve arka)
+  for (let y = .7; y < 2.8; y += .3) { B(4.02, .03, .02, siding, 0, y, -1.71); for (const sx of [2.01, -2.01]) B(.02, .03, 3.42, siding, sx, y, 0); }
+  // ön pencerelerde panjur ve lento, diğerlerinde lento
+  for (const x of [-1.3, 1.3]) B(1.05, .1, .12, wood, x, 2.24, 1.76);
+  for (const sx of [2.03, -2.03]) for (const s2 of [-1, 1]) { B(.04, .86, .3, shut, sx, 1.75, s2 * .62); for (let yy = -.3; yy <= .31; yy += .15) B(.02, .02, .26, dark, sx * 1.012, 1.75 + yy, s2 * .62); }
+  for (const x of [-1.25, 1.25]) for (const s2 of [-1, 1]) { const px = x + s2 * .55 * Math.sign(x); B(.18, .86, .04, shut, px, 1.75, -1.76); for (let yy = -.3; yy <= .31; yy += .15) B(.15, .02, .02, dark, px, 1.75 + yy, -1.785); }
+  for (const x of [-1.25, 1.25]) B(1.05, .1, .12, wood, x, 2.24, -1.76); for (const sx of [2.06, -2.06]) B(.12, .1, 1.05, wood, sx, 2.24, 0);
+  // sundurma: iki direk + küçük çift eğimli çatı, iki basamak, paspas
+  for (const sx of [-.78, .78]) { g.add(mesh(new THREE.CylinderGeometry(.06, .07, 2.15, 8), white, sx, 1.25, 2.35)); B(.18, .12, .18, stone, sx, .18, 2.35); }
+  for (const sx of [1, -1]) B(1.0, .07, 1.0, roof, sx * .42, 2.52, 2.0, 0, 0, -sx * .45); B(.08, .1, 1.0, dark, 0, 2.73, 2.0);
+  B(1.6, .12, .4, stone, 0, .06, 2.5); B(.8, .02, .45, M(0x8d6e63), 0, .19, 2.05);
+  // kapı feneri, saksılar, posta kutusu
+  B(.14, .22, .14, dark, .72, 2.0, 1.9); B(.1, .16, .1, lampM, .72, 1.98, 1.9); B(.04, .04, .1, dark, .72, 2.08, 1.84);
+  for (const sx of [-1.05, 1.05]) { g.add(mesh(new THREE.CylinderGeometry(.16, .12, .3, 10), pot, sx, .15, 2.12)); g.add(mesh(new THREE.CylinderGeometry(.14, .14, .03, 10), soil, sx, .3, 2.12)); g.add(mesh(new THREE.SphereGeometry(.2, 8, 6), leaf, sx, .46, 2.12)); for (const a of [0, 2.1, 4.2]) g.add(mesh(new THREE.SphereGeometry(.05, 6, 6), flower, sx + Math.cos(a) * .12, .6, 2.12 + Math.sin(a) * .12)); }
+  B(.07, .9, .07, wood, 1.75, .45, 2.75); B(.3, .22, .4, M(0xb71c1c), 1.75, .98, 2.75); B(.32, .04, .42, dark, 1.75, 1.1, 2.75);
+  // çatı penceresi (yanlardaki üçgen alınlarda), baca şapkası ve tuğla çizgileri
+  for (const sx of [2.03, -2.03]) { B(.06, .55, .55, white, sx, 3.45, 0); B(.07, .42, .42, glass, sx * 1.001, 3.45, 0); B(.08, .03, .44, white, sx * 1.002, 3.45, 0); B(.08, .44, .03, white, sx * 1.002, 3.45, 0); }
+  g.add(mesh(new THREE.CylinderGeometry(.09, .11, .3, 8), M(0x8d4a30), 1.0, 4.82, -.55)); g.add(mesh(new THREE.CylinderGeometry(.09, .11, .3, 8), M(0x8d4a30), 1.2, 4.82, -.55));
+  for (let y = 3.5; y < 4.55; y += .18) B(.47, .025, .47, M(0xd8c3b0), 1.1, y, -.55);
+  // temel menfezleri ve odun yığını
+  for (const x of [-1.4, 0, 1.4]) B(.3, .1, .03, dark, x, .16, -1.86);
+  const logM = M(0x8b5a2b), endM = M(0xd9b382); for (let i = 0; i < 5; i++) { const row = i < 3 ? 0 : 1, x = -2.3 - (row ? (i - 3) * .19 + .095 : i * .19), y = .09 + row * .16; g.add(mesh(new THREE.CylinderGeometry(.09, .09, .9, 7).rotateX(Math.PI / 2), logM, x, y, -.9)); g.add(mesh(new THREE.CylinderGeometry(.075, .075, .02, 7).rotateX(Math.PI / 2), endM, x, y, -.44)); }
 }
 function ballTexture() {
   const c = document.createElement('canvas'); c.width = 256; c.height = 128;
@@ -17867,7 +17908,7 @@ function brBuildWorld() {
   const solids = BR.solids, obs = BR.obs, taken = [];
   const addBox = (x, z, hx, hz, y0, y1, stand) => { solids.push({ t: 'b', x, z, hx, hz, y0, y1 }); obs.push({ box: true, x, z, hx, hz, r: Math.hypot(hx, hz), h: stand ? y1 : Infinity, top: y1, y0, tb: y0, stand: !!stand, pass: false }); };
   const free = (x, z, r) => taken.every(t => Math.hypot(t[0] - x, t[1] - z) > t[2] + r);
-  const houses = [[], [], [], []], barnGeo = { w: [], r: [], t: [] }, chestSpots = [], mtx = new THREE.Matrix4(), qq = new THREE.Quaternion(), YAX = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+  const houses = HOUSE_VARIANTS.map(() => []), barnGeo = { w: [], r: [], t: [] }, chestSpots = [], mtx = new THREE.Matrix4(), qq = new THREE.Quaternion(), YAX = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
   const pushBarnBox = (key, w, h, d, x, y, z, rot) => { const g = new THREE.BoxGeometry(rot ? d : w, h, rot ? w : d); g.translate(x, y, z); barnGeo[key].push(g); };
   for (const p of BR_POIS) {
     const base = BR.flats.find(f => f.x === p.x).h, nb = p.n === 'Eski Kale' ? 3 : 2;
