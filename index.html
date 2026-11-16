@@ -4471,7 +4471,7 @@ three/build/three.module.js:
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-k</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-l</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -13983,6 +13983,7 @@ function updateCarried() {
   if (charHolder.userData.glb) handW.set(-.3, 1.4, .6).applyMatrix4(charHolder.matrixWorld);
   else playerRig.armR.el.localToWorld(handW.set(0, -.36, 0));
   const o = carriedObj(carried);
+  if (carried.off && carried.type === 'obj') { o.position.copy(handW).add(carried.off.clone().applyAxisAngle(Y_AX, facing - carried.f0)); return; }   // tuttuğun noktadan
   if (carried.type === 'obj' && isTreeObj(o)) {   // ağaç: gövdesinden tutulur, tepesi dışa doğru yatık
     o.position.set(handW.x, handW.y - .9 * o.scale.y, handW.z);
     o.rotation.set(0, facing, .32);
@@ -14065,9 +14066,9 @@ function squashAt(x, z, R, hold = null) {
     if (near(h.position, (ob ? ob.r : .5) * .7)) n += squashObj(h, hold, false, ob);
   }
   for (const g of SIGNS) if (near(g.position, .4)) n += squashObj(g, hold, false, null);
-  for (const c of npcs) if (c.state !== 'held' && c.state !== 'thrown' && c.holder.visible && near(c.holder.position, .2)) { if (c.city) cyHurt(c, 999, 'squash'); n += squashObj(c.holder, hold, true, null); }
+  for (const c of npcs) if (c.state !== 'held' && c.state !== 'thrown' && c.holder.visible && near(c.holder.position, .2)) { const q = c.holder.position; let ddx = q.x - x, ddz = q.z - z; if (Math.hypot(ddx, ddz) < .01) { const a0 = Math.random() * 6.283; ddx = Math.cos(a0); ddz = Math.sin(a0); } const dd = Math.hypot(ddx, ddz); q.x = x + ddx / dd * (R + .7); q.z = z + ddz / dd * (R + .7); c.state = 'down'; c.downT = 0; c.vy = 0; if (c.vel) c.vel.set(ddx / dd * 2, 0, ddz / dd * 2); if (c.city && Math.random() < .4) cySay(c, cyPick([adT('Az kalsın!'), adT('Oha, kıl payı!')]), 1.4); }   // insanlar ezilmez: son anda kenara düşer
   if (inCity) n += cyCarSquash(x, z, R);
-  for (const arr of [kids, pros, coaches, cyclists, hoods]) for (const c of arr) if (c.holder.visible && near(c.holder.position, .2)) n += squashObj(c.holder, hold, true, null);
+  for (const arr of [kids, pros, coaches, cyclists, hoods]) for (const c of arr) if (c.holder.visible && near(c.holder.position, .2)) { const q = c.holder.position, ddx = q.x - x, ddz = q.z - z, dd = Math.hypot(ddx, ddz) || 1; q.x = x + ddx / dd * (R + .7); q.z = z + ddz / dd * (R + .7); }
   if (n) play('squash', { gap: .07, at: { x, y: player.position.y, z }, range: 40 + giantS * 6 });
   return n;
 }
@@ -25537,22 +25538,6 @@ function cyPedAt(x, y, z, role) {   // arabadan çıkan / olay için gelen biri:
 /* ---------- 🚗 trafik: şeritte gider, kavşakta döner, önündekine göre frenler; polis arabaları kovalar ---------- */
 const CY_CARCOL = [0xd7262e, 0x1f6fe5, 0xf2c014, 0x1fa65a, 0x2b2b2b, 0xf4f4f6, 0xff6a13, 0x8a2be2, 0x795548, 0x00838f];
 let CY_CG = null;
-function cyCarMesh(c) {
-  if (!CY_CG) CY_CG = { body: new THREE.BoxGeometry(1.9, .62, 4.2), cab: new THREE.BoxGeometry(1.72, .58, 2.2), wh: new THREE.CylinderGeometry(.36, .36, .28, 12).rotateZ(Math.PI / 2), lt: new THREE.BoxGeometry(.4, .14, .06), head: new THREE.SphereGeometry(.17, 8, 6),
-    glass: new THREE.MeshStandardMaterial({ color: 0x1c2a3a, roughness: .1, metalness: .4, transparent: true, opacity: .75 }), tire: M(0x111214, { roughness: .9 }), hl: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff1c8, emissiveIntensity: .8 }), tl: new THREE.MeshStandardMaterial({ color: 0x550000, emissive: 0xff1a1a, emissiveIntensity: .7 }),
-    red: new THREE.MeshStandardMaterial({ color: 0xff2020, emissive: 0xff0000, emissiveIntensity: 0 }), blue: new THREE.MeshStandardMaterial({ color: 0x2050ff, emissive: 0x0030ff, emissiveIntensity: 0 }) };
-  const G = CY_CG, g = new THREE.Group(), paint = new THREE.MeshStandardMaterial({ color: c.col, metalness: .5, roughness: .3 });
-  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
-  add(G.body, paint, 0, .62, 0); add(G.cab, G.glass, 0, 1.2, -.25); add(new THREE.BoxGeometry(1.74, .08, 2.2), paint, 0, 1.52, -.25);
-  for (const [x, z] of [[-.92, 1.35], [.92, 1.35], [-.92, -1.35], [.92, -1.35]]) add(G.wh, G.tire, x, .36, z);
-  for (const s of [-1, 1]) { add(G.lt, G.hl, s * .65, .7, 2.11); add(G.lt, G.tl, s * .65, .72, -2.11); }
-  c.driver = add(G.head, M(0xf1c27d), -.42, 1.25, -.1);
-  if (c.police) { c.lr = add(new THREE.BoxGeometry(.5, .16, .3), G.red.clone(), -.3, 1.64, -.25); c.lb = add(new THREE.BoxGeometry(.5, .16, .3), G.blue.clone(), .3, 1.64, -.25); for (const s of [-1, 1]) add(new THREE.BoxGeometry(.04, .3, 1.6), M(0xffffff), s * .96, .66, 0); }
-  if (c.taxi) add(new THREE.BoxGeometry(.7, .22, .3), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffe082, emissiveIntensity: .7 }), 0, 1.68, -.25);
-  c.paint = paint; g.rotation.order = 'YXZ';
-  g.userData.car = c; g.userData.obs = { x: 0, z: 0, r: 2.1, h: Infinity, top: 1.6, tb: 0, y0: 0, stand: false, pass: false };
-  return g;
-}
 function cyCarPlace(c, s0) {   // yeni bir şeride koy
   c.axis = Math.random() < .5 ? 'x' : 'z'; c.line = Math.floor(Math.random() * (CG + 1)); c.dir = Math.random() < .5 ? 1 : -1;
   c.s = s0 ?? (-CS / 2 + 10 + Math.random() * (CS - 20)); c.sp = 0; c.wreck = false; c.fire = 0; c.stopT = 0; c.held = false; c.occ = 1 + (Math.random() < .4 ? 1 : 0) + (Math.random() < .2 ? 1 : 0);
@@ -26005,7 +25990,7 @@ function cityUpdate(dt) {
     if (n.flee > 0) { n.state = 'flee'; n.timer = n.flee; n.flee = 0; }
     if (CITY.talk && CITY.talk.n === n) { n.state = 'idle'; n.timer = 5; n.vel.multiplyScalar(.5); if (dP > 5) cyTalkClose(); continue; }
     if (n.state === 'down' || n.state === 'flee' || n.stuck) continue;
-    if (giant && dP < 12 * giantS && n.role !== 'police') { n.state = 'flee'; n.timer = 3; if (Math.random() < .004) cySay(n, cyLine('giant'), 1.6); continue; }
+    if (giant && dP < 12 * giantS && n.role !== 'police' && Math.random() < .0015) cySay(n, cyPick([adT('Ne kadar büyük!'), adT('Merhaba dev!'), adT('Bir dev var, bak!')]), 1.6);   // devden kaçmazlar
     n.atkT = (n.atkT || 0) - dt;
     // saldırganlar: kızgın serseri, aranırken polis
     let foe = null;
@@ -26924,8 +26909,10 @@ function gvLate(dt) {   // kemikler yerleştikten sonra: el açıları, parmakla
 function gvAct(o, d) {
   const c = o ? gvCast(o, d) : GV.c; if (!c) return; GV.grabT = .35; play('swing', { gain: .3 });
   if (GV.sel === 'FL' || GV.sel === 'FR') { if (c.surf !== 'air' && c.surf !== 'wall') gvStep(GV.sel === 'FL' ? 'L' : 'R', c.surf === 'ent' ? gvEntPos(c.ent, new THREE.Vector3()) : c.H); return; }   // 🦶 VR 2: ayağı oraya bas
+  if (carried && carried.type === 'obj' && (GV.sel === 'L' || GV.sel === 'B') && !GV.dual) { const o = carriedObj(carried); if ((c.ent && c.ent.ref === o) || c.H.distanceTo(o.getWorldPosition(new THREE.Vector3())) < Math.max(1.6, o.scale.x * 1.6) * Math.max(1, giantS * .3)) { gvDual(o, c.H); return; } }   // 🤲 çift tutuş
+  if (GV.sel === 'B' && c.b && (c.surf === 'wall' || c.surf === 'roof') && !gvHolding('R') && !gvHolding('L')) { if (gvSplitBuilding(c)) return; }   // 🤲 iki elle binayı parçala
   const sides = GV.sel === 'B' ? ['R', 'L'] : [GV.sel];
-  for (const s of sides) if (gvHolding(s)) { gvRelease(s, c); return; }
+  for (const s of sides) if (gvHolding(s)) { GV.dual = null; gvRelease(s, c); return; }
   if (c.ent) {
     let s = c.ent.type === 'obj' ? 'R' : sides[0];
     const T = gvEntPos(c.ent, new THREE.Vector3()), Sh = gvArm(s).sh.getWorldPosition(new THREE.Vector3());
@@ -26945,7 +26932,7 @@ function gvGrab(side, e) {
   GV.grabT = .35; GV.anc[side] = null;
   if (side === 'L' && e.type === 'npc') { const n = e.ref; n.state = 'held'; n.vel.set(0, 0, 0); n.vy = 0; cyEnsure(n); n.fear = Math.min(1.5, (n.fear || 0) + .4); GPL.list.push(n); if (n.city) cySay(n, cyPick([adT('Aaaa! Beni aldı!'), adT('İndir beni!')]), 1.8); play('pop'); return; }
   if (carried) { showMsg(adT('🤚 Sağ elin dolu — önce bırak'), 1.2); return; }
-  attachCarried(e); if (!(GV.on && GV3.on && GV3.grip) && (e.type === 'npc' || !isTreeObj(carriedObj(e)))) gpToggle();   // VR 3 kavrama: avuca almadan elde tutar
+  attachCarried(e); if (e.type === 'npc') { if (!(GV.on && GV3.on && GV3.grip)) gpToggle(); } else if (GV.c && GV.c.H) { const o = carriedObj(e); carried.off = o.position.clone().sub(GV.c.H); carried.f0 = facing; }   // 🖐️ eşya imlecin tuttuğu noktadan tutulur
   if (e.type === 'npc') { cyEnsure(e.ref); e.ref.fear = Math.min(1.5, (e.ref.fear || 0) + .4); if (e.ref.city) cySay(e.ref, cyPick([adT('Aaaa! Beni aldı!'), adT('İndir beni!'), adT('Ne yapıyorsun?!')]), 1.8); }
 }
 function gvPlaceNpc(n, H) {
@@ -26984,7 +26971,7 @@ function gvWindow(c, side) {
   const win = xs ? new THREE.Vector3(b.x + nrm.x * b.hx, wy, uc) : new THREE.Vector3(uc, wy, b.z + nrm.z * b.hz);
   GV.cine = { t: 0, win, nrm, side, fl, n: null, ht: win.clone().addScaledVector(nrm, .6 * giantS), k: 0, broke: false, grabbed: false };
   GV.anc[side] = null; showMsg(adT('🪟 Cama uzanıyorsun…'), 1.2);
-  try { roomOpen(win, nrm, fl); } catch (e) { sftErr(e); }
+  ROOM.forceKind = b.office ? 'tower' : null; try { roomOpen(win, nrm, fl); } catch (e) { sftErr(e); }
 }
 function gvCineTick(dt) {
   const C = GV.cine, S = giantS; C.t += dt; const n = C.nrm, w = C.win;
@@ -27383,7 +27370,8 @@ function cyBldDamage(k, dmg, at) {
   if (at) { const F = admFxInit(); for (let i = 0; i < Math.min(30, dmg / 4); i++) admEmit(F.sp, at.x, at.y, at.z, (Math.random() - .5) * 7, Math.random() * 4, (Math.random() - .5) * 7, 1.6, 2.1, 2.5, 1, 14, .4); }
   if (b.hp <= 0) cyBldCollapse(k);
 }
-function cyBldCollapse(k) {
+function cyBldCollapse(k, at) {
+  if (typeof cyFragment === 'function') { try { cyFragment(k, at); return; } catch (e) { sftErr(e); } }   // 🏚️ çökmez, parça parça dağılır
   const b = CITY.bld[k]; if (!b || b.dead || b[5]) return; b.dead = true; b.falling = true; if (b.h0 == null) b.h0 = b[4];
   CYD.falling.push({ k, t: 0, h0: b[4] }); cyHideOnRoof(k);
   const A = AREAS.city, x = A.cx + b[0], z = A.cz + b[1], P = player.position, near = Math.hypot(x - P.x, z - P.z);
@@ -27873,7 +27861,7 @@ function htTick(dt) {
     const r = htRead(lm), H = HT.hands[side] || (HT.hands[side] = { c: { ...r.c }, size: r.size, curl: r.curl.slice(), seen: 0, fist: false, P: null, vel: new THREE.Vector3(), sqT: 0, cd: 0, hist: [] });
     const k = THREE.MathUtils.clamp(.3 + Math.hypot(r.c.x - H.c.x, r.c.y - H.c.y) * 8, .3, .85); H.c.x += (r.c.x - H.c.x) * k; H.c.y += (r.c.y - H.c.y) * k; H.size += (r.size - H.size) * k; H.curl = H.curl.map((c0, j) => c0 + (r.curl[j] - c0) * .6); H.seen = elapsed;
     HT.s0[side] = HT.s0[side] ? HT.s0[side] + (H.size - HT.s0[side]) * .01 : H.size;   // ortalama el boyu (derinlik referansı)
-    const back = HT.cam === 'environment', mx = fx(H.c.x), lat = (mx - .5) * 2, ver = (.5 - H.c.y) * 2, rr = H.size / HT.s0[side] - 1, dep = THREE.MathUtils.clamp(back ? .5 - rr * 1.6 : .5 + rr * 1.6, 0, 1);
+    const back = HT.cam === 'environment', mx = fx(H.c.x), lat = (mx - .5) * 2, ver = (.5 - H.c.y) * 2, rr = H.size / HT.s0[side] - 1, dep = THREE.MathUtils.clamp(back ? .5 - rr * 2.8 : .5 + rr * 2.8, 0, 1);   // el yaklaşınca tam uzanır (daha hassas)
     let T; if (back) { const rc = HT.rc3 || (HT.rc3 = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(THREE.MathUtils.clamp(lat * 1.05, -1, 1), THREE.MathUtils.clamp(ver * 1.05, -1, 1)), camera); T = rc.ray.origin.clone().addScaledVector(rc.ray.direction, (.35 + 1.3 * dep) * L); }   // arka kamera: el ekranda gerçekte durduğu yerde
     else T = eye.clone().addScaledVector(rt, lat * 1.25 * L).addScaledVector(up, ver * .9 * L - .2 * L).addScaledVector(cf, (.35 + 1.3 * dep) * L);   // el daha uzağa ve daha geniş sağa-sola uzanır
     if (HT.ok || curKey === 'school' && typeof SCH !== 'undefined' && SCH.built && !giant) T = okTarget(lat, ver, dep, side);   // 🖐️ okulda: karakterin kendi kolu uzanır (ayrı el yok)
@@ -28148,7 +28136,7 @@ function roomOpen(win, nrm, fl) {
   const S = ROOM.scene, g = ROOM.g = new THREE.Group(); S.add(g);
   const W = 6.4, D = 5.2, H = 3.1, floorY = fl * 3.4, lat = new THREE.Vector3(-nrm.z, 0, nrm.x), c = win.clone().addScaledVector(nrm, -(D / 2 + .15)); c.y = floorY;
   g.position.copy(c); g.rotation.y = Math.atan2(nrm.x, nrm.z);   // odanın +Z'si pencereye bakar
-  const kinds = ['party', 'birthday', 'office', 'dinner'], kind = ROOM.kind = kinds[(Math.random() * kinds.length) | 0];
+  const kinds = ['party', 'birthday', 'office', 'dinner'], tower = ROOM.tower = ROOM.forceKind === 'tower', kind = ROOM.kind = tower ? 'office' : kinds[(Math.random() * kinds.length) | 0]; ROOM.forceKind = null; ROOM.desks = null;
   const wallC = { party: 0x6a4c9c, birthday: 0xf3d9b1, office: 0xdfe6ec, dinner: 0xe8cfa8 }[kind];
   const room = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), [roomMat(wallC, { side: THREE.BackSide }), roomMat(wallC, { side: THREE.BackSide }), roomMat(0xf5f1e6, { side: THREE.BackSide }), roomMat(kind === 'office' ? 0x8d9aa6 : 0x8a5a3a, { side: THREE.BackSide }), roomMat(wallC, { side: THREE.BackSide }), roomMat(wallC, { side: THREE.BackSide })]);
   room.position.y = H / 2; g.add(room);
@@ -28156,11 +28144,12 @@ function roomOpen(win, nrm, fl) {
   const box = (w, h, d, col, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), roomMat(col)); m.position.set(x, y, z); g.add(m); return m; };
   if (kind === 'party') { for (let i = 0; i < 9; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(.18, 12, 10), roomMat([0xff5252, 0xffd740, 0x40c4ff, 0x69f0ae][i % 4], { roughness: .3 })); b.position.set((Math.random() - .5) * W * .85, H - .35 - Math.random() * .3, (Math.random() - .5) * D * .8); g.add(b); } box(1.4, .9, .6, 0x222222, -W / 2 + .9, .45, -D / 2 + .5); box(.5, 1.1, .5, 0x111111, W / 2 - .5, .55, -D / 2 + .5); }
   if (kind === 'birthday' || kind === 'dinner') { box(2.2, .08, 1.1, 0x7b4a2a, 0, .78, -.3); for (const [x, z] of [[-1, -.75], [1, -.75], [-1, .15], [1, .15]]) box(.06, .78, .06, 0x5d3a1e, x, .39, z); if (kind === 'birthday') { box(.5, .25, .5, 0xfff3e0, 0, .95, -.3); box(.52, .06, .52, 0xf48fb1, 0, 1.06, -.3); for (let i = 0; i < 5; i++) { box(.02, .14, .02, 0xffffff, -.15 + i * .075, 1.16, -.3); } } else for (let i = 0; i < 4; i++) box(.22, .02, .22, 0xffffff, -.75 + i * .5, .83, -.3); }
-  if (kind === 'office') for (const x of [-1.6, 1.6]) { box(1.4, .06, .7, 0xeeeeee, x, .74, -1.2); box(.5, .35, .04, 0x1e2a38, x, .98, -1.4); box(.45, .5, .45, 0x37474f, x, .25, -.6); }
+  if (tower) roomTowerFill(g, W, D, H); else if (kind === 'office') for (const x of [-1.6, 1.6]) { box(1.4, .06, .7, 0xeeeeee, x, .74, -1.2); box(.5, .35, .04, 0x1e2a38, x, .98, -1.4); box(.45, .5, .45, 0x37474f, x, .25, -.6); }
   box(.6, 1.2, .3, 0x6d4c41, W / 2 - .4, .6, D / 2 - .5);   // dolap
   ROOM.ppl = [];
   const cols = [0xef5350, 0x42a5f5, 0x66bb6a, 0xffca28, 0xab47bc, 0x26c6da];
   for (let i = 0; i < 4; i++) { const r = createStickman(cols[(i + 1) % cols.length]); const h = new THREE.Group(); h.add(r.stick); h.scale.setScalar(.92); h.position.set(-W / 2 + 1 + i * (W - 2) / 3, 0, (i % 2 ? -.9 : .6)); h.rotation.y = Math.PI + (Math.random() - .5); g.add(h); ROOM.ppl.push({ r, h, ph: Math.random() * 6, run: 0, home: h.position.clone() }); }
+  if (tower) roomTowerPeople(g);
   // portal düzlemi (kırık camın yeri)
   if (!ROOM.rt) ROOM.rt = new THREE.WebGLRenderTarget(4, 4, { samples: 0 });
   if (!ROOM.plane) {
@@ -28172,7 +28161,7 @@ function roomOpen(win, nrm, fl) {
   ROOM.plane.position.copy(win).addScaledVector(nrm, .06); ROOM.plane.rotation.set(0, Math.atan2(nrm.x, nrm.z), 0); ROOM.plane.material.uniforms.glass.value = 1; scene.add(ROOM.plane);
   ROOM.on = true; ROOM.t = 0; ROOM.broken = false; ROOM.fl = fl; ROOM.c = c; ROOM.nrm = nrm.clone();
 }
-function roomBreak() { if (!ROOM.on) return; ROOM.broken = true; ROOM.plane.material.uniforms.glass.value = 0; play('glass', { gain: .9 }); for (const p of ROOM.ppl) p.run = 1; }
+function roomBreak() { if (!ROOM.on) return; ROOM.broken = true; if (ROOM.tower && ROOM.desks) ROOM.desks.forEach((d, i) => { d.t = -i * .18; setTimeout(() => { if (d.t < 0) d.t = 0; }, i * 180); }); ROOM.plane.material.uniforms.glass.value = 0; play('glass', { gain: .9 }); for (const p of ROOM.ppl) p.run = 1; }
 function roomClose() {
   if (ROOM.g) { ROOM.scene.remove(ROOM.g); ROOM.g.traverse(o => { if (o.geometry) o.geometry.dispose(); }); ROOM.g = null; }
   if (ROOM.real && ROOM.real.holder.parent === ROOM.scene) scene.add(ROOM.real.holder); ROOM.real = null;
@@ -28182,6 +28171,7 @@ function roomTick(dt) {
   if (!ROOM.on) return; ROOM.t += dt;
   const P = player.position; if (ROOM.c && Math.hypot(P.x - ROOM.c.x, P.z - ROOM.c.z) > 400 || ROOM.t > 40 || !(inCity || curKey === 'ankara')) { roomClose(); return; }
   if (ROOM.kind === 'party' && ROOM.lamp) ROOM.lamp.color.setHSL((elapsed * .4) % 1, .8, .6);
+  if (ROOM.tower && ROOM.broken) roomTowerTopple(dt);
   for (const p of ROOM.ppl) {
     const r = p.r, t = elapsed * 6 + p.ph;
     if (p.run) {   // panik: kollar havada, odanın içinde kaçışır
@@ -28220,6 +28210,7 @@ function v4Gestures(P, dt) {   // P: karakter uzayında yumuşatılmış noktala
     const vel = i => P[i].clone().sub(G.prev[i]).divideScalar(dt), fq = charHolder.getWorldQuaternion(new THREE.Quaternion());
     const L = P[11].x >= P[12].x, ank = L ? [[27, 'kL', 'L'], [28, 'kR', 'R']] : [[28, 'kL', 'L'], [27, 'kR', 'R']], wr = L ? [[15, 'pL', 'L'], [16, 'pR', 'R']] : [[16, 'pL', 'L'], [15, 'pR', 'R']];
     if (V4.legs) for (const [i, k, s] of ank) { const v = vel(i), hip = s === 'L' ? (L ? 23 : 24) : (L ? 24 : 23); if (G.cd[k] <= 0 && v.z > 1.6 && P[i].y > P[hip].y - .62) { G.cd[k] = .7; const foot = r['leg' + s].kn.localToWorld(new THREE.Vector3(0, -.47, 0)); v4Strike('kick', s, foot, new THREE.Vector3(0, 0, 1).applyQuaternion(fq)); } }
+    G.cd.sL ??= 0; G.cd.sR ??= 0; if (V4.legs) for (const [i, k, s] of ank) { const v = vel(i), sk = 's' + s; if (G.cd[sk] <= 0 && G.cd[k] <= 0 && v.y < -1.8) { G.cd[sk] = .8; if (giant) { stompReq = true; htMsg('🦶 ' + adT('Ezdin!')); } else footStomp(s); } }   // 🦶 ayağını hızla yere bas: ez
     for (const [i, k, s] of wr) { const v = vel(i); if (G.cd[k] <= 0 && v.z > 2.2) { G.cd[k] = .5; const hand = r['arm' + s].el.localToWorld(new THREE.Vector3(0, -.32, 0)); v4Strike('punch', s, hand, new THREE.Vector3(0, 0, 1).applyQuaternion(fq)); } }
   }
   G.prev = P.map(p => p.clone());
@@ -28360,7 +28351,7 @@ function ankCollapse(b, bx, bz) {
   const tilt = .18 + Math.random() * .2, delay = Math.min(.5, b.h * .006);
   play('boom', { at: new THREE.Vector3(x, 0, z), gain: .9 }); setTimeout(() => play('squash', { at: new THREE.Vector3(x, 0, z), gain: .7 }), 450); shake = Math.max(shake, Math.min(.55, b.h * .012));
   for (let k = 0; k < 30; k++) spawnDust(x + (Math.random() - .5) * (b.maxx - b.minx), Math.random() * b.h * .6, z + (Math.random() - .5) * (b.maxz - b.minz), 2 + b.h * .09, 3, (Math.random() - .5) * 6 + dx * 3, (Math.random() - .5) * 6 + dz * 3, 0xb8ad98);
-  const D = ankDebris(), wc = new THREE.Color(ANK_WALL[(Math.random() * ANK_WALL.length) | 0]), nD = Math.min(34, 8 + (b.h * .8) | 0), sz = THREE.MathUtils.clamp(b.h * .09, 1, 4);
+  const D = ankDebris(), wc = new THREE.Color(ANK_WALL[(Math.random() * ANK_WALL.length) | 0]), nD = 20, sz = THREE.MathUtils.clamp(Math.max(b.maxx - b.minx, b.maxz - b.minz, b.h) * .22, 1.5, 7);
   for (let k = 0; k < nD; k++) { const j = D.i++ % D.N; D.list[j] = { p: new THREE.Vector3(x + (Math.random() - .5) * (b.maxx - b.minx), b.h * (.3 + Math.random() * .7), z + (Math.random() - .5) * (b.maxz - b.minz)), v: new THREE.Vector3((Math.random() - .5) * 9 + dx * 7, 2 + Math.random() * 7, (Math.random() - .5) * 9 + dz * 7), r: new THREE.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6), rv: new THREE.Vector3((Math.random() - .5) * 8, (Math.random() - .5) * 8, (Math.random() - .5) * 8), s: new THREE.Vector3(sz * (.5 + Math.random()), sz * (.4 + Math.random() * .6), sz * (.5 + Math.random())), t: 0 }; D.m.setColorAt(j, k % 3 ? wc : new THREE.Color(0x8a857c)); D.m.count = Math.max(D.m.count, j + 1); }
   if (D.m.instanceColor) D.m.instanceColor.needsUpdate = true;
   const upd = (attr, o0, s0, n, u) => {   // katlar yukarıdan aşağı çöker, üst kısım devrilir
@@ -28368,7 +28359,8 @@ function ankCollapse(b, bx, bz) {
     for (let j = s0; j < s0 + n; j++) { const ox = o0[j * 3], oy = o0[j * 3 + 1], oz = o0[j * 3 + 2], hr = oy / Math.max(1, b.h); attr.setXYZ(j, ox + dx * hr * b.h * k, Math.max(Math.min(floor, oy), oy * f), oz + dz * hr * b.h * k); }
     attr.needsUpdate = true;
   };
-  fx6({ u() { const u = THREE.MathUtils.clamp((elapsed - t0 - delay) / 1.5, 0, 1); upd(wa, C.w0, b.w0, b.wn, u); upd(ra, C.r0, b.r0, b.rn, u); return u < 1; } });
+  { const flat = (attr, o0, s0, n) => { for (let j = s0; j < s0 + n; j++) attr.setXYZ(j, o0[j * 3], Math.min(floor, o0[j * 3 + 1]), o0[j * 3 + 2]); attr.needsUpdate = true; }; flat(wa, C.w0, b.w0, b.wn); flat(ra, C.r0, b.r0, b.rn); }   // 🏚️ çökmez: anında parçalara ayrılır
+  try { const pool = (ANK.ppl || []).filter(n => npcSolid(n) && n.holder.visible && n.state !== 'held').sort((a, c2) => c2.holder.position.distanceTo(player.position) - a.holder.position.distanceTo(player.position)); let i = 0; bldSpill(x, z, b.maxx - b.minx, b.maxz - b.minz, b.h, dx, dz, (px, py, pz) => { const n = pool[i++]; if (!n) return null; n.holder.position.set(px, py, pz); return n; }); } catch (e) {}
   if (ANK.dead % 10 === 0) showMsg(`🏚️ ${ANK.dead} ${adT('bina yıkıldı')}`, 1.2);
   const P = player.position; for (const n of ANK.ppl || []) { if (npcSolid(n) && Math.hypot(n.holder.position.x - x, n.holder.position.z - z) < Math.max(b.maxx - b.minx, b.maxz - b.minz) * .7 + 6) { n.state = 'flee'; n.timer = 3; } }
 }
@@ -29698,7 +29690,7 @@ function shatterAt(at, R, dir, power = 1) {
 /* ---------- 🧍 VR 4: kamera senin ayarında kalır · sol tık basılı = baktığın yöne yürü · tekerlek = sağa / sola dön ---------- */
 canvas.addEventListener('mousedown', e => { if (!V4.on || e.button !== 0 || paused) return; V4.walk = true; e.stopImmediatePropagation(); }, true);
 addEventListener('mouseup', e => { if (e.button === 0) V4.walk = false; }, true);
-addEventListener('wheel', e => { if (!V4.on || paused) return; yaw -= Math.sign(e.deltaY) * .14; e.stopImmediatePropagation(); e.preventDefault(); }, { capture: true, passive: false });
+addEventListener('wheel', e => { if (!V4.on || paused) return; if (V4.wheelV) pitch = THREE.MathUtils.clamp(pitch + Math.sign(e.deltaY) * .08, -1.2, 1.35); else yaw -= Math.sign(e.deltaY) * .14; e.stopImmediatePropagation(); e.preventDefault(); }, { capture: true, passive: false });
 /* ---------- 🏙️ Ultra grafikte şehir binaları: kat silmeleri, çatı parapeti, çatı kulesi, anten, balkonlar, dükkân tenteleri ---------- */
 function cyUltraTick() {
   if (!inCity || !CITY.built || !CITY.bld) return; const on = GFX.q === 'ultra';
@@ -29711,7 +29703,7 @@ function cyUltraTick() {
 function cyUltraBuild() {
   const g = CITY.ultraG = new THREE.Group(); CITY.g.add(g); const B = CITY.bld, Mx = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), col = new THREE.Color(); CITY.ulH = B.map(b => b[4]);
   const L = { led: [], par: [], awn: [], bal: [], ant: [], hut: [] };
-  B.forEach((b, k) => { const [x, z, w, d, h, sp] = b;
+  B.forEach((b, k) => { const [x, z, w, d, h, sp] = b; if (b.office) return;
     for (let y = 3.4; y < h - .5; y += 3.4) L.led.push([k, x, y, z, w + .35, .16, d + .35]);
     L.par.push([k, x, h + .45, z - d / 2 + .15, w, .9, .3], [k, x, h + .45, z + d / 2 - .15, w, .9, .3], [k, x - w / 2 + .15, h + .45, z, .3, .9, d], [k, x + w / 2 - .15, h + .45, z, .3, .9, d]);
     if (!sp) { L.awn.push([k, x, 3.05, z + d / 2 + .9, w * .85, .16, 1.8]); L.awn.push([k, x, 3.05, z - d / 2 - .9, w * .85, .16, 1.8]); }
@@ -29724,6 +29716,139 @@ function cyUltraBuild() {
     const list = L[key]; if (!list.length) continue; const m = new THREE.InstancedMesh(box, mat, list.length); m.userData.kk = list.map(a => a[0]); m.userData.off = new Uint8Array(list.length);
     list.forEach((a, i) => { Mx.compose(P.set(a[1], a[2], a[3]), Q, S.set(a[4], a[5], a[6])); m.setMatrixAt(i, Mx); if (color) m.setColorAt(i, col.setHex(pal[a[0] % pal.length])); });
     m.castShadow = key !== 'led'; m.receiveShadow = true; g.add(m);
+  }
+}
+
+/* =====================================================================
+   🏚️ Binalar parça parça dağılır (çökmez): ~20 büyük parça savrulur, içindekiler dışarı dökülür (düşer, kalkar, kaçar)
+   🤲 Çift tutuş (bilgisayar, VR el modu): sağ elinle tuttuğun şeye 1 ya da 3 seçip tıkla → iki elle tutarsın; tekerleği aşağı
+      çevir = ellerini ayır → tozla ikiye bölünür (ağaç, araba, eşya). Yeterince büyüksen 3 (iki el) ile binaya tıkla → binayı parçalarsın.
+   🖐️ Eşyalar imlecin tuttuğu noktadan tutulur (merkezinden değil).
+   🖱️ VR 4'te tekerleğe tıkla: tekerlek sağ-sol ↔ yukarı-aşağı · VR 4'te ayağını hızla yere bas = ez
+   🚗 Arabalar ayrıntılı ve farklı (sedan, hatchback, SUV, minibüs) · 🏙️ binalar farklı: kademeli kuleler, kırma çatılar
+   🏢 Şehrin ortasında simsiyah, uzun bir ofis binası: camına elini sokunca içeride takım elbiseli çalışanlar, masalar devrilip aşağı düşer
+   ===================================================================== */
+const Y_AX = new THREE.Vector3(0, 1, 0);
+// 🏚️ şehir binası parçalanır
+function cyFragment(k, at) {
+  const b = CITY.bld[k]; if (!b || b.dead || (b[5] && !b.office)) return; b.dead = true; b.falling = false; const h0 = b[4]; if (b.h0 == null) b.h0 = h0;
+  const A = AREAS.city, x = A.cx + b[0], z = A.cz + b[1], bm = cyBldMesh(), col = new THREE.Color(0x9e9e9e); if (bm && bm.instanceColor) bm.getColorAt(k, col);
+  cyHideOnRoof(k); cyBldSet(k, 1.4, 0, .12); b[4] = 1.4; cyBldTint(k, .5);
+  const P = at || player.position, D = ankDebris(), dk = col.clone().multiplyScalar(.6), glass = new THREE.Color(0x3d5a73);
+  let dx = x - P.x, dz = z - P.z; const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
+  const nx = 3, ny = Math.max(2, Math.min(6, Math.round(h0 / 12))), nz = 3, cnt = Math.min(24, nx * ny * nz), sx = b[2] / nx, sy = h0 / ny, sz = b[3] / nz;
+  let made = 0; for (let iy = 0; iy < ny && made < cnt; iy++) for (let ix = 0; ix < nx && made < cnt; ix++) for (let iz = 0; iz < nz && made < cnt; iz++) { if (made > 0 && Math.random() < .25) continue; made++;
+    const j = D.i++ % D.N, px = x - b[2] / 2 + (ix + .5) * sx, py = (iy + .5) * sy, pz = z - b[3] / 2 + (iz + .5) * sz, up = iy / ny;
+    D.list[j] = { p: new THREE.Vector3(px, py, pz), v: new THREE.Vector3((px - x) * .5 + dx * (6 + up * 10) + (Math.random() - .5) * 4, 2 + up * 6 + Math.random() * 4, (pz - z) * .5 + dz * (6 + up * 10) + (Math.random() - .5) * 4), r: new THREE.Vector3(Math.random() * .4, Math.random() * 3, Math.random() * .4), rv: new THREE.Vector3((Math.random() - .5) * 3, (Math.random() - .5) * 3, (Math.random() - .5) * 3), s: new THREE.Vector3(sx * (.75 + Math.random() * .3), sy * (.75 + Math.random() * .25), sz * (.75 + Math.random() * .3)), t: 0 };
+    D.m.setColorAt(j, b.office ? (made % 3 ? new THREE.Color(0x111318) : glass) : made % 4 ? col : dk); D.m.count = Math.max(D.m.count, j + 1); }
+  if (D.m.instanceColor) D.m.instanceColor.needsUpdate = true;
+  const near = Math.hypot(x - player.position.x, z - player.position.z); play('boom', { at: new THREE.Vector3(x, 5, z), gain: 1 }); setTimeout(() => play('squash', { gain: .7 }), 300); shake = Math.max(shake, Math.max(.2, 1.1 - near / 140));
+  for (let i = 0; i < 40; i++) { const a = Math.random() * 6.283; spawnDust(x + Math.cos(a) * b[2] * .5, Math.random() * h0 * .6, z + Math.sin(a) * b[3] * .5, 3 + h0 * .05, 3, Math.cos(a) * 7, Math.sin(a) * 7, 0x9a8f80); }
+  for (const n of CITY.peds) { if (n.dead || !n.holder.visible || n.state === 'held') continue; const q = n.holder.position; if (Math.abs(q.x - x) < b[2] / 2 + 3 && Math.abs(q.z - z) < b[3] / 2 + 3) { n.stuck = false; q.x = x + (Math.sign(q.x - x) || 1) * (b[2] / 2 + 4); n.state = 'down'; n.downT = 0; n.vy = 0; } else if (Math.hypot(q.x - x, q.z - z) < 60 && npcSolid(n)) { n.state = 'flee'; n.timer = 3; } }
+  bldSpill(x, z, b[2], b[3], h0, dx, dz, (px, py, pz) => cyPedAt(px, py, pz));
+  cyCrime(2, adT('Dev bir yaratık koca bir binayı parçaladı! 🏚️'));
+}
+function bldSpill(x, z, w, d, h, dx, dz, mk) {   // içindekiler dışarı dökülür: savrulur, düşer, kalkıp kaçar
+  const n = 3 + ((Math.random() * 3) | 0);
+  for (let i = 0; i < n; i++) setTimeout(() => { const py = Math.min(h * .6, 4 + Math.random() * h * .5), p = mk(x + (Math.random() - .5) * w * .6, 0, z + (Math.random() - .5) * d * .6); if (!p) return;
+    p.holder.position.y = py; p.state = 'thrown'; const f = { type: 'npc', ref: p, vel: new THREE.Vector3(dx * (5 + Math.random() * 4) + (Math.random() - .5) * 5, 0, dz * (5 + Math.random() * 4) + (Math.random() - .5) * 5), vy: 3 + Math.random() * 3, strong: false }; flyers.push(f);
+    setTimeout(() => { if (p.city) cySay(p, cyPick([adT('Evim parçalandı!'), adT('Yardım edin!'), adT('Neyse ki iyiyim!'), adT('Kaçın!')]), 2); }, 900); }, 120 + i * 160);
+}
+// 🤲 çift tutuş + ikiye bölme (bilgisayar)
+function gvDual(o, H) { GV.dual = { o, off2: H.clone().sub(o.position), f0: facing, n: 0 }; showMsg(adT('🤲 Çift tutuş — tekerleği aşağı çevir: ellerini ayır, ikiye böl'), 2.4); play('pop'); }
+function gvDualLate() {
+  const D = GV.dual; if (!D) return; if (!GV.on || !carried || carriedObj(carried) !== D.o) { GV.dual = null; return; }
+  charHolder.updateMatrixWorld(true); const T = D.o.position.clone().add(D.off2.clone().applyAxisAngle(Y_AX, facing - D.f0)); gpArmIK(playerRig.armL, T, -1);
+}
+addEventListener('wheel', e => {
+  if (!GV.on || !GV.dual || paused) return; e.stopImmediatePropagation(); e.preventDefault(); const D = GV.dual;
+  if (e.deltaY > 0) { D.n++; const p = D.o.position; for (let i = 0; i < 8; i++) spawnDust(p.x, p.y + 1, p.z, 1.2, 1.2, (Math.random() - .5) * 4, (Math.random() - .5) * 4, 0xbcaaa4); play('hit', { gain: .4 }); shake = Math.max(shake, .08);
+    showMsg(`🤲 ${adT('Ayırıyorsun')} ${'▮'.repeat(D.n)}${'▯'.repeat(Math.max(0, 3 - D.n))}`, .8); if (D.n >= 3) { const o = D.o; GV.dual = null; htTear(o); } }
+  else D.n = Math.max(0, D.n - 1);
+}, { capture: true, passive: false });
+function gvSplitBuilding(c) {   // iki elle binayı parçala (yeterince büyüksen)
+  if (inCity && CITY.built) { const k = CITY.obs.indexOf(c.b); if (k < 0 || k >= CITY.bld.length) return false; const b = CITY.bld[k]; if (b.dead || (b[5] && !b.office)) return false;
+    if (giantS * 2.8 < b[4]) { showMsg(`🏢 ${adT('Bu binayı iki elle parçalamak için daha büyük ol')} (≥ ${Math.ceil(b[4] / 2.8)}×)`, 1.8); return true; }
+    gvTearFx(c.H); cyFragment(k, player.position.clone()); return true; }
+  if (curKey === 'ankara' && ANK.bld) { const b = ANK.bld.find(q => q.obs === c.b && q.alive); if (!b) return false;
+    if (giantS * 2.8 < b.h) { showMsg(`🏢 ${adT('Bu binayı iki elle parçalamak için daha büyük ol')} (≥ ${Math.ceil(b.h / 2.8)}×)`, 1.8); return true; }
+    gvTearFx(c.H); ankCollapse(b, player.position.x, player.position.z); return true; }
+  return false;
+}
+function gvTearFx(H) { const F = admFxInit(); for (let i = 0; i < 50; i++) admEmit(F.sp, H.x, H.y, H.z, (Math.random() - .5) * 10, Math.random() * 6, (Math.random() - .5) * 10, 1.6, 1.3, .4, .7, 10, .5); GN.anim = { k: 'flick', t: 0, dur: .5 }; htMsg('🤲 ' + adT('İki elle ayırdın!')); }
+// 🖱️ VR 4: tekerleğe tıkla → yukarı / aşağı
+canvas.addEventListener('mousedown', e => { if (!V4.on || e.button !== 1) return; e.preventDefault(); e.stopImmediatePropagation(); V4.wheelV = !V4.wheelV; showMsg(V4.wheelV ? adT('🖱️ Tekerlek: yukarı / aşağı bak') : adT('🖱️ Tekerlek: sağa / sola dön'), 1.4); }, true);
+// 🚗 ayrıntılı arabalar (tipine göre birleşik parçalar)
+function cyCarType(t) {
+  CY_CG.types ||= {}; if (CY_CG.types[t]) return CY_CG.types[t];
+  const P = { paint: [], dark: [], glass: [], chrome: [], tire: [], hl: [], tl: [], plate: [] }, B = (k, w, h, d, x, y, z, rx = 0) => { const g = new THREE.BoxGeometry(w, h, d); if (rx) g.rotateX(rx); g.translate(x, y, z); P[k].push(g); }, C = (k, r, l, x, y, z, seg = 14) => { const g = new THREE.CylinderGeometry(r, r, l, seg).rotateZ(Math.PI / 2); g.translate(x, y, z); P[k].push(g); };
+  const D = { sedan: { L: 4.3, W: 1.86, bh: .58, by: .62, ch: .54, cl: 2.05, cz: -.2, wr: .36, wz: 1.36 }, hatch: { L: 3.9, W: 1.8, bh: .58, by: .62, ch: .58, cl: 2.0, cz: -.55, wr: .35, wz: 1.25 }, suv: { L: 4.6, W: 1.98, bh: .78, by: .8, ch: .62, cl: 2.6, cz: -.35, wr: .43, wz: 1.48 }, van: { L: 4.9, W: 2.0, bh: 1.55, by: 1.2, ch: 0, cl: 0, cz: 0, wr: .38, wz: 1.6 } }[t], { L, W, bh, by, ch, cl, cz, wr, wz } = D;
+  B('paint', W, bh, L, 0, by, 0); B('dark', W + .03, .14, L * .82, 0, by - bh / 2 + .02, 0);
+  for (const s of [1, -1]) { B('dark', W + .04, .22, .22, 0, wr + .06, s * (L / 2 + .06)); B('plate', .52, .12, .02, 0, wr + .08, s * (L / 2 + .18)); }
+  B('dark', W * .5, .16, .04, 0, by + bh * .1, L / 2 + .01);   // ızgara
+  if (t !== 'van') { B('glass', W * .9, ch, cl, 0, by + bh / 2 + ch / 2, cz); B('paint', W * .92, .07, cl * .92, 0, by + bh / 2 + ch + .02, cz); B('glass', W * .86, ch * .9, .06, 0, by + bh / 2 + ch * .45, cz + cl / 2 + .12, -.55); if (t !== 'hatch') B('glass', W * .86, ch * .85, .06, 0, by + bh / 2 + ch * .42, cz - cl / 2 - .1, .55); for (const s of [-1, 1]) { B('paint', .06, ch * .9, .07, s * W * .45, by + bh / 2 + ch / 2, cz + cl * .05); B('paint', .2, .1, .14, s * (W / 2 + .09), by + bh / 2 + .12, cz + cl / 2 - .1); } if (t === 'suv') for (const s of [-1, 1]) B('chrome', .05, .05, cl * .8, s * W * .38, by + bh / 2 + ch + .08, cz); }
+  else { B('glass', W * .9, .5, .06, 0, 1.55, L / 2 + .01); for (const s of [-1, 1]) { B('glass', .04, .42, L * .55, s * (W / 2 + .01), 1.5, -.2); B('paint', .2, .1, .14, s * (W / 2 + .09), 1.3, L / 2 - .3); } B('dark', .03, .9, .03, W / 2 + .02, 1.1, .2); }
+  for (const s of [-1, 1]) for (const zz of [-wz, wz]) { C('tire', wr, .28, s * (W / 2 - .02), wr, zz); C('chrome', wr * .58, .3, s * (W / 2 - .01), wr, zz, 10); }
+  for (const s of [-1, 1]) { B('hl', .42, .13, .06, s * W * .34, by + bh * .18, L / 2 + .02); B('tl', .4, .12, .06, s * W * .36, by + bh * .22, -L / 2 - .02); B('dark', .04, bh * .7, L * .55, s * (W / 2 + .005), by + .04, .1); }
+  const out = {}; for (const k in P) if (P[k].length) { out[k] = mergeGeometries(P[k].map(g => g.index ? g : g), false); P[k].forEach(g => g.dispose()); }
+  out.D = D; return CY_CG.types[t] = out;
+}
+function cyCarMesh(c) {
+  if (!CY_CG) CY_CG = { head: new THREE.SphereGeometry(.17, 8, 6), glass: new THREE.MeshStandardMaterial({ color: 0x1c2a3a, roughness: .08, metalness: .5, transparent: true, opacity: .8 }), tire: M(0x111214, { roughness: .9 }), dark: M(0x1d2024, { roughness: .6 }), chrome: M(0xd5dade, { metalness: .9, roughness: .2 }), plate: M(0xf2f2f2, { roughness: .5 }), hl: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff1c8, emissiveIntensity: .8 }), tl: new THREE.MeshStandardMaterial({ color: 0x550000, emissive: 0xff1a1a, emissiveIntensity: .5 }), red: new THREE.MeshStandardMaterial({ color: 0xff2020, emissive: 0xff0000, emissiveIntensity: 0 }), blue: new THREE.MeshStandardMaterial({ color: 0x2050ff, emissive: 0x0030ff, emissiveIntensity: 0 }) };
+  const t = c.kind || (c.kind = c.police || c.taxi ? 'sedan' : cyPick(['sedan', 'sedan', 'hatch', 'hatch', 'suv', 'suv', 'van'])), G = CY_CG, T = cyCarType(t), g = new THREE.Group(), paint = new THREE.MeshStandardMaterial({ color: c.col, metalness: .55, roughness: .28 });
+  const mats = { paint, dark: G.dark, glass: G.glass, chrome: G.chrome, tire: G.tire, hl: G.hl, tl: G.tl, plate: G.plate };
+  for (const k in mats) if (T[k]) { const m = new THREE.Mesh(T[k].clone(), mats[k]); m.castShadow = k !== 'glass'; m.receiveShadow = true; g.add(m); }   // her araba kendi kopyası: ezilince diğerleri etkilenmez
+  const D = T.D, add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
+  c.driver = add(G.head, M(0xf1c27d), -.42, t === 'van' ? 1.45 : D.by + D.bh / 2 + .2, t === 'van' ? D.L / 2 - .9 : D.cz + .2);
+  const top = t === 'van' ? 1.98 : D.by + D.bh / 2 + D.ch + .06;
+  if (c.police) { c.lr = add(new THREE.BoxGeometry(.5, .16, .3), G.red.clone(), -.3, top + .1, D.cz); c.lb = add(new THREE.BoxGeometry(.5, .16, .3), G.blue.clone(), .3, top + .1, D.cz); for (const s of [-1, 1]) add(new THREE.BoxGeometry(.04, .3, 1.6), M(0xffffff), s * (D.W / 2 + .01), D.by, 0); }
+  if (c.taxi) add(new THREE.BoxGeometry(.7, .22, .3), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffe082, emissiveIntensity: .7 }), 0, top + .12, D.cz);
+  c.paint = paint; g.rotation.order = 'YXZ';
+  g.userData.car = c; g.userData.obs = { x: 0, z: 0, r: D.L / 2 - .05, h: Infinity, top, tb: 0, y0: 0, stand: false, pass: false };
+  return g;
+}
+// 🏙️ binalar biraz farklı: kademeli kuleler, kırma çatılar, cam kuleler · 🏢 simsiyah ofis binası
+function cyVariety() {
+  if (CITY.varG || !CITY.bld) return; const g = CITY.varG = new THREE.Group(); CITY.g.add(g); const B = CITY.bld, Mx = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), col = new THREE.Color();
+  // ofis kulesi: merkeze en yakın büyük blok
+  const cx0 = B.reduce((s, b) => s + b[0], 0) / B.length, cz0 = B.reduce((s, b) => s + b[1], 0) / B.length;
+  let tk = -1, td = 1e9; B.forEach((b, k) => { if (b[5] || b[2] < 40) return; const d = Math.hypot(b[0] - cx0, b[1] - cz0); if (d < td) { td = d; tk = k; } });
+  if (tk < 0) { let hm = 0; B.forEach((b, k) => { if (!b[5] && b[4] > hm) { hm = b[4]; tk = k; } }); }
+  if (tk >= 0) { const b = B[tk]; b.office = true; b[2] = Math.min(b[2], 30); b[3] = Math.min(b[3], 30); cyHideOnRoof(tk); cyBldSet(tk, 98.6); b[4] = 98.6; const bm = cyBldMesh(); if (bm && bm.instanceColor) { bm.setColorAt(tk, col.setHex(0x0e1013)); bm.instanceColor.needsUpdate = true; } const o = CITY.obs[tk]; if (o) { o.office = true; o.hx = b[2] / 2; o.hz = b[3] / 2; o.r = Math.hypot(o.hx, o.hz); }
+    const crown = new THREE.Mesh(new THREE.BoxGeometry(b[2] * .7, 5, b[3] * .7), new THREE.MeshStandardMaterial({ color: 0x0b0c0e, metalness: .6, roughness: .25 })); crown.position.set(b[0], 98.6 + 2.5, b[1]); crown.userData.kk = tk; g.add(crown);
+    const sp = new THREE.Mesh(new THREE.CylinderGeometry(.25, .4, 16, 6), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: .8, roughness: .3 })); sp.position.set(b[0], 98.6 + 13, b[1]); sp.userData.kk = tk; g.add(sp);
+    const lab = qLabel(adT('🏢 OFİS KULESİ'), '#ffffff', 2.4); lab.position.set(b[0], 98.6 + 7, b[1] + b[3] / 2 + .5); lab.userData.kk = tk; g.add(lab); CITY.tower = tk; }
+  CITY.vaH = B.map(b => b[4]);
+  const setb = [], roofs = [];
+  B.forEach((b, k) => { const [x, z, w, d, h, sp] = b; if (sp || b.office) return;
+    if (h >= 34 && k % 3 !== 2) setb.push([k, x + (k % 2 ? w * .08 : -w * .08), h + h * .11, z, w * .62, h * .22, d * .62]);
+    else if (h <= 15) roofs.push([k, x, h + Math.min(w, d) * .18, z, w * .74, Math.min(w, d) * .36, d * .74]); });
+  const bm2 = cyBuildingMat(), pal = [0xcfc6b8, 0xb9c3cc, 0xd8cfc0, 0xa9b4bd, 0xe0d6c4];
+  if (setb.length) { const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), bm2, setb.length); m.userData.kk = setb.map(a => a[0]); setb.forEach((a, i) => { Mx.compose(P.set(a[1], a[2], a[3]), Q, S.set(a[4], a[5], a[6])); m.setMatrixAt(i, Mx); m.setColorAt(i, col.setHex(pal[a[0] % pal.length])); }); m.castShadow = m.receiveShadow = true; g.add(m); }
+  if (roofs.length) { const geo = new THREE.ConeGeometry(.71, 1, 4).rotateY(Math.PI / 4), m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ roughness: .85 }), roofs.length); m.userData.kk = roofs.map(a => a[0]); const rc = [0xa0522d, 0x8d4b2f, 0x6d4c41, 0x7b3f2b]; roofs.forEach((a, i) => { Mx.compose(P.set(a[1], a[2], a[3]), Q, S.set(a[4], a[5], a[6])); m.setMatrixAt(i, Mx); m.setColorAt(i, col.setHex(rc[a[0] % rc.length])); }); m.castShadow = true; g.add(m); }
+}
+function cyVarietySync() {   // yıkılan binanın kulesi / çatısı da gider
+  const g = CITY.varG; if (!g || (CITY.vaT = (CITY.vaT || 0) + 1) % 30) return; const B = CITY.bld, Z = new THREE.Matrix4().makeScale(0, 0, 0);
+  for (const m of g.children) { if (m.isInstancedMesh) { const kk = m.userData.kk; m.userData.off ||= new Uint8Array(kk.length); let ch = false; for (let i = 0; i < kk.length; i++) { const b = B[kk[i]]; if (b && (b.dead || b[4] !== CITY.vaH[kk[i]]) && !m.userData.off[i]) { m.userData.off[i] = 1; m.setMatrixAt(i, Z); ch = true; } } if (ch) m.instanceMatrix.needsUpdate = true; }
+    else if (m.userData.kk != null) { const b = B[m.userData.kk]; if (b && b.dead) m.visible = false; } }
+}
+// 🏢 ofis kulesinin içi: takım elbiseli çalışanlar, masalar devrilip camdan aşağı düşer
+function roomTowerFill(g, W, D, H) {
+  const box = (w, h, d, col, x, y, z, par = g) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), roomMat(col)); m.position.set(x, y, z); par.add(m); return m; };
+  ROOM.desks = [];
+  for (const [x, z] of [[-1.9, -1.4], [0, -1.4], [1.9, -1.4], [-1.9, .2], [0, .2], [1.9, .2]]) { const d = new THREE.Group(); d.position.set(x, 0, z); g.add(d); box(1.3, .05, .7, 0x2b2f36, 0, .74, 0, d); for (const [lx, lz] of [[-.6, -.3], [.6, -.3], [-.6, .3], [.6, .3]]) box(.04, .74, .04, 0x9aa0a6, lx, .37, lz, d); box(.55, .34, .04, 0x101820, 0, .98, -.2, d); box(.2, .03, .12, 0xeeeeee, .35, .78, .1, d); box(.08, .1, .08, 0xffffff, -.45, .82, .05, d); ROOM.desks.push({ g: d, t: -1 }); }
+  box(.5, 1.1, .35, 0x37474f, -W / 2 + .4, .55, -D / 2 + .4); box(.25, .5, .25, 0x2e7d32, W / 2 - .5, .25, -D / 2 + .4); box(.3, 1.2, .3, 0xb3e5fc, W / 2 - .45, .6, .8);
+}
+function roomTowerPeople(g) {
+  for (const p of ROOM.ppl) { try { humanize(p.r, { shirt: cyPick([0x1a1a1a, 0x263238, 0x37474f, 0x1c2331]), pants: 0x1a1a1a, longSleeve: true, body: huPick(['normal', 'normal', 'thin', 'fat']) }); const tie = new THREE.Mesh(new THREE.BoxGeometry(.05, .28, .02), roomMat(cyPick([0xb71c1c, 0x0d47a1, 0x4a148c]))); tie.position.set(0, .3, .13); p.r.torso.add(tie); p.r.huAdd.push(tie); } catch (e) {} }
+}
+function roomTowerTopple(dt) {   // cam kırılınca masalar devrilir, pencereye kayar, aşağı düşer
+  if (!ROOM.desks) return;
+  for (const d of ROOM.desks) {
+    if (d.t < 0) continue; d.t += dt;
+    if (!d.out) { const k = Math.min(1, d.t / .6); d.g.rotation.x = -k * 1.4; d.g.position.z += (1.2 + d.t * 3) * dt; if (d.g.position.z > 2.3) { d.out = true; scene.attach(d.g); d.v = ROOM.nrm.clone().multiplyScalar(3 + Math.random() * 2); d.vy = 1; d.spin = (Math.random() - .5) * 4; } }
+    else if (!d.done) { d.vy -= 20 * dt; d.g.position.addScaledVector(d.v, dt); d.g.position.y += d.vy * dt; d.g.rotation.x += d.spin * dt; d.g.rotation.z += d.spin * .5 * dt; const gy = .05;
+      if (d.g.position.y <= gy) { d.g.position.y = gy; d.done = true; d.g.rotation.set(Math.PI / 2, d.g.rotation.y, 0); play('hit', { at: d.g.position.clone(), gain: .7 }); for (let i = 0; i < 12; i++) spawnDust(d.g.position.x, .2, d.g.position.z, 1.4, 1.5, 0, 0, 0x9a9a9a); setTimeout(() => { if (d.g.parent) d.g.parent.remove(d.g); }, 20000); } }
   }
 }
 
@@ -29881,7 +30006,7 @@ renderer.setAnimationLoop(() => {
   if (VRMA.state === 'ready' && VRMA.wrap.visible) { player.updateMatrixWorld(true); vrmUpdate(paused || photoMode ? 0 : dt); } vrmItemHold();   // anime kız modeli (menüde de duruşu doğru kalır)
   try { gpLate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }
   try { const dd = paused || photoMode ? 0 : dt; gvLate(dd); gpExtraLate(dd); gpLeftLate(dd); gpShoulderTick(dd); gpHeldPoseTick(); } catch (e) { sftErr(e); }
-  try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); schLoop(paused || photoMode ? 0 : dt); npcLblTick(paused ? 0 : dt); if (curKey !== 'ankara') ankDebrisTick(paused || photoMode ? 0 : dt); cyUltraTick(); } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
+  try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); schLoop(paused || photoMode ? 0 : dt); npcLblTick(paused ? 0 : dt); if (curKey !== 'ankara') ankDebrisTick(paused || photoMode ? 0 : dt); cyUltraTick(); gvDualLate(); if (inCity && CITY.built) { cyVariety(); cyVarietySync(); } } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
   try { buddyUpdate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🤝 arkadaş: senin pozunu kopyalar
   updateDay(paused || photoMode || ADM.freeze ? 0 : dt * (ADM.daySpeed ? 40 : 1));
   updateWeather(paused || photoMode || ADM.freeze ? 0 : dt);
