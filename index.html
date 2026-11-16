@@ -4471,7 +4471,7 @@ three/build/three.module.js:
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-m</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-n</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -15003,7 +15003,7 @@ function update(dt) {
   camLow = THREE.MathUtils.lerp(camLow, slide ? 1 : 0, 1 - Math.exp(-8 * dt));
   camBase.lerp(tmp.copy(pos).add(new THREE.Vector3(0, ((HERO.on ? 1.02 : 1.5) - .55 * camLow + .25 * gunBlend) * giantS * (gSit ? (gSit.mode === 'lie' ? .32 : .55) : 1) * (1 - .3 * reachK) * (HOME.sleep ? .5 : 1) * (FB.on || V4.on ? .62 : 1) + ROBO.lift, 0)), 1 - Math.exp(-12 * dt));
   camTarget.copy(camBase).addScaledVector(right, .95 * gunBlend);
-  { const nr = giantS < .6 ? .02 : .1; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); } }   // minikken kamera yakına gelir
+  { const nr = giantS < .6 ? .02 : giantS > 1.5 ? Math.min(2.5, Math.round(giantS * 1.4) / 20) : .1; if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); } }   // minikken kamera yakına gelir · devken yakın düzlem büyür (zeminler titremez)
   let camD = THREE.MathUtils.lerp(dist, 3.6, gunBlend) * (giantS >= 1 ? 1 + (giantS - 1) * .75 : Math.pow(giantS, .8)) + ROBO.k * (INV.eq === 'robo' ? 1.6 : 0);
   if (inHouse) camD = Math.min(camD, 4.5);
   if (inMall) camD = Math.min(camD, 8);
@@ -25332,28 +25332,141 @@ const CY_INFO = {
   pond: ['🎣 Balık Gölü', '#a0e7ff'], stage: ['🎸 Sokak Sahnesi', '#d0bfff'], court: ['🏀 Basket Sahası', '#ffc09f'], plaza: ['⛲ Şehir Meydanı', '#e0f2ff'],
 };
 function cyBuildingMat() {
+  // 🏙️ cephe gölgelendiricide: 5 tarz (0 klasik · 1 tuğla · 2 şerit pencere · 3 cam giydirme · 4 siyah cam), pencere çerçevesi, kayıtlar,
+  // denizlik, lento, perde / jaluzi, köşe taşları, kat ve çatı silmeleri; zemin katta vitrin, kapı, renkli tabela; çatıda çakıl + kenar
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .82, metalness: .06 });
   m.onBeforeCompile = sh => {
     sh.uniforms.uNight = CITY.uNight; sh.uniforms.uBlk = CITY.uBlk;
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vCyP; varying vec3 vCyN;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\n#ifdef USE_INSTANCING\n vCyP = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz; vCyN = normalize(mat3(modelMatrix * instanceMatrix) * objectNormal);\n#else\n vCyP = (modelMatrix * vec4(transformed, 1.0)).xyz; vCyN = normalize(mat3(modelMatrix) * objectNormal);\n#endif');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vCyP; varying vec3 vCyN; uniform float uNight; uniform vec3 uBlk; float cyHash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }')
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aCyS; varying vec3 vCyP; varying vec3 vCyN; flat varying vec3 vCyC; flat varying vec3 vCyZ; flat varying float vCyS;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+#ifdef USE_INSTANCING
+ mat4 cyM = modelMatrix * instanceMatrix;
+#else
+ mat4 cyM = modelMatrix;
+#endif
+ vCyP = (cyM * vec4(transformed, 1.0)).xyz; vCyN = normalize(mat3(cyM) * objectNormal);
+ vCyC = cyM[3].xyz; vCyZ = vec3(length(cyM[0].xyz), length(cyM[1].xyz), length(cyM[2].xyz)); vCyS = aCyS;`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vCyP; varying vec3 vCyN; flat varying vec3 vCyC; flat varying vec3 vCyZ; flat varying float vCyS; uniform float uNight; uniform vec3 uBlk; float cyHash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }')
       .replace('#include <color_fragment>', `#include <color_fragment>
-        vec3 cyA = abs(vCyN); float cyLit = 0.0;
-        if (cyA.y < .5) {
-          float cyU = cyA.x > cyA.z ? vCyP.z : vCyP.x;
-          vec2 cyC = vec2(cyU / 3.0, vCyP.y / 3.4), cyF = fract(cyC), cyI = floor(cyC);
-          float cyWn = step(.16, cyF.x) * step(cyF.x, .84) * step(.22, cyF.y) * step(cyF.y, .86) * step(1.0, cyI.y);
-          float cyR = cyHash(cyI + floor(vCyP.xz * .013) * 7.0);
-          vec3 cyG = mix(vec3(.09, .13, .19), vec3(.42, .56, .72), cyF.y * .65 + cyR * .25);
-          float cyShop = (1.0 - step(1.0, cyI.y)) * step(.08, cyF.x) * step(cyF.x, .92) * step(.12, vCyP.y) * step(vCyP.y, 2.7);
-          diffuseColor.rgb = mix(diffuseColor.rgb, cyG, max(cyWn, cyShop * .85));
-          cyLit = cyWn * step(.6, cyR) + cyShop * .5;
+        vec3 cyA = abs(vCyN), cyEm = vec3(0.0); float cyGl = 0.0;
+        vec3 cyB = diffuseColor.rgb; float cySt = floor(vCyS + .5);
+        if (dot(cyB, vec3(.3, .59, .11)) < .07) cySt = 4.0;
+        float cyTop = vCyC.y + vCyZ.y * .5, cyBase = vCyC.y - vCyZ.y * .5;
+        vec2 cyCm = mod(vCyC.xz, 97.0);
+        if (cyA.y < .5 && vCyZ.y > 2.2) {
+          bool cyXF = cyA.x > cyA.z;
+          float cyW = cyXF ? vCyZ.z : vCyZ.x;
+          float cyU = (cyXF ? vCyP.z - vCyC.z : vCyP.x - vCyC.x) + cyW * .5;
+          float cyY = vCyP.y, cyFl = floor(cyY / 3.4), cyFy = fract(cyY / 3.4);
+          float cyNb = max(1.0, floor((cyW - 1.2) / 3.0)), cyBay = (cyW - 1.2) / cyNb, cyUU = (cyU - .6) / cyBay, cyBi = floor(cyUU), cyBx = fract(cyUU);
+          float cyIn = step(.6, cyU) * step(cyU, cyW - .6), cyUp = step(1.0, cyFl);
+          float cyFace = cyXF ? (vCyN.x > 0.0 ? 1.0 : 2.0) : (vCyN.z > 0.0 ? 3.0 : 4.0);
+          vec2 cySeed = cyCm * .37 + cyFace * 13.1;
+          float cyR = cyHash(vec2(cyBi, cyFl) + cySeed);
+          float cyGround = step(cyBase, .5) * (1.0 - cyUp);
+          float cyAA = clamp(1.6 - max(fwidth(cyY), fwidth(cyU)) * 9.0, 0.0, 1.0);   // uzakta ince çizgiler söner (titreşmesin)
+          vec3 cyCol = cyB;
+          vec3 cyGlass = mix(vec3(.08, .12, .17), vec3(.45, .58, .72), clamp(cyFy * .55 + cyR * .3, 0.0, 1.0));
+          if (cySt > .5 && cySt < 1.5) {   // tuğla örgüsü
+            vec2 cyQ = vec2(cyU / .46 + step(.5, fract(cyY / .36)) * .5, cyY / .18), cyQf = fract(cyQ);
+            float cyMo = max(step(cyQf.x, .07), step(cyQf.y, .14)) * cyAA;
+            cyCol = mix(cyB * (.86 + .26 * cyHash(floor(cyQ))), vec3(.80, .77, .72), cyMo * .7);
+          }
+          float cyWin = 0.0, cyFrame = 0.0, cyStone = 0.0, cyDark = 0.0;
+          vec3 cyFrC = cySt < .5 ? vec3(.93, .92, .88) : cySt < 1.5 ? vec3(.95, .95, .93) : cySt < 2.5 ? vec3(.26, .28, .30) : cySt < 3.5 ? vec3(.62, .66, .70) : vec3(.12, .13, .15);
+          if (cySt < 1.5) {   // klasik / tuğla: tek tek pencere
+            float wx = step(.2, cyBx) * step(cyBx, .8), wy = step(.22, cyFy) * step(cyFy, .84);
+            float gx = step(.25, cyBx) * step(cyBx, .75), gy = step(.255, cyFy) * step(cyFy, .81);
+            cyWin = gx * gy; cyFrame = wx * wy * (1.0 - cyWin);
+            float mul = min(1.0, (step(abs(cyBx - .5), .014) + step(abs(cyFy - .6), .012)) * cyAA);
+            cyFrame = max(cyFrame, cyWin * mul); cyWin *= 1.0 - mul;
+            cyStone = step(.15, cyBx) * step(cyBx, .85) * step(.17, cyFy) * step(cyFy, .22);
+            if (cySt < .5) cyStone = max(cyStone, step(.18, cyBx) * step(cyBx, .82) * step(.84, cyFy) * step(cyFy, .9));
+            cyDark = step(cyFy, .035) * cyAA * .5;
+            float cp = cyHash(cySeed * 1.3 + vec2(cyBi, cyFl) * 3.7);
+            vec3 curt = mix(vec3(.86, .79, .62), vec3(.72, .42, .38), cyHash(vec2(cyFl, cyBi) + cySeed + 9.0));
+            if (cp > .58) cyGlass = mix(cyGlass, curt, min(1.0, step(cyBx, .34) + step(.66, cyBx)) * .92);
+            else if (cp < .26) cyGlass = mix(cyGlass, vec3(.84, .84, .8) * (.86 + .14 * step(.5, fract(cyY / .09)) * cyAA), step(.6, cyFy) * .92);
+            cyGlass *= mix(.62, 1.0, smoothstep(.81, .73, cyFy));   // girinti gölgesi
+            float k = cyIn * cyUp; cyWin *= k; cyFrame *= k; cyStone *= k;
+          } else if (cySt < 2.5) {   // şerit pencere
+            float band = step(.3, cyFy) * step(cyFy, .86), mull = step(fract(cyU / 1.5), .035) * cyAA;
+            cyWin = band * (1.0 - mull) * cyIn * cyUp; cyFrame = band * mull * cyIn * cyUp;
+            cyDark = (step(.27, cyFy) * step(cyFy, .3) + step(.86, cyFy) * step(cyFy, .89)) * cyIn * cyUp * .55;
+            cyGlass = mix(vec3(.10, .16, .22), vec3(.50, .64, .76), clamp(cyFy * .6 + cyR * .25, 0.0, 1.0));
+          } else {   // cam giydirme / siyah cam
+            float mull = max(step(fract(cyU / 1.5), .03), step(cyFy, .03)) * cyAA, spand = step(cyFy, .15);
+            cyWin = (1.0 - mull) * (1.0 - spand) * cyUp; cyFrame = mull * cyUp; cyDark = spand * (1.0 - mull) * cyUp;
+            float hh = clamp((cyY - cyBase) / max(vCyZ.y, 1.0), 0.0, 1.0);
+            cyGlass = cySt > 3.5 ? mix(vec3(.02, .025, .03), vec3(.16, .20, .27), hh * .6 + cyR * .15 + cyFy * .2) : mix(vec3(.10, .24, .30), vec3(.55, .75, .86), hh * .55 + cyR * .18 + cyFy * .15);
+            cyCol = cySt > 3.5 ? vec3(.04, .045, .05) : cyB * .62;
+          }
+          vec3 o = mix(cyCol, cyCol * .6, cyDark);
+          o = mix(o, vec3(.86, .84, .80), cyStone);
+          o = mix(o, cyFrC, cyFrame);
+          o = mix(o, cyGlass, cyWin); cyGl = cyWin;
+          cyEm = vec3(1.0, .78, .48) * cyWin * step(.62, cyR);
+          // köşeler: taş / pilaster / metal kolon
+          float cyEd = min(cyU, cyW - cyU);
+          if (cyEd < .6 && cyUp > .5) {
+            if (cySt < 1.5) { float q = mod(floor(cyY / .55), 2.0), wq = q > .5 ? .6 : .38; float inQ = step(cyEd, wq); vec3 qc = cySt < .5 ? mix(cyB, vec3(.93, .91, .87), .65) : vec3(.86, .83, .77); o = mix(o, mix(qc, qc * .7, step(fract(cyY / .55), .08) * cyAA), inQ); }
+            else if (cySt < 2.5) o = mix(cyB * .92, cyB * .75, step(cyEd, .08) * cyAA);
+            else o = mix(o, cyFrC, step(cyEd, .3));
+          }
+          // çatı silmesi
+          float cyCt = cyTop - cyY;
+          if (cyCt < .75) {
+            if (cySt < 1.5) { o = vec3(.88, .86, .82) * (cySt < .5 ? 1.0 : .94); o = mix(o, o * .55, step(.5, fract(cyU / .35)) * step(.42, cyCt) * step(cyCt, .56) * cyAA); o = mix(o, o * .75, step(cyCt, .08)); }
+            else if (cyCt < .4) o = cySt > 3.5 ? vec3(.09, .1, .11) : vec3(.55, .58, .6);
+          }
+          // zemin kat: vitrin, kapı, tabela, silme
+          if (cyGround > .5) {
+            float isDoor = (cyXF ? 0.0 : 1.0) * step(abs(cyBi - floor(cyNb * .5)), .1);
+            float plinth = step(cyY, .42);
+            float shopG = step(.07, cyBx) * step(cyBx, .93) * step(.42, cyY) * step(cyY, 2.5) * cyIn * (1.0 - isDoor);
+            float shopF = step(.04, cyBx) * step(cyBx, .96) * step(.36, cyY) * step(cyY, 2.56) * cyIn * (1.0 - isDoor) * (1.0 - shopG);
+            float sgn = step(2.68, cyY) * step(cyY, 3.16) * cyIn, corn = step(3.22, cyY);
+            float sh = cyHash(vec2(floor(cyBi / 2.0), cyFace) + cyCm * .1);
+            vec3 sc = sh < .2 ? vec3(.72, .14, .12) : sh < .4 ? vec3(.12, .42, .25) : sh < .6 ? vec3(.10, .30, .62) : sh < .8 ? vec3(.86, .62, .10) : vec3(.36, .22, .15);
+            o = cySt > 2.5 ? (cySt > 3.5 ? vec3(.05, .055, .06) : cyB * .5) : cyCol;
+            o = mix(o, vec3(.34, .33, .32), plinth);
+            o = mix(o, vec3(.12, .13, .14), shopF);
+            vec3 shopIn = mix(vec3(.22, .27, .32), vec3(.80, .74, .60), clamp(cyHash(vec2(cyBi, cyFace) + cyCm) * .6 + (cyY - .42) * .12, 0.0, 1.0));
+            shopIn = mix(shopIn, vec3(.12, .13, .14), step(abs(cyBx - .5), .01) * cyAA);
+            shopIn = mix(shopIn, shopIn * .55, step(cyY, .62));
+            o = mix(o, shopIn, shopG);
+            float dF = isDoor * step(.26, cyBx) * step(cyBx, .74) * step(cyY, 2.4), dG = isDoor * step(.3, cyBx) * step(cyBx, .7) * step(.06, cyY) * step(cyY, 2.32);
+            o = mix(o, vec3(.1, .1, .11), dF);
+            o = mix(o, mix(vec3(.15, .2, .26), vec3(.46, .56, .64), cyY * .3), dG * (1.0 - step(abs(cyBx - .5), .008)));
+            o = mix(o, vec3(.85, .8, .6), dG * step(abs(abs(cyBx - .5) - .04), .008) * step(abs(cyY - 1.1), .22));
+            o = mix(o, sc, sgn);
+            float lt = sgn * step(.2, cyBx) * step(cyBx, .8) * step(2.79, cyY) * step(cyY, 3.05) * step(.42, cyHash(floor(vec2(cyU * 2.6, cyY * 7.0)))) * cyAA;
+            o = mix(o, vec3(.97, .95, .88), lt);
+            o = mix(o, cySt > 2.5 ? cyFrC : vec3(.86, .84, .79), corn);
+            cyGl = shopG + dG;
+            cyEm = vec3(1.0, .82, .55) * (shopG * .55 + dG * .3) + (sc * 1.4 + .25) * sgn * .5 + vec3(1.0) * lt * .3;
+          }
+          diffuseColor.rgb = o;
+        } else if (vCyN.y > .5) {   // çatı: çakıl + kenar
+          float e = min(vCyZ.x * .5 - abs(vCyP.x - vCyC.x), vCyZ.z * .5 - abs(vCyP.z - vCyC.z));
+          float aa = clamp(1.6 - fwidth(vCyP.x) * 6.0, 0.0, 1.0);
+          vec3 gr = vec3(.43, .43, .41) * (.88 + .22 * (cyHash(floor(vCyP.xz * 1.5)) - .5) * aa);
+          diffuseColor.rgb = cySt > 3.5 ? vec3(.07, .075, .08) : mix(gr, cyB * .85, step(e, .45));
         } else diffuseColor.rgb *= .6;`)
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n if (uBlk.z > 0.0 && distance(vCyP.xz, uBlk.xy) < uBlk.z) cyLit = 0.0;\n totalEmissiveRadiance += vec3(1.0, .78, .48) * cyLit * (.06 + uNight * .62);');
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, .24, clamp(cyGl, 0.0, 1.0));')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n if (uBlk.z > 0.0 && distance(vCyP.xz, uBlk.xy) < uBlk.z) cyEm = vec3(0.0);\n totalEmissiveRadiance += cyEm * (.06 + uNight * .62);');
   };
   return m;
 }
+// bina tarzları (gölgelendirici bunu okur): 0 klasik, 1 tuğla, 2 şerit, 3 cam, 4 siyah cam
+function cyBldStyles(bm, B) {
+  const st = CITY.bsty = new Float32Array(B.length), brick = [0x9c4a33, 0xa65a3c, 0x8e4430, 0xb0623f, 0x7d3f2e], col = new THREE.Color();
+  B.forEach((b, k) => { const [, , , , h, sp] = b, r = ((Math.sin(k * 127.1 + 311.7) * 43758.5453) % 1 + 1) % 1;
+    const s = sp ? (sp === 'jobs' ? 3 : 0) : h >= 44 ? (r < .65 ? 3 : 2) : r < .38 ? 0 : r < .7 ? 1 : 2;
+    st[k] = s; if (s === 1) bm.setColorAt(k, col.setHex(brick[k % brick.length])); });
+  bm.geometry.setAttribute('aCyS', new THREE.InstancedBufferAttribute(st, 1)); if (bm.instanceColor) bm.instanceColor.needsUpdate = true;
+}
+function cyBldStyle(k, s) { const bm = cyBldMesh(); if (!bm || !CITY.bsty) return; CITY.bsty[k] = s; const a = bm.geometry.getAttribute('aCyS'); if (a) { a.array[k] = s; a.needsUpdate = true; } }
 function cyObs(x, z, hx, hz, top, stand = true) { const o = { box: true, x: AREAS.city.cx + x, z: AREAS.city.cz + z, hx, hz, r: Math.hypot(hx, hz), h: stand ? top : Infinity, top, y0: 0, tb: 0, stand, pass: false, cityB: true }; CITY.obs.push(o); return o; }
 function cyLabel(text, col, x, y, z, h = 1.6) { const s = qLabel(text, col, h); s.position.set(x, y, z); CITY.g.add(s); return s; }
 
@@ -25378,7 +25491,7 @@ function cityBuild() {
   const lineM = new THREE.MeshStandardMaterial({ color: 0xf2f2e8, roughness: .7 }), dm = new THREE.InstancedMesh(new THREE.BoxGeometry(.25, .02, 3), lineM, dashes.length);
   dashes.forEach(([x, z, r], i) => { Mx.compose(Pv.set(x, .03, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), r ? Math.PI / 2 : 0), S.set(1, 1, 1)); dm.setMatrixAt(i, Mx); }); g.add(dm);
   const cm = new THREE.InstancedMesh(new THREE.BoxGeometry(.6, .02, 3), lineM, cross.length);
-  cross.forEach(([x, z, r], i) => { Mx.compose(Pv.set(x, .031, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), r ? Math.PI / 2 : 0), S.set(1, 1, 1)); cm.setMatrixAt(i, Mx); }); g.add(cm);
+  cross.forEach(([x, z, r], i) => { Mx.compose(Pv.set(x, .038, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), r ? Math.PI / 2 : 0), S.set(1, 1, 1)); cm.setMatrixAt(i, Mx); }); g.add(cm);
   // binalar (tek çizim: pencereler gölgelendiricide)
   const B = [], pal = [0xd9d4c7, 0xc9b8a0, 0xa8b5c4, 0xe0c9b3, 0x9aa3ad, 0xd4c1a5, 0xbfc7cf, 0xcfa98a, 0x8f9aa6, 0xe8e2d6, 0xb6a48f, 0x7f8c99];
   for (let i = 0; i < CG; i++) for (let j = 0; j < CG; j++) {
@@ -25395,7 +25508,7 @@ function cityBuild() {
   const bm = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), cyBuildingMat(), B.length), col = new THREE.Color();
   const SC = { home: 0xa5d6a7, jobs: 0x90caf9, police: 0x5c7cfa, hospital: 0xf5f5f5, bank: 0xf2e6b6 };
   B.forEach(([x, z, w, d, h, sp], k) => { Mx.compose(Pv.set(x, h / 2, z), Q0, S.set(w, h, d)); bm.setMatrixAt(k, Mx); bm.setColorAt(k, col.setHex(SC[sp] || pal[k % pal.length])); cyObs(x, z, w / 2, d / 2, h); });
-  bm.castShadow = true; bm.receiveShadow = true; g.add(bm); CITY.bld = B;
+  bm.castShadow = true; bm.receiveShadow = true; g.add(bm); CITY.bld = B; cyBldStyles(bm, B);
   // çatı detayları: su depoları ve klimalar
   const tanks = B.filter((b, k) => k % 3 === 0), tm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.4, 1.4, 2.6, 10), new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: .9 }), tanks.length);
   tanks.forEach(([x, z, w, d, h], k) => { Mx.compose(Pv.set(x + w * .25, h + 1.3, z - d * .2), Q0, S.set(1, 1, 1)); tm.setMatrixAt(k, Mx); }); tm.castShadow = true; g.add(tm);
@@ -28803,9 +28916,9 @@ function schBuild() {
   const W = (f, x0, z0, x1, z1, c = IN) => { const w = Math.max(.02, Math.abs(x1 - x0)), d = Math.max(.02, Math.abs(z1 - z0)); sb(f, w, SCH_WH, d, c, (x0 + x1) / 2, SCH_WH / 2, (z0 + z1) / 2); SCH.walls[f].push({ x: (x0 + x1) / 2, z: (z0 + z1) / 2, hx: w / 2, hz: d / 2 }); };
   for (let f = 0; f < 3; f++) {
     // zemin / döşeme (merdiven boşluğu açık)
-    if (f === 0) sb(0, 5.02, .008, 1.92, 0xcfc8bd, -.5, .004, -.95);
+    if (f === 0) sb(0, 5.02, .003, 1.92, 0xcfc8bd, -.5, .0015, -.95);
     else for (const [x0, x1, z0, z1] of [[-3.01, -.7, -1.91, .01], [-.5, 2.01, -1.91, .01], [-.7, -.5, -1.91, -1.85], [-.7, -.5, -.55, .01]]) sb(f, x1 - x0, .04, z1 - z0, 0xbdb5a8, (x0 + x1) / 2, -.02, (z0 + z1) / 2);
-    const fin = (x0, x1, z0, z1, c) => sb(f, x1 - x0, .004, z1 - z0, c, (x0 + x1) / 2, .006, (z0 + z1) / 2);
+    const fin = (x0, x1, z0, z1, c) => sb(f, x1 - x0, .004, z1 - z0, c, (x0 + x1) / 2, .007, (z0 + z1) / 2);
     fin(-3, 2, -.5, 0, 0xe2e0d8);   // koridor (mermer)
     SCH_ROOM[f].forEach((nm, i) => { const [x0, x1] = SCH_COLS[i]; fin(x0, x1, -1.9, -.5, nm === 'Kantin' ? 0xcfe7ea : /Müdür|Öğretmen|Zümre/.test(nm) ? 0xb9905f : nm === 'Kütüphane' ? 0xa1887f : 0xe8d4a8); });
     // duvarlar
@@ -29732,31 +29845,48 @@ function shatterAt(at, R, dir, power = 1) {
 canvas.addEventListener('mousedown', e => { if (!V4.on || e.button !== 0 || paused) return; V4.walk = true; e.stopImmediatePropagation(); }, true);
 addEventListener('mouseup', e => { if (e.button === 0) V4.walk = false; }, true);
 addEventListener('wheel', e => { if (!V4.on || paused) return; if (V4.wheelV) pitch = THREE.MathUtils.clamp(pitch + Math.sign(e.deltaY) * .08, -1.2, 1.35); else yaw -= Math.sign(e.deltaY) * .14; e.stopImmediatePropagation(); e.preventDefault(); }, { capture: true, passive: false });
-/* ---------- 🏙️ Ultra grafikte şehir binaları: kat silmeleri, çatı parapeti, çatı kulesi, anten, balkonlar, dükkân tenteleri ---------- */
+/* ---------- 🏙️ şehir binalarının ayrıntıları (Düşük hariç her grafikte): kat silmeleri, çatı parapeti, çatı kulesi, anten, hizalı balkonlar,
+   dükkân başına tente, kapı saçağı, yangın merdivenleri (tuğla binalar), cephe klimaları, çatıda güneş panelleri ---------- */
 function cyUltraTick() {
-  if (!inCity || !CITY.built || !CITY.bld) return; const on = GFX.q === 'ultra';
+  if (!inCity || !CITY.built || !CITY.bld) return; const q = GFX.q, on = q !== 'low';
   if (!CITY.ultraG) { if (!on) return; cyUltraBuild(); }
   CITY.ultraG.visible = on; if (!on) return;
+  if (CITY.ulQ !== q) { CITY.ulQ = q; for (const m of CITY.ultraG.children) m.castShadow = !!m.userData.sh && (q !== 'mid' || m.userData.big); }
   if ((CITY.ulT = (CITY.ulT || 0) + 1) % 30) return;   // yıkılan / sökülen binaların süsleri kaybolur
   const B = CITY.bld, Z = new THREE.Matrix4().makeScale(0, 0, 0);
   for (const m of CITY.ultraG.children) { const kk = m.userData.kk; let ch = false; for (let i = 0; i < kk.length; i++) { const k = kk[i], b = B[k]; if (b && (b.dead || b.falling || b[4] !== CITY.ulH[k]) && !m.userData.off[i]) { m.userData.off[i] = 1; m.setMatrixAt(i, Z); ch = true; } } if (ch) m.instanceMatrix.needsUpdate = true; }
 }
 function cyUltraBuild() {
-  const g = CITY.ultraG = new THREE.Group(); CITY.g.add(g); const B = CITY.bld, Mx = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), col = new THREE.Color(); CITY.ulH = B.map(b => b[4]);
-  const L = { led: [], par: [], awn: [], bal: [], ant: [], hut: [] };
-  B.forEach((b, k) => { const [x, z, w, d, h, sp] = b; if (b.office) return;
-    for (let y = 3.4; y < h - .5; y += 3.4) L.led.push([k, x, y, z, w + .35, .16, d + .35]);
+  const g = CITY.ultraG = new THREE.Group(); CITY.g.add(g); const B = CITY.bld, Mx = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), col = new THREE.Color(), XA = new THREE.Vector3(1, 0, 0); CITY.ulH = B.map(b => b[4]);
+  const L = { led: [], par: [], awn: [], can: [], bal: [], ant: [], hut: [], fe: [], ac: [], sol: [] }, ST = CITY.bsty || [];
+  const hsh = (a, b) => ((Math.sin(a * 91.7 + b * 47.3 + 13.1) * 43758.5453) % 1 + 1) % 1;
+  B.forEach((b, k) => { const [x, z, w, d, h, sp] = b; if (b.office) return; const st = ST[k] | 0;
+    const nb = Math.max(1, Math.floor((w - 1.2) / 3)), bay = (w - 1.2) / nb, bx = i => x - w / 2 + .6 + (i + .5) * bay, door = Math.floor(nb / 2);   // gölgelendiricideki pencere düzeni
+    if (st < 3) for (let y = 3.4; y < h - .5; y += 3.4) L.led.push([k, x, y, z, w + .3, .14, d + .3]);
     L.par.push([k, x, h + .45, z - d / 2 + .15, w, .9, .3], [k, x, h + .45, z + d / 2 - .15, w, .9, .3], [k, x - w / 2 + .15, h + .45, z, .3, .9, d], [k, x + w / 2 - .15, h + .45, z, .3, .9, d]);
-    if (!sp) { L.awn.push([k, x, 3.05, z + d / 2 + .9, w * .85, .16, 1.8]); L.awn.push([k, x, 3.05, z - d / 2 - .9, w * .85, .16, 1.8]); }
-    if (!sp && h < 45) for (let y = 6.8; y < h - 2; y += 6.8) for (const s of [-1, 1]) { L.bal.push([k, x + s * w * .24, y - 1.25, z + d / 2 + .55, 3.2, .2, 1.1]); L.bal.push([k, x + s * w * .24, y - .75, z + d / 2 + 1.05, 3.2, .9, .06]); }
+    for (const s of [1, -1]) { const fz = z + s * d / 2;   // ön ve arka cephe: dükkân tenteleri + kapı saçağı
+      for (let i = 0; i < nb; i++) { if (i === door) { L.can.push([k, bx(i), 2.62, fz + s * .9, bay * .82, .14, 1.8]); continue; } if (sp || hsh(k * 3 + i, s) < .22) continue; L.awn.push([k, bx(i), 2.42, fz + s * .62, bay * .9, .1, 1.3, s * .32, (k + (i >> 1)) % 7]); } }
+    if (!sp && st < 2 && h < 45) for (let y = 6.8; y < h - 2; y += 6.8) for (const s of [-1, 1]) {   // pencereye hizalı balkonlar
+      const i = Math.max(0, Math.min(nb - 1, Math.round((s * w * .24 + w / 2 - .6) / bay - .5))), xx = bx(i), fz = z + d / 2;
+      L.bal.push([k, xx, y + .07, fz + .55, bay * .92, .14, 1.1], [k, xx, y + 1.0, fz + 1.08, bay * .92, .06, .06], [k, xx, y + .55, fz + 1.08, bay * .92, .03, .03], [k, xx - bay * .45, y + 1.0, fz + .55, .05, .06, 1.1], [k, xx + bay * .45, y + 1.0, fz + .55, .05, .06, 1.1]);
+      for (let q = 0; q <= 6; q++) L.bal.push([k, xx - bay * .45 + q * bay * .15, y + .55, fz + 1.08, .035, .9, .035]); for (const e of [-1, 1]) L.bal.push([k, xx + e * bay * .45, y + .55, fz + .55, .035, .9, .035]); }
+    if (!sp && st === 1 && h < 45) { const fx = x + w / 2, z0 = z, nf = Math.floor(h / 3.4);   // yangın merdiveni (yan cephe)
+      for (let f = 1; f < nf; f++) { const y = f * 3.4;
+        L.fe.push([k, fx + .6, y + .13, z0, 1.2, .08, 3.4], [k, fx + 1.18, y + 1.0, z0, .05, .05, 3.4], [k, fx + 1.18, y + .52, z0, .04, .04, 3.4], [k, fx + .6, y + 1.0, z0 - 1.7, 1.2, .05, .05], [k, fx + .6, y + 1.0, z0 + 1.7, 1.2, .05, .05]);
+        for (const q of [-1.7, 0, 1.7]) L.fe.push([k, fx + 1.18, y + .5, z0 + q, .05, 1.0, .05]);
+        if (f < nf - 1) L.fe.push([k, fx + .42, y + 1.74, z0, .62, .08, 4.5, (f % 2 ? 1 : -1) * Math.atan2(3.4, 3.0)]); }
+      L.fe.push([k, fx + 1.0, 3.4 - .9, z0 + 1.2, .05, 1.8, .05], [k, fx + 1.0, 3.4 - .9, z0 + 1.6, .05, 1.8, .05]); }
+    if (!sp && st < 2 && h < 50) for (const s of [1, -1]) for (let f = 1; f < Math.floor(h / 3.4); f++) for (let i = 0; i < nb; i++) if (hsh(k * 7 + f * 13 + i, s * 5) < .1) L.ac.push([k, bx(i), f * 3.4 + .32, z + s * (d / 2 + .23), .78, .5, .42]);
     if (k % 2 === 0) L.ant.push([k, x - w * .3, h + 3.2, z - d * .3, .12, 6, .12]);
+    if (!sp && h < 30 && k % 3 === 1) for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) L.sol.push([k, x - w * .12 + (i - .5) * 2.3, h + .62, z - d * .24 + (j - .5) * 1.7, 2.1, .06, 1.25, -.45]);
     L.hut.push([k, x + w * .12, h + 1.4, z + d * .22, Math.min(6, w * .3), 2.8, Math.min(5, d * .25)]); });
-  const box = new THREE.BoxGeometry(1, 1, 1), M2 = { stone: new THREE.MeshStandardMaterial({ color: 0xe6e1d6, roughness: .8 }), dark: new THREE.MeshStandardMaterial({ color: 0x8f969c, roughness: .55, metalness: .35 }), awn: new THREE.MeshStandardMaterial({ roughness: .75 }) };
+  const box = new THREE.BoxGeometry(1, 1, 1), M2 = { stone: new THREE.MeshStandardMaterial({ color: 0xe6e1d6, roughness: .8 }), dark: new THREE.MeshStandardMaterial({ color: 0x8f969c, roughness: .55, metalness: .35 }), awn: new THREE.MeshStandardMaterial({ roughness: .75 }),
+    can: new THREE.MeshStandardMaterial({ color: 0x37474f, roughness: .4, metalness: .5 }), fe: new THREE.MeshStandardMaterial({ color: 0x2a2d31, roughness: .6, metalness: .5 }), ac: new THREE.MeshStandardMaterial({ color: 0xd9dcde, roughness: .5 }), sol: new THREE.MeshStandardMaterial({ color: 0x1b2b4b, roughness: .25, metalness: .4 }) };
   const pal = [0xc62828, 0x2e7d32, 0x1565c0, 0xf9a825, 0x6d4c41, 0x00897b, 0x6a1b9a];
-  for (const [key, mat, color] of [['led', M2.stone], ['par', M2.stone], ['awn', M2.awn, true], ['bal', M2.dark], ['ant', M2.dark], ['hut', M2.stone]]) {
-    const list = L[key]; if (!list.length) continue; const m = new THREE.InstancedMesh(box, mat, list.length); m.userData.kk = list.map(a => a[0]); m.userData.off = new Uint8Array(list.length);
-    list.forEach((a, i) => { Mx.compose(P.set(a[1], a[2], a[3]), Q, S.set(a[4], a[5], a[6])); m.setMatrixAt(i, Mx); if (color) m.setColorAt(i, col.setHex(pal[a[0] % pal.length])); });
-    m.castShadow = key !== 'led'; m.receiveShadow = true; g.add(m);
+  for (const [key, mat, color, sh, big] of [['led', M2.stone, 0, 0], ['par', M2.stone, 0, 1, 1], ['awn', M2.awn, 1, 1], ['can', M2.can, 0, 1], ['bal', M2.dark, 0, 1], ['ant', M2.dark, 0, 1], ['hut', M2.stone, 0, 1, 1], ['fe', M2.fe, 0, 1], ['ac', M2.ac, 0, 0], ['sol', M2.sol, 0, 1]]) {
+    const list = L[key]; if (!list.length) continue; const m = new THREE.InstancedMesh(box, mat, list.length); m.userData.kk = list.map(a => a[0]); m.userData.off = new Uint8Array(list.length); m.userData.sh = !!sh; m.userData.big = !!big;
+    list.forEach((a, i) => { Q.setFromAxisAngle(XA, a[7] || 0); Mx.compose(P.set(a[1], a[2], a[3]), Q, S.set(a[4], a[5], a[6])); m.setMatrixAt(i, Mx); if (color) m.setColorAt(i, col.setHex(pal[(a[8] ?? a[0]) % pal.length])); });
+    m.castShadow = !!sh; m.receiveShadow = true; g.add(m);
   }
 }
 
@@ -29849,13 +29979,22 @@ function cyCarMesh(c) {
   return g;
 }
 // 🏙️ binalar biraz farklı: kademeli kuleler, kırma çatılar, cam kuleler · 🏢 simsiyah ofis binası
+function cyGroundFix() {   // ince zemin katmanları: üstteki her zaman önde çizilir (uzakta / devken titreşmez)
+  if (CITY.gfix || !CITY.g) return; CITY.gfix = true; const bb = new THREE.Box3(), top = new Map();
+  CITY.g.updateMatrixWorld(true);
+  CITY.g.traverse(o => { if (!o.isMesh || !o.material || Array.isArray(o.material) || o.material.onBeforeCompile && o.isInstancedMesh && o.count === CITY.bld.length) return;
+    if (o.isInstancedMesh) { o.computeBoundingBox(); bb.copy(o.boundingBox).applyMatrix4(o.matrixWorld); } else { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); }
+    if (bb.max.y > .6 || bb.max.y < .012 || bb.max.y - bb.min.y > .3 || Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) < .4) return;
+    top.set(o.material, Math.max(top.get(o.material) || 0, bb.max.y)); });
+  for (const [m, y] of top) { m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -Math.max(1, Math.round(y * 60)); m.needsUpdate = true; }
+}
 function cyVariety() {
-  if (CITY.varG || !CITY.bld) return; const g = CITY.varG = new THREE.Group(); CITY.g.add(g); const B = CITY.bld, Mx = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), col = new THREE.Color();
+  cyGroundFix(); if (CITY.varG || !CITY.bld) return; const g = CITY.varG = new THREE.Group(); CITY.g.add(g); const B = CITY.bld, Mx = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), col = new THREE.Color();
   // ofis kulesi: merkeze en yakın büyük blok
   const cx0 = B.reduce((s, b) => s + b[0], 0) / B.length, cz0 = B.reduce((s, b) => s + b[1], 0) / B.length;
   let tk = -1, td = 1e9; B.forEach((b, k) => { if (b[5] || b[2] < 40) return; const d = Math.hypot(b[0] - cx0, b[1] - cz0); if (d < td) { td = d; tk = k; } });
   if (tk < 0) { let hm = 0; B.forEach((b, k) => { if (!b[5] && b[4] > hm) { hm = b[4]; tk = k; } }); }
-  if (tk >= 0) { const b = B[tk]; b.office = true; b[2] = Math.min(b[2], 30); b[3] = Math.min(b[3], 30); cyHideOnRoof(tk); cyBldSet(tk, 98.6); b[4] = 98.6; const bm = cyBldMesh(); if (bm && bm.instanceColor) { bm.setColorAt(tk, col.setHex(0x0e1013)); bm.instanceColor.needsUpdate = true; } const o = CITY.obs[tk]; if (o) { o.office = true; o.hx = b[2] / 2; o.hz = b[3] / 2; o.r = Math.hypot(o.hx, o.hz); }
+  if (tk >= 0) { const b = B[tk]; b.office = true; b[2] = Math.min(b[2], 30); b[3] = Math.min(b[3], 30); cyHideOnRoof(tk); cyBldSet(tk, 98.6); b[4] = 98.6; cyBldStyle(tk, 4); const bm = cyBldMesh(); if (bm && bm.instanceColor) { bm.setColorAt(tk, col.setHex(0x0e1013)); bm.instanceColor.needsUpdate = true; } const o = CITY.obs[tk]; if (o) { o.office = true; o.hx = b[2] / 2; o.hz = b[3] / 2; o.r = Math.hypot(o.hx, o.hz); }
     const crown = new THREE.Mesh(new THREE.BoxGeometry(b[2] * .7, 5, b[3] * .7), new THREE.MeshStandardMaterial({ color: 0x0b0c0e, metalness: .6, roughness: .25 })); crown.position.set(b[0], 98.6 + 2.5, b[1]); crown.userData.kk = tk; g.add(crown);
     const sp = new THREE.Mesh(new THREE.CylinderGeometry(.25, .4, 16, 6), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: .8, roughness: .3 })); sp.position.set(b[0], 98.6 + 13, b[1]); sp.userData.kk = tk; g.add(sp);
     const lab = qLabel(adT('🏢 OFİS KULESİ'), '#ffffff', 2.4); lab.position.set(b[0], 98.6 + 7, b[1] + b[3] / 2 + .5); lab.userData.kk = tk; g.add(lab); CITY.tower = tk; }
@@ -29865,7 +30004,8 @@ function cyVariety() {
     if (h >= 34 && k % 3 !== 2) setb.push([k, x + (k % 2 ? w * .08 : -w * .08), h + h * .11, z, w * .62, h * .22, d * .62]);
     else if (h <= 15) roofs.push([k, x, h + Math.min(w, d) * .18, z, w * .74, Math.min(w, d) * .36, d * .74]); });
   const bm2 = cyBuildingMat(), pal = [0xcfc6b8, 0xb9c3cc, 0xd8cfc0, 0xa9b4bd, 0xe0d6c4];
-  if (setb.length) { const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), bm2, setb.length); m.userData.kk = setb.map(a => a[0]); setb.forEach((a, i) => { Mx.compose(P.set(a[1], a[2], a[3]), Q, S.set(a[4], a[5], a[6])); m.setMatrixAt(i, Mx); m.setColorAt(i, col.setHex(pal[a[0] % pal.length])); }); m.castShadow = m.receiveShadow = true; g.add(m); }
+  if (setb.length) { const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), bm2, setb.length); m.userData.kk = setb.map(a => a[0]); const bm0 = cyBldMesh(); setb.forEach((a, i) => { Mx.compose(P.set(a[1], a[2], a[3]), Q, S.set(a[4], a[5], a[6])); m.setMatrixAt(i, Mx); if (bm0 && bm0.instanceColor) { bm0.getColorAt(a[0], col); m.setColorAt(i, col); } else m.setColorAt(i, col.setHex(pal[a[0] % pal.length])); });
+    m.geometry.setAttribute('aCyS', new THREE.InstancedBufferAttribute(new Float32Array(setb.map(a => CITY.bsty ? CITY.bsty[a[0]] : 0)), 1)); m.castShadow = m.receiveShadow = true; g.add(m); }
   if (roofs.length) { const geo = new THREE.ConeGeometry(.71, 1, 4).rotateY(Math.PI / 4), m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ roughness: .85 }), roofs.length); m.userData.kk = roofs.map(a => a[0]); const rc = [0xa0522d, 0x8d4b2f, 0x6d4c41, 0x7b3f2b]; roofs.forEach((a, i) => { Mx.compose(P.set(a[1], a[2], a[3]), Q, S.set(a[4], a[5], a[6])); m.setMatrixAt(i, Mx); m.setColorAt(i, col.setHex(rc[a[0] % rc.length])); }); m.castShadow = true; g.add(m); }
 }
 function cyVarietySync() {   // yıkılan binanın kulesi / çatısı da gider
