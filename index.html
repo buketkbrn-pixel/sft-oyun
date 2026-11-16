@@ -4471,7 +4471,7 @@ three/build/three.module.js:
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-h</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-i</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -24331,7 +24331,7 @@ function admSet7(id, on) {
   if (PET7[id]) pt7Set(id, on);
   if (id === 'wr_pulse' && !on) charHolder.scale.setScalar(giantS);
 }
-function admUpdate7(dt) { try { hrUpdate(dt); } catch (e) { sftErr(e); } try { gpUpdate(dt); gvPre(dt); gpLeftPre(dt); fmTick(dt); nv3Pre(dt); v4Pre(dt); gnEatTick(dt); } catch (e) { sftErr(e); } try { bossUpdate(dt); } catch (e) { sftErr(e); } if (dt > 0) { ch7Update(dt); au7Update(dt); pt7Update(dt); wr7Update(dt); } }
+function admUpdate7(dt) { try { hrUpdate(dt); } catch (e) { sftErr(e); } try { gpUpdate(dt); gvPre(dt); gpLeftPre(dt); fmTick(dt); nv3Pre(dt); v4Pre(dt); vr3BodyPre(); v5Pre(dt); gnEatTick(dt); } catch (e) { sftErr(e); } try { bossUpdate(dt); } catch (e) { sftErr(e); } if (dt > 0) { ch7Update(dt); au7Update(dt); pt7Update(dt); wr7Update(dt); } }
 Object.assign(L_EN, { 'Hile barları': 'Cheat sliders', 'Sıfırla': 'Reset', '💥 KRİTİK!': '💥 CRITICAL!', '🗼 Taş kule!': '🗼 Stone tower!', '🔺 Piramit!': '🔺 Pyramid!', '🌉 Kemer köprü!': '🌉 Arch bridge!', '🌬️ Yel değirmeni!': '🌬️ Windmill!', '🗼 Deniz feneri!': '🗼 Lighthouse!', '🧊 İglo!': '🧊 Igloo!', '⛺ Kamp çadırı ve ateş!': '⛺ Camping tent and fire!', '🌳 Ağaç ev!': '🌳 Treehouse!', '🪨 Taş çember!': '🪨 Stone circle!', '🗿 Totem direği!': '🗿 Totem pole!', '♟️ Dev satranç taşları!': '♟️ Giant chess pieces!', '🎲 Dev zar! Ona koşarak çarp': '🎲 Giant dice! Run into it', '🍄 Mantar ev!': '🍄 Mushroom house!', '🪣 Dilek kuyusu! İçine bak': '🪣 Wishing well! Walk up to it', '🪣 Dileğin kabul oldu!': '🪣 Your wish came true!' });
 Object.assign(L_EN, { '🎛️ Hile barları sıfırlandı': '🎛️ Cheat sliders reset', '⚡ Yerinde dirildin!': '⚡ Revived on the spot!', '🧹 Hazır yapılar temizlendi': '🧹 Ready builds cleared', '🧹 Temizlenecek yapı yok': '🧹 Nothing to clear', '🔝 Tüm barlar en üstte!': '🔝 All sliders maxed!', 'seninle takılır, kendi yolunu seçer': 'hangs out with you, picks its own path' });
 admRender();
@@ -27754,7 +27754,7 @@ const htHas = side => HT.st === 'run' && (GV.on || (GV3.on && GV3.mode === 'n'))
 function htCurl(side) { return htHas(side) ? HT.hands[side].curl : null; }
 function htMsg(t) { const e = $('htSt'); if (e) e.textContent = t + (HT.fps && HT.st === 'run' ? ` · ${HT.fps} fps` : ''); }
 function htUI() {
-  const p = $('htBox'); if (p) p.style.display = HT.on || V4.on ? 'block' : 'none';
+  const p = $('htBox'); if (p) p.style.display = HT.on || V4.on || window.__v5on ? 'block' : 'none';
   document.querySelectorAll('[data-ht]').forEach(b => { b.classList.toggle('on', HT.on); b.textContent = HT.on ? '📷 ' + adT('El takibi açık') : '📷 ' + adT('Elimle oyna'); });
 }
 function htFail(kind, e) {
@@ -27771,6 +27771,7 @@ function htFail(kind, e) {
   showMsg(m, 8);
 }
 async function htStart() {
+  if (window.__v5on) v5Stop(true);
   if (!GV3.on) gv3Set(true); if (!GV3.on) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { htFail('cam'); return; }
   HT.on = true; HT.st = 'cam'; htUI(); htMsg(adT('📷 Kamera açılıyor…'));
@@ -27861,6 +27862,7 @@ function htTick(dt) {
     if (!HT.nf) { htPredict(dt); return; } HT.nf = false;
   } else if (now - HT.lastDet < 16) { htPredict(dt); return; }
   HT.dd = THREE.MathUtils.clamp((now - (HT.lastDet || now - 33)) / 1000, .012, .1); HT.lastDet = now; HT.fpsN = (HT.fpsN || 0) + 1; if (now - (HT.fpsT || 0) > 1000) { HT.fps = HT.fpsN; HT.fpsN = 0; HT.fpsT = now; } let res; try { res = HT.lm.detectForVideo(v, now); } catch (e) { return; }
+  if (GV3.on && (HT.bf = (HT.bf || 0) + 1) % 3 === 0) try { htBody(v, now + .5); } catch (e) {}   // 🧍 eğilme / baş yönü
   const cv = $('htCv'), g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height);
   const L = gvArmLen('R'), cf = camera.getWorldDirection(new THREE.Vector3()), up0 = new THREE.Vector3(0, 1, 0), rt = new THREE.Vector3().crossVectors(cf, up0).normalize(), up = new THREE.Vector3().crossVectors(rt, cf).normalize();
   const eye = camera.position.clone(), seen = [];
@@ -27887,6 +27889,7 @@ function htTick(dt) {
     const fwdV = H.vel.dot(cf), downV = -H.vel.dot(up0);
     if (giant && !H.fist && avg < .3 && fwdV > 3.2 * giantS && H.cd <= 0) { H.cd = .9; htPush(side, T, cf); }
     if (giant && H.fist && !holding && downV > 3.4 * giantS && H.cd <= 0) { H.cd = .9; htSlam(side); }
+    if (!holding && avg > .55 && fwdV > 2.6 * Math.max(1, giantS) && (H.stT || 0) < elapsed) { H.stT = elapsed + .45; vr3Strike(side, T, cf); }   // 👊 hızlı vuruş: parçala
     }
     // önizlemede iskelet (aynalı)
     g.strokeStyle = side === 'R' ? '#69f0ae' : '#ffd166'; g.lineWidth = 2; g.beginPath();
@@ -27976,12 +27979,12 @@ function gvCrossPos(hr) { const c = $('gvCross'); if (!c) return; if (hr) { c.st
 const V4 = { on: false, st: 'off', pl: null, P: null, vis: null, sv: [], hy: null, last: 0, mirror: true, legs: false };
 function v4UI() {
   document.querySelectorAll('[data-v4]').forEach(b => { b.classList.toggle('on', V4.on); b.textContent = V4.on ? '🧍 VR 4 ' + adT('açık') : '🧍 VR 4 (' + adT('tüm vücut') + ')'; });
-  const bx = $('htBox'); if (bx) { bx.style.display = HT.on || V4.on ? 'block' : 'none'; bx.classList.toggle('v4', V4.on); } document.body.classList.toggle('v4mode', V4.on);
+  const bx = $('htBox'); if (bx) { bx.style.display = HT.on || V4.on || window.__v5on ? 'block' : 'none'; bx.classList.toggle('v4', V4.on); } document.body.classList.toggle('v4mode', V4.on);
   const m = $('v4Mir'); if (m) { m.style.display = V4.on ? '' : 'none'; m.textContent = V4.mirror ? '🪞 ' + adT('Ayna: açık') : '🪞 ' + adT('Ayna: kapalı'); }
 }
 async function v4Start() {
   if (dead || RIDE.on) { showMsg(adT('🧍 Önce araçtan in'), 1.4); return; }
-  if (HT.on) htStop(true); if (GV3.on) gv3Set(false); if (GV.on) gvToggle(false); if (FM.on) fmToggle(FM.mode);
+  if (HT.on) htStop(true); if (GV3.on) gv3Set(false); if (GV.on) gvToggle(false); if (FM.on) fmToggle(FM.mode); if (window.__v5on) v5Stop(true);
   V4.on = true; V4.st = 'cam'; V4.P = null; v4UI(); htMsg(adT('📷 Kamera açılıyor…'));
   dist = 4.3; pitch = .12; yaw = facing;   // karakter önden, tüm boy görünür
   try { const st = await camOpen(); if (!V4.on) { st.getTracks().forEach(t => t.stop()); return; } V4.stream = st; const v = $('htVid'); v.srcObject = st; await v.play(); }
@@ -29441,6 +29444,7 @@ function schHand(side, H, lat, ver, dep, avg, pin) {
   if (S2.fist && !S2.held && !S2.co && avg > .72 && S2.v.y < -1.1 * SCH.S && low && (S2.cd || 0) < elapsed) { S2.cd = elapsed + .8; schCrush(S2.p); }   // yumruk indir: ez
   if (S2.held && S2.held.o && avg > .86) { S2.sq += HT.dd || .033; if (S2.sq > .35) { S2.sq = 0; schSqueeze(S2.held.o); } } else S2.sq = 0;   // sık
   if (S2.co && other && other.held && other.held.o === S2.co.o) { if (S2.p.distanceTo(other.p) > S2.co.d0 + .1 * SCH.S) { const b = schTear(S2.co.o); S2.co = null; if (b) { b.userData.sch.held = side; S2.held = { o: b, off: new THREE.Vector3(0, -.03 * SCH.S, 0) }; } } }
+  if (closed && !S2.held && sp > 2.2 && (S2.pcd || 0) < elapsed) { S2.pcd = elapsed + .5; schPunch(S2.p, S2.v); }   // 👊 hızlı yumruk
   // fiske: işaret parmağı bükülüyken birden açılır
   const ic = H.curl[1]; if (ic > .65) S2.icT = elapsed; else if (ic < .3 && S2.icT && elapsed - S2.icT < .25 && !S2.held) { S2.icT = 0; const hit = schHandPick(S2.p, false); if (hit) { const v = new THREE.Vector3(fwd.x * 2.6, 1.3, fwd.z * 2.6); schPhysAdd(hit.o, v); play('swing', { gain: .4 }); htMsg('👆 ' + adT('Fiske!')); } }
   // açık avuçla süpür: eşyalar itilir
@@ -29473,6 +29477,143 @@ function schCarryStart(x, y) {   // basılı tut / sürükle: büyükleri havaya
   if (!schHold(T.p, 'touch')) return; SCH.carry = { p: T.p, id: T.id, lock: T.lock, x, y }; schTouchCarry(T.p, T.lock ? innerWidth / 2 : x, T.lock ? innerHeight / 2 : y);
 }
 function schCarryTick() { const T = SCH.tap; if (T && performance.now() - T.t0 > 380 && schAdult(T.p)) schCarryStart(T.x0, T.y0); const C = SCH.carry; if (C) { if (!C.p.held) { SCH.carry = null; return; } schTouchCarry(C.p, C.lock ? innerWidth / 2 : C.x, C.lock ? innerHeight / 2 : C.y); } }
+
+/* =====================================================================
+   🧍 VR 3 GÖVDE: ön kamera ellerinle birlikte seni de görür — eğilince karakter de eğilir, başını çevirince baktığın yöne bakar.
+   👊 Hızlı vuruş: elini hızla ileri savurursan (yumruk) önündeki her şeyi parçalar — binalar, eşyalar (şehirde ve Ankara'da da).
+   🦶 VR 5: arka kamerayı yere / ayaklarına tut. Ayaklarını oynatınca karakter de oynatır, gerçekten yürüyünce karakter yürür
+   (adımlar telefonun hareket sensöründen ve kameradan), telefonu çevirdiğin yöne döner. Normalde ayakla vurursun (şut),
+   devken ayakla ezersin (tepinme). Kamera en geniş açıda açılır.
+   ===================================================================== */
+async function poseLM() {   // vücut tanıma modeli (VR 3 gövde, VR 4, VR 5 ortak)
+  if (V4.pl) return V4.pl; if (V4.plP) return V4.plP;
+  V4.plP = (async () => { const { V, fs } = await htVision(); const opt = d => ({ baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task', delegate: d }, runningMode: 'VIDEO', numPoses: 1, minPoseDetectionConfidence: .4, minPosePresenceConfidence: .4, minTrackingConfidence: .4 });
+    try { V4.pl = await V.PoseLandmarker.createFromOptions(fs, opt('GPU')); } catch (x) { V4.pl = await V.PoseLandmarker.createFromOptions(fs, opt('CPU')); } return V4.pl; })();
+  try { return await V4.plP; } finally { V4.plP = null; }
+}
+// 🧍 VR 3 gövde (ön kamera, ellerle aynı görüntüden; 3 karede bir)
+function htBody(v, ts) {
+  if (!V4.pl) { if (!HT.plTry) { HT.plTry = true; poseLM().catch(() => {}); } return; }
+  let res; try { res = V4.pl.detectForVideo(v, ts); } catch (e) { return; } const L = res && res.landmarks && res.landmarks[0]; if (!L) return;
+  const ok = i => (L[i].visibility ?? 1) > .5; if (!ok(11) || !ok(12)) return;
+  const fx = q => HT.cam === 'environment' ? q : 1 - q, dx = fx(L[11].x) - fx(L[12].x), dy = L[11].y - L[12].y, w = Math.hypot(dx, dy);
+  const B = HT.body || (HT.body = { roll: 0, fwd: 0, yaw: 0, pit: 0, w0: w, p0: null, t: 0 });
+  const roll = THREE.MathUtils.clamp(Math.atan2(dy, Math.abs(dx) + 1e-4), -.8, .8);   // sola eğilince +
+  if (Math.abs(roll) < .12 && Math.abs(w / B.w0 - 1) < .12) B.w0 += (w - B.w0) * .02;   // dik dururken referansı yavaşça güncelle
+  const fwd = THREE.MathUtils.clamp((w / B.w0 - 1) * 2.6, -.4, 1);
+  let yawH = 0, pit = 0; if (ok(0) && (ok(7) || ok(8))) { const ex = (fx(L[7].x) + fx(L[8].x)) / 2, ey = (L[7].y + L[8].y) / 2, ed = Math.abs(fx(L[7].x) - fx(L[8].x)) + .02; yawH = THREE.MathUtils.clamp((fx(L[0].x) - ex) / ed * 2.2, -1.2, 1.2); const pr = (L[0].y - ey) / ed; if (B.p0 == null) B.p0 = pr; else if (Math.abs(pr - B.p0) < .15) B.p0 += (pr - B.p0) * .01; pit = THREE.MathUtils.clamp((pr - B.p0) * 2, -.8, .8); }
+  const k = .45; B.roll += (roll - B.roll) * k; B.fwd += (fwd - B.fwd) * k; B.yaw += (yawH - B.yaw) * k; B.pit += (pit - B.pit) * k; B.t = elapsed;
+}
+function vr3BodyPre() {   // animasyondan sonra: karakter eğilir, başını çevirir
+  const B = HT.body; if (!GV3.on || !HT.on || !B || elapsed - B.t > .6 || V4.on) return; const r = playerRig;
+  v4Save(r.torso); r.torso.rotation.z += -B.roll * .9; r.torso.rotation.x += B.fwd * .75;
+  v4Save(r.look); r.look.rotation.y += -B.yaw; r.look.rotation.x += B.pit * .7;
+}
+function vr3BodyLate() {   // birinci şahısta: kamera da eğilir, başının yönüne döner
+  const B = HT.body; if (!GV3.on || !HT.on || !B || elapsed - B.t > .6 || fpBlend < .5 || paused || photoMode) return;
+  const S = Math.max(.3, giantS), q = camera.quaternion, right = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+  camera.position.addScaledVector(right, -B.roll * .35 * S); camera.position.y -= Math.max(0, B.fwd) * .35 * S;
+  camera.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -B.yaw * .5)).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -B.pit * .35));
+}
+// 👊 hızlı vuruş: önündekileri parçalar
+function vr3Strike(side, at, dir) {
+  const S = Math.max(1, giantS), R = 1.6 * S, dmg = 70 + giantS * 12; dir = dir.clone().setY(0).normalize();
+  try { v4Strike('punch', side, at, dir); } catch (e) {}
+  try { bossBlast(at.x, Math.max(.5, at.y), at.z, R, dmg); } catch (e) {}   // şehirde binalar hasar alır, Ankara'da yıkılır
+  shake = Math.max(shake, .15 + giantS * .02); for (let i = 0; i < 14; i++) spawnDust(at.x, Math.max(.2, at.y), at.z, .3 * S, 1, dir.x * 5, dir.z * 5, groundDust());
+  htMsg('💥 ' + adT('Parçaladın!'));
+}
+// 🦶 VR 5 — arka kamera ayaklara
+const V5 = { on: false, st: 'off', walkT: 0, setW: false, g: null, up: false, lastStep: 0, steps: 0, th: 1.7, feet: {}, a0: null, yaw0: 0, last: 0, prev: null, diff: null, kcd: { L: 0, R: 0 } };
+function v5UI() {
+  window.__v5on = V5.on;
+  document.querySelectorAll('[data-v5]').forEach(b => { b.classList.toggle('on', V5.on); b.textContent = V5.on ? '🦶 VR 5 ' + adT('açık') : '🦶 VR 5 (' + adT('ayaklar') + ')'; });
+  const bx = $('htBox'); if (bx) bx.style.display = HT.on || V4.on || V5.on ? 'block' : 'none'; const vd = $('htVid'); if (vd) vd.style.transform = V5.on ? 'none' : '';
+}
+function v5Motion(e) {   // 👣 adım sayar (telefonun ivmesi)
+  const a = e.accelerationIncludingGravity || e.acceleration; if (!a || !V5.on) return; const m = Math.hypot(a.x || 0, a.y || 0, a.z || 0); V5.g = V5.g == null ? m : V5.g * .95 + m * .05; const d = m - V5.g, now = performance.now();
+  if (d > V5.th && !V5.up && now - V5.lastStep > 290) { V5.up = true; V5.accT = now; v5Step(now); } else if (d < V5.th * .3) V5.up = false;
+}
+function v5Orient(e) { if (e.alpha == null || !V5.on) return; V5.alpha = e.alpha; }
+function v5Step(now) { const iv = now - V5.lastStep; V5.lastStep = now; V5.steps++; V5.walkT = .65; V5.run = iv < 380; }
+async function v5Start() {
+  if (dead || RIDE.on) { showMsg(adT('🦶 Önce araçtan in'), 1.4); return; }
+  if (HT.on) htStop(true); if (V4.on) v4Stop(true); if (GV3.on) gv3Set(false); if (FM.on) fmToggle(FM.mode);
+  V5.on = true; V5.st = 'cam'; V5.feet = {}; V5.a0 = null; V5.steps = 0; v5UI(); htMsg(adT('📷 Arka kamera açılıyor…'));
+  dist = DIST_MIN; pitch = .1;   // birinci şahıs
+  const add = () => { addEventListener('devicemotion', v5Motion); addEventListener('deviceorientation', v5Orient); };
+  try { if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') DeviceMotionEvent.requestPermission().then(r => { if (r === 'granted') add(); }).catch(() => {}); else add(); } catch (e) { add(); }
+  try { const st = await camOpen('environment'); if (!V5.on) { st.getTracks().forEach(t => t.stop()); return; } V5.stream = st; const v = $('htVid'); v.srcObject = st; await v.play(); }
+  catch (e) { V5.on = false; v5UI(); htFail('cam', e); return; }
+  V5.st = 'model'; htMsg(adT('🧠 Bacak tanıma yükleniyor…'));
+  try { await poseLM(); } catch (e) { htMsg(adT('🦶 Bacak modeli yüklenemedi — hareketle algılıyorum')); }
+  if (!V5.on) return; V5.st = 'run'; htMsg(adT('🦶 Telefonu ayaklarına doğru tut'));
+  showMsg(adT('🦶 VR 5: arka kamerayı ayaklarına tut · ayağını oynat = karakter oynatır · gerçekten yürü = yürür · telefonu çevir = dön · hızlı ayak = şut (devken ezer)'), 5);
+}
+function v5Stop(quiet) {
+  V5.on = false; V5.st = 'off'; if (V5.setW) { keys.KeyW = false; V5.setW = false; } removeEventListener('devicemotion', v5Motion); removeEventListener('deviceorientation', v5Orient);
+  if (V5.stream) { V5.stream.getTracks().forEach(t => t.stop()); V5.stream = null; } if (!HT.on && !V4.on) { const v = $('htVid'); if (v) v.srcObject = null; }
+  v5UI(); if (!quiet) showMsg(adT('🦶 VR 5 kapandı'), 1.2);
+}
+function v5Foot(side, y, x, now, conf) {   // bir ayağın görüntüdeki yeri → bacak açısı, şut / tepinme, adım
+  const F = V5.feet[side] || (V5.feet[side] = { y, x, base: y, vy: 0, t: now, fwd: 0, peak: false });
+  const dt = Math.max(.016, (now - F.t) / 1000), vy = (y - F.y) / dt; F.vy += (vy - F.vy) * .5; F.y += (y - F.y) * .6; F.x = x; F.t = now; F.seen = elapsed;
+  if (Math.abs(F.vy) < .25) F.base += (F.y - F.base) * .03;   // dururken taban
+  F.fwd = THREE.MathUtils.clamp((F.base - F.y) * 3.2, -.6, 1.3);   // ayak ileri (görüntüde yukarı)
+  if (F.fwd > .22 && !F.peak) { F.peak = true; if (V5.lastFoot && V5.lastFoot !== side && now - V5.lastStep > 300 && performance.now() - (V5.accT || 0) > 1500) v5Step(now); V5.lastFoot = side; } else if (F.fwd < .08) F.peak = false;   // kameradan adım
+  if (V5.kcd[side] > elapsed) return;
+  if (F.vy < -1.6 && F.fwd > .25 && conf) {   // hızlı ileri: şut / devken tepin
+    V5.kcd[side] = elapsed + .7; charHolder.updateMatrixWorld(true);
+    if (giant) { stompReq = true; htMsg('🦶 ' + adT('Ezdin!')); }
+    else { playerRig.kickT = .35; V5.kickT = .35; const foot = playerRig['leg' + side].kn.localToWorld(new THREE.Vector3(0, -.47, 0)), dir = new THREE.Vector3(0, 0, 1).applyQuaternion(charHolder.getWorldQuaternion(new THREE.Quaternion())); try { v4Strike('kick', side, foot, dir); } catch (e) {} }
+  }
+}
+function v5Diff(v, now) {   // model yoksa: görüntü farkıyla sol / sağ ayak hareketi
+  const c = V5.dc || (V5.dc = Object.assign(document.createElement('canvas'), { width: 48, height: 36 })), g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(v, 0, 0, 48, 36);
+  const d = g.getImageData(0, 12, 48, 24).data, cur = new Uint8Array(48 * 24); for (let i = 0; i < cur.length; i++) cur[i] = (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
+  if (V5.prev) { let L = 0, R = 0; for (let y = 0; y < 24; y++) for (let x = 0; x < 48; x++) { const e = Math.abs(cur[y * 48 + x] - V5.prev[y * 48 + x]) > 28 ? 1 : 0; if (x < 24) L += e; else R += e; }
+    const n = 24 * 24; for (const [s, a, b] of [['L', L, R], ['R', R, L]]) if (a / n > .22 && a > b * 2 && V5.kcd[s] < elapsed && V5.walkT <= 0) { V5.kcd[s] = elapsed + .8; if (giant) stompReq = true; else { playerRig.kickT = .35; V5.kickT = .35; try { v4Strike('kick', s, playerRig['leg' + s].kn.localToWorld(new THREE.Vector3(0, -.47, 0)), new THREE.Vector3(0, 0, 1).applyQuaternion(charHolder.getWorldQuaternion(new THREE.Quaternion()))); } catch (e) {} } } }
+  V5.prev = cur;
+}
+function v5Pre(dt) {   // her kare: algıla, yürü, dön, bacakları uygula
+  if (!V5.on) return; if (dead || RIDE.on) { v5Stop(true); return; }
+  if (dist > FP_DIST - .1) dist = DIST_MIN;
+  const v = $('htVid'), now = performance.now();
+  if (V5.st === 'run' && v && v.readyState >= 2 && now - V5.last > 33) {
+    V5.last = now; let L = null; if (V4.pl) { try { const res = V4.pl.detectForVideo(v, now); L = res && res.landmarks && res.landmarks[0]; } catch (e) {} }
+    const cv = $('htCv'), g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height); let seen = 0;
+    if (L) {
+      const pts = [[27, 31, 29], [28, 32, 30]].map(ix => { const P = ix.filter(i => (L[i].visibility ?? 1) > .3).map(i => L[i]); if (!P.length) return null; return { x: P.reduce((s, p) => s + p.x, 0) / P.length, y: P.reduce((s, p) => s + p.y, 0) / P.length, c: P.length >= 2 }; }).filter(Boolean);
+      pts.sort((a, b) => a.x - b.x); if (pts.length === 2) { v5Foot('L', pts[0].y, pts[0].x, now, pts[0].c); v5Foot('R', pts[1].y, pts[1].x, now, pts[1].c); seen = 2; } else if (pts.length === 1) { v5Foot(pts[0].x < .5 ? 'L' : 'R', pts[0].y, pts[0].x, now, pts[0].c); seen = 1; }
+      g.fillStyle = '#ffd166'; for (const p of pts) { g.beginPath(); g.arc(p.x * cv.width, p.y * cv.height, 6, 0, 6.283); g.fill(); }
+    }
+    if (!seen) { try { v5Diff(v, now); } catch (e) {} }
+    htMsg(seen ? `🦶 ${adT('Ayaklar görünüyor')}${V5.steps ? ' · 👣 ' + V5.steps : ''}` : `🦶 ${adT('Ayaklarına tut')}${V5.steps ? ' · 👣 ' + V5.steps : ''}`);
+  }
+  // 👣 yürü (adımlar) + telefonla dön
+  if (V5.walkT > 0) { V5.walkT -= dt; keys.KeyW = true; V5.setW = true; } else if (V5.setW) { keys.KeyW = false; V5.setW = false; }
+  if (V5.alpha != null) { if (V5.a0 == null) { V5.a0 = V5.alpha; V5.yaw0 = yaw; } yaw = V5.yaw0 + wrapAng((V5.alpha - V5.a0) * Math.PI / 180); }
+  pitch = THREE.MathUtils.lerp(pitch, .08, .1);
+  if (V5.kickT > 0) { V5.kickT -= dt; playerRig.kickT = Math.max(0, V5.kickT); }
+  // 🦵 dururken ayak hareketleri bacaklara
+  if (V5.walkT <= 0 && !(V5.kickT > 0)) for (const s of ['L', 'R']) { const F = V5.feet[s]; if (!F || elapsed - F.seen > .5) continue; const l = playerRig['leg' + s]; v4Save(l.hip); v4Save(l.kn); l.hip.rotation.x = -F.fwd * .9; l.kn.rotation.x = Math.max(0, F.fwd) * .9; }
+}
+{ // VR 5 düğmeleri
+  try { $('v3Bar').insertAdjacentHTML('beforeend', `<button data-v5="1">🦶 VR 5</button>`); } catch (e) {}
+  try { $('gvPanel').querySelector('.gvbody .gvr').insertAdjacentHTML('beforeend', `<button data-v5="1">🦶 VR 5</button>`); } catch (e) {}
+  try { $('pVR4').insertAdjacentHTML('afterend', `<button id="pVR5">🦶 VR 5 (${adT('arka kamera ayaklara — ayakla oyna, gerçekten yürü')})</button>`); $('pVR5').addEventListener('click', () => { resumeGame(); setTimeout(() => v5Start(), 50); }); } catch (e) {}
+  document.addEventListener('click', e => { const b = e.target.closest('[data-v5]'); if (!b) return; if (V5.on) v5Stop(); else v5Start(); });
+  v5UI();
+}
+
+function schPunch(w, vw) {   // 🏫 okulda hızlı yumruk: önündeki eşyalar parçalanıp savrulur, büyükler sendeler, öğrenciler kaçar
+  const dir = vw.clone().setY(0).normalize(), v = new THREE.Vector3(); let n = 0;
+  for (const o of SCH.items.slice()) { const U = o.userData.sch; if (U.held || !o.visible) continue; o.getWorldPosition(v); if (Math.hypot(v.x - w.x, v.z - w.z) > .1 * SCH.S || Math.abs(v.y - w.y) > .25 * SCH.S) continue; n++;
+    const b = !U.torn && o !== SCH.ball ? schTear(o) : null; for (const x of [o, b]) if (x) schPhysAdd(x, new THREE.Vector3(dir.x * (2 + Math.random()), 1 + Math.random(), dir.z * (2 + Math.random()))); }
+  for (const p of SCH.ppl) { if (!p.h.visible || p.held || p.state === 'gone' || p.state === 'fall') continue; p.r.torso.getWorldPosition(v); if (Math.hypot(v.x - w.x, v.z - w.z) < .12 * SCH.S) schPushPerson(p, dir.x, dir.z); else if (Math.hypot(v.x - w.x, v.z - w.z) < .4 * SCH.S) p.shockT = 1.5; }
+  play('punch', { gain: .8 }); shake = Math.max(shake, .1); for (let i = 0; i < 10; i++) spawnDust(w.x, w.y, w.z, .06 * SCH.S, .5, dir.x * 2, dir.z * 2, 0xd7ccc8);
+  if (n) schLogAdd(`💥 ${n} ${adT('eşya parçalandı')}`);
+}
 
 /* ---------- 🏷️ herkesin etiketi: bir kişiye sol tıkla / dokun → adı, yaşı, işi (köy, şehir, Ankara; okulda da) ---------- */
 const NPCL = { list: [] };
@@ -29628,7 +29769,7 @@ renderer.setAnimationLoop(() => {
   if (VRMA.state === 'ready' && VRMA.wrap.visible) { player.updateMatrixWorld(true); vrmUpdate(paused || photoMode ? 0 : dt); } vrmItemHold();   // anime kız modeli (menüde de duruşu doğru kalır)
   try { gpLate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }
   try { const dd = paused || photoMode ? 0 : dt; gvLate(dd); gpExtraLate(dd); gpLeftLate(dd); gpShoulderTick(dd); gpHeldPoseTick(); } catch (e) { sftErr(e); }
-  try { fbLate(); gv3Late(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); schLoop(paused || photoMode ? 0 : dt); npcLblTick(paused ? 0 : dt); } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
+  try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); schLoop(paused || photoMode ? 0 : dt); npcLblTick(paused ? 0 : dt); } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
   try { buddyUpdate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🤝 arkadaş: senin pozunu kopyalar
   updateDay(paused || photoMode || ADM.freeze ? 0 : dt * (ADM.daySpeed ? 40 : 1));
   updateWeather(paused || photoMode || ADM.freeze ? 0 : dt);
