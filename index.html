@@ -344,7 +344,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-w</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.11-x</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -12772,6 +12772,7 @@ function vrmGestTarget(id, sx, B) {   // el hedefi (kol boyu cinsinden, karakter
 function vrmUpdate(dt) {
   if (VRMA.state !== 'ready' || !VRMA.wrap.visible) return;
   const B = VRMA.bones, R = VRMA.rest, r = playerRig, W = VRMA.wrap;
+  if (typeof CRIG !== 'undefined' && CRIG.edit && VRMA === VRMS.custom) { for (const k in B) if (R[k]) { B[k].quaternion.copy(R[k].local); B[k].position.copy(R[k].pos); } try { credTick(); } catch (e) {} return; }   // 🦴 iskelet düzeltilirken dinlenme duruşu
   charHolder.updateMatrixWorld(true);
   const Rw = W.getWorldQuaternion(VQ[0]).clone(), Ri = Rw.clone().invert();
   const rel = o => Ri.clone().multiply(o.getWorldQuaternion(new THREE.Quaternion()));
@@ -22949,6 +22950,7 @@ function gvArm(side) { return side === 'R' ? playerRig.armR : playerRig.armL; }
 function gvHolding(side) { return side === 'R' ? !!(GP.on && carried) || (GV.on && !!carried) : GPL.list.length > 0; }
 function gvToggle(force) {
   const on = force ?? !GV.on;
+  if (on && vrBanned()) return;
   if (on && !gpCan()) { showMsg(adT('🎮 VR el modu için önce B ile dev ol'), 1.8); return; }
   GV.on = on; const c = $('gvCross'); if (c) c.style.display = on ? 'block' : 'none'; const pn = $('gvPanel'); if (pn) pn.style.display = on ? 'block' : 'none'; const gh = $('gHelp'); if (gh) gh.style.display = on ? 'none' : '';
   if (on) { GV.d0 = dist; dist = DIST_MIN; GV.anc.R = GV.anc.L = null; GV.cine = null; gvPanelSync(); if (touchMode && pn && !GV.minSet) { GV.minSet = true; pn.classList.add('min'); } }
@@ -23194,6 +23196,7 @@ addEventListener('wheel', e => { if (GV.on && !paused) { GV.ext = THREE.MathUtil
 const FM = { on: false, mode: 'joy', L: { x: 0, z: 0, lift: 0, act: false, down: 0 }, R: { x: 0, z: 0, lift: 0, act: false, down: 0 }, ui: null, joy: {} };
 function fmToggle(mode) {
   if (!giant) { showMsg(adT('🦶 Ayak modu için önce B ile dev ol'), 1.6); return; }
+  if (!(FM.on && FM.mode === mode) && vrBanned()) return;
   if (FM.on && FM.mode === mode) { FM.on = false; } else { FM.on = true; FM.mode = mode; }
   for (const s of ['L', 'R']) Object.assign(FM[s], { x: 0, z: 0, lift: 0, act: false }); FM.p0 = player.position.clone(); FM.f0 = facing; if (GV.on) gvToggle(false);
   if (!FM.on || FM.mode !== 'joy') { for (const k of ['legL', 'legR']) { playerRig[k].hip.rotation.set(0, 0, 0); playerRig[k].kn.rotation.set(0, 0, 0); } }
@@ -23840,6 +23843,7 @@ const GV3_E = new THREE.Euler(), GV3_Q = new THREE.Quaternion(), GV3_Q0 = new TH
 function gv3Dev(e) { if (e.alpha == null && e.beta == null) return; GV3.a = e.alpha || 0; GV3.b = e.beta || 0; GV3.g = e.gamma || 0; GV3.has = true; }
 function gv3Set(on, mode) {
   if (on) {
+    if (vrBanned()) { gv3UI(); return; }
     mode = mode || (giant ? 'g' : 'n');
     if (mode === 'g' && !gpCan()) { showMsg(adT('🥽 VR 3 için önce B ile dev ol'), 1.8); return; }
     if (mode === 'n' && (RIDE.on || dead)) { showMsg(adT('🥽 Önce araçtan in'), 1.6); return; }
@@ -23906,6 +23910,7 @@ function htFail(kind, e) {
   showMsg(m, 8);
 }
 async function htStart() {
+  if (vrBanned()) return;
   if (window.__v5on) v5Stop(true);
   if (!HT.ok) { if (!GV3.on) gv3Set(true); if (!GV3.on) return; }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { htFail('cam'); return; }
@@ -24126,6 +24131,7 @@ function v4UI() {
 }
 function mirUI() { const m = $('v4Mir'); if (!m) return; const on = V4.on ? V4.mirror : HT.mirror; m.style.display = V4.on || HT.on ? '' : 'none'; m.textContent = '🪞 ' + (on ? adT('Ayna: açık (ters)') : adT('Ayna: kapalı (düz)')); }
 async function v4Start() {
+  if (vrBanned()) return;
   if (dead || RIDE.on) { showMsg(adT('🧍 Önce araçtan in'), 1.4); return; }
   if (HT.on) htStop(true); if (GV3.on) gv3Set(false); if (GV.on) gvToggle(false); if (FM.on) fmToggle(FM.mode); if (window.__v5on) v5Stop(true);
   V4.on = true; V4.st = 'cam'; V4.P = null; v4UI(); htMsg(adT('📷 Kamera açılıyor…'));
@@ -24912,6 +24918,7 @@ function v5Motion(e) {   // 👣 adım sayar (telefonun ivmesi)
 function v5Orient(e) { if (e.alpha == null || !V5.on) return; V5.alpha = e.alpha; }
 function v5Step(now) { const iv = now - V5.lastStep; V5.lastStep = now; V5.steps++; V5.walkT = .65; V5.run = iv < 380; }
 async function v5Start() {
+  if (vrBanned()) return;
   if (dead || RIDE.on) { showMsg(adT('🦶 Önce araçtan in'), 1.4); return; }
   if (HT.on) htStop(true); if (V4.on) v4Stop(true); if (GV3.on) gv3Set(false); if (FM.on) fmToggle(FM.mode);
   V5.on = true; V5.st = 'cam'; V5.feet = {}; V5.a0 = null; V5.steps = 0; v5UI(); htMsg(adT('📷 Arka kamera açılıyor…'));
@@ -25219,7 +25226,7 @@ function roomTowerTopple(dt) {   // cam kırılınca masalar devrilir, pencereye
    ===================================================================== */
 VRMS.custom = Object.assign(mkVRM(null, null), { custom: true });
 ANIME_SAVE.custom = 'custom'; ANIME_NAME.custom = '🧩 Kendi modelim';
-const CRIG = { buf: null, name: '', flip: null, busy: false, info: '' };
+const CRIG = { buf: null, name: '', flip: null, busy: false, info: '', ov: {}, auto: false, edit: false, H: 1 };
 function crigDB() { return new Promise((res, rej) => { const r = indexedDB.open('sftModel', 1); r.onupgradeneeded = () => r.result.createObjectStore('m'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 async function crigStore(v) { try { const db = await crigDB(); await new Promise((res, rej) => { const t = db.transaction('m', 'readwrite'); if (v) t.objectStore('m').put(v, 'char'); else t.objectStore('m').delete('char'); t.oncomplete = res; t.onerror = () => rej(t.error); }); } catch (e) { console.warn('crig db', e); } }
 async function crigFetch() { try { const db = await crigDB(); return await new Promise((res, rej) => { const t = db.transaction('m', 'readonly'), q = t.objectStore('m').get('char'); q.onsuccess = () => res(q.result || null); q.onerror = () => rej(q.error); }); } catch (e) { return null; } }
@@ -25238,7 +25245,14 @@ function crigMapBones(root) {
   const sideOf = n => /left/.test(n) || /(^|[_.\s-])l($|[_.\s-])/.test(n) || /^l[A-Z_]/.test(n) ? 'left' : /right/.test(n) || /(^|[_.\s-])r($|[_.\s-])/.test(n) ? 'right' : '';
   const fing = /thumb|index|middle|ring|pinky|little|finger|toe|end|top|nub|twist|roll|ik|pole|target/;
   const B = {}, put = (k, b) => { if (!B[k]) B[k] = b; };
-  const spines = [];
+  const spines = [], FG = {}, dep0 = b => { let d = 0; for (let q = b; q; q = q.parent) d++; return d; };
+  for (const b of bones) {   // parmaklar (başparmak, işaret, orta, yüzük, serçe) ve ayak parmağı
+    const n = clean(b.name), s = sideOf(n), m = n.replace(/left|right/g, ''); if (!s || /twist|ik|pole|target/.test(m)) continue;
+    const f = /thumb/.test(m) ? 'Thumb' : /index/.test(m) ? 'Index' : /middle/.test(m) ? 'Middle' : /ring/.test(m) ? 'Ring' : /pinky|little/.test(m) ? 'Little' : null;
+    if (f && !/end|nub|tip|4$/.test(m)) (FG[s + f] ||= []).push(b);
+    else if (/toe/.test(m) && !/end|nub|tip/.test(m)) put(s + 'Toes', b);
+  }
+  for (const [k, arr] of Object.entries(FG)) { arr.sort((a, b) => dep0(a) - dep0(b)); const sg = /Thumb/.test(k) ? ['Metacarpal', 'Proximal', 'Distal'] : ['Proximal', 'Intermediate', 'Distal']; arr.slice(0, 3).forEach((b, i) => put(k + sg[i], b)); }
   for (const b of bones) {
     const n = clean(b.name), s = sideOf(n), m = n.replace(/left|right/g, '');
     if (fing.test(m) && !/forearm/.test(m)) continue;
@@ -25271,16 +25285,16 @@ function crigJoints(P, n, H) {
   const side = (ids, s) => { let x = 0, z = 0, c = 0; for (const i of ids) if (P[i * 3] * s > .004 * H) { x += P[i * 3]; z += P[i * 3 + 2]; c++; } return c ? { x: x / c, z: z / c, c } : null; };
   // bacak arası: bacakların arası boşken ortanın dolduğu ilk yükseklik
   let crotch = .47, empty = false;
-  for (let k = 18; k <= 62; k++) { const ids = BK[k]; if (ids.length < 6) continue; let c = 0; for (const i of ids) if (Math.abs(P[i * 3]) < .02 * H) c++; if (c < 2) empty = true; else if (empty) { crotch = k / NB; break; } }
+  for (let k = 18; k <= 62; k++) { const ids = BK[k]; if (ids.length < 6) continue; let c = 0; for (const i of ids) if (Math.abs(P[i * 3]) < .006 * H) c++; if (c < 3) empty = true; else if (empty) { crotch = k / NB; break; } }   // bacaklar birbirine değse de: tam ortada nokta varsa birleşmiştir
   crotch = THREE.MathUtils.clamp(crotch, .3, .6);
   // boyun: omuzla baş arasındaki en dar yer
   let neck = .84, wmin = 1e9;
   for (let k = 74; k <= 93; k++) { const ids = BK[k]; if (ids.length < 4) continue; const w = pct(ids.map(i => Math.abs(P[i * 3])), .95); if (w < wmin * .98) { wmin = w; neck = k / NB; } }
   const shY = (neck - .05) * H, hipY = Math.min(crotch + .035, .58) * H;
   // gövde yarı genişliği: göğüs hizasında içteki küme (kollar ayrık duruyorsa aradaki boşluktan ayrılır)
-  const tb = band(shY / H - .13, shY / H - .06).map(i => Math.abs(P[i * 3])).sort((a, b) => a - b);
-  let tw = pct(tb, .9); for (let j = Math.floor(tb.length * .3); j < tb.length - 1; j++) if (tb[j + 1] - tb[j] > .03 * H) { tw = tb[j]; break; }
-  tw = THREE.MathUtils.clamp(tw || .12 * H, .05 * H, .3 * H);
+  const twAt = (f0, f1) => { const tb = band(f0, f1).map(i => Math.abs(P[i * 3])).sort((a, b) => a - b); if (tb.length < Math.max(8, n * .004)) return 1e9; let t = pct(tb, .9); for (let j = Math.floor(tb.length * .3); j < tb.length - 1; j++) if (tb[j + 1] - tb[j] > .03 * H && tb[j] > .04 * H && tb.length - j < tb.length * .5) { t = tb[j]; break; } return t; };
+  let tw = Math.min(twAt(shY / H - .13, shY / H - .06), twAt(shY / H - .21, shY / H - .14));   // göğüs ve bel hizası: T duruşundaki kollar karışmaz
+  tw = THREE.MathUtils.clamp(tw < 1e8 ? tw : .12 * H, .05 * H, .3 * H);
   let hz = 0; { let c = 0; for (const i of band(.55, .75)) if (Math.abs(P[i * 3]) < tw) { hz += P[i * 3 + 2]; c++; } hz = c ? hz / c : 0; }
   const J = { H, hipY, shY, neckY: neck * H, hz, tw, crotch: crotch * H, side: {} };
   for (const s of [1, -1]) {
@@ -25289,7 +25303,8 @@ function crigJoints(P, n, H) {
     // kollar: en uçtaki nokta gövdeden çok uzaktaysa kollar açık (T / A duruşu), değilse yanda
     let tip = null, xm = -1e9; for (const i of band(.3, .97)) { const x = P[i * 3] * s; if (x > xm) { xm = x; tip = new THREE.Vector3(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]); } }
     const out = tip && xm > tw + .14 * H; let S, E, W, T;
-    if (out) { S = new THREE.Vector3(s * tw * .8, shY, hz); E = S.clone().lerp(tip, .46); E.z -= .01 * H; W = S.clone().lerp(tip, .82); T = tip.clone(); }
+    if (out) { let sy = shY, sz = hz; { let cy = 0, cz2 = 0, c = 0; for (const i of band(crotch + .05, .97)) { const x = P[i * 3] * s; if (x > tw * 1.15 && x < tw * 1.15 + .05 * H) { cy += P[i * 3 + 1]; cz2 += P[i * 3 + 2]; c++; } } if (c > 4) { sy = THREE.MathUtils.clamp(cy / c, shY - .08 * H, shY + .02 * H); sz = cz2 / c; } }   // omuz: kolun gövdeye girdiği yerin ortası
+      S = new THREE.Vector3(s * tw * .8, sy, sz); E = S.clone().lerp(tip, .46); E.z -= .01 * H; W = S.clone().lerp(tip, .82); T = tip.clone(); }
     else {
       const ab = band(.5, .64).filter(i => P[i * 3] * s > 0).map(i => [Math.abs(P[i * 3]), P[i * 3 + 2]]).sort((a, b) => a[0] - b[0]); let ax = tw * 1.05, az = hz;
       for (let j = Math.floor(ab.length * .2); j < ab.length - 1; j++) if (ab[j][0] > tw * .6 && ab[j + 1][0] - ab[j][0] > .02 * H) { const o = ab.slice(j + 1); ax = o.reduce((a, q) => a + q[0], 0) / o.length; az = o.reduce((a, q) => a + q[1], 0) / o.length; break; }
@@ -25353,6 +25368,197 @@ function crigAuto(root, flipOv) {
   }
   return { grp, bones: B, flip, H, armsOut };
 }
+// ---------- 🦴 profesyonel otomatik iskelet (v2): orta çizgilerden eklemler, köprücük, üst göğüs, ayak parmağı, ayrık parmaklar,
+// simetri, 4 kemikli yumuşak deri ağırlıkları (komşu köşelerle yumuşatılır) ve elle düzeltme (ov: eklem kaydırmaları, boyun oranı) ----------
+const CRIG_OVK = { hips: 'Kalça', chest: 'Göğüs', neck: 'Boyun', head: 'Baş', sh: 'Omuz', el: 'Dirsek', wr: 'Bilek', hip: 'Bacak kökü', kn: 'Diz', an: 'Ayak bileği', toe: 'Ayak ucu' };
+function crigJoints2(P, n, H, ov = {}) {
+  const J = crigJoints(P, n, H), o = k => ov[k] || [0, 0, 0], V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+  const ptsWhere = f => { const a = []; for (let i = 0; i < n; i++) if (f(P[i * 3], P[i * 3 + 1], P[i * 3 + 2])) a.push(i); return a; };
+  for (const s of [1, -1]) {
+    const Q = J.side[s];
+    // bacak: 2%'lik bantların orta noktaları → diz ve ayak bileği
+    const leg = ptsWhere((x, y) => x * s > .004 * H && y < J.crotch), NB = 50, bins = Array.from({ length: NB }, () => [0, 0, 0, 1e9, -1e9]);
+    for (const i of leg) { const k = Math.min(NB - 1, Math.floor(P[i * 3 + 1] / J.crotch * NB)); const b = bins[k]; b[0] += P[i * 3]; b[1] += P[i * 3 + 2]; b[2]++; b[3] = Math.min(b[3], P[i * 3 + 2]); b[4] = Math.max(b[4], P[i * 3 + 2]); }
+    const cen = y => { const k = THREE.MathUtils.clamp(Math.floor(y / J.crotch * NB), 0, NB - 1); for (let d = 0; d < 4; d++) for (const kk of [k + d, k - d]) { const b = bins[kk]; if (b && b[2] > 2) return { x: b[0] / b[2], z: b[1] / b[2], ext: b[4] - b[3] }; } return null; };
+    const shin = cen(.16 * H); let anY = .06 * H;
+    if (shin) for (let y = .12 * H; y > .025 * H; y -= .005 * H) { const c = cen(y); if (c && c.ext > shin.ext * 1.45) { anY = y + .012 * H; break; } }
+    anY = THREE.MathUtils.clamp(anY, .03 * H, .11 * H);
+    const anC = cen(anY + .02 * H) || { x: Q.ankle.x, z: Q.ankle.z }; Q.ankle.set(anC.x, anY, anC.z);
+    const hpC = cen(J.crotch - .03 * H); if (hpC) Q.hip.set(hpC.x, Q.hip.y, hpC.z);
+    const knY = Q.ankle.y + (Q.hip.y - Q.ankle.y) * .47, knC = cen(knY) || { x: Q.hip.x, z: J.hz }; Q.knee.set(knC.x, knY, knC.z + .008 * H);
+    Q.toes = V3(THREE.MathUtils.lerp(Q.ankle.x, Q.toe.x, .7), .015 * H, THREE.MathUtils.lerp(Q.ankle.z, Q.toe.z, .72));
+    // kol: omuzdan uca eksen boyunca kesitler → bilek (en dar yer) ve dirsek
+    const u = Q.T.clone().sub(Q.S), L = u.length(); u.normalize();
+    const arm = ptsWhere((x, y, z) => { if (x * s < J.tw * (Q.out ? .95 : .55) || y < J.crotch - .12 * H) return false; const vx = x - Q.S.x, vy = y - Q.S.y, vz = z - Q.S.z, t = vx * u.x + vy * u.y + vz * u.z; if (t < 0 || t > L * 1.02) return false; const px = vx - u.x * t, py = vy - u.y * t, pz = vz - u.z * t; return px * px + py * py + pz * pz < (.09 * H) ** 2; });
+    if (arm.length > 30) {
+      const AB = 40, ab = Array.from({ length: AB }, () => ({ c: V3(0, 0, 0), k: 0, r: 0 }));
+      for (const i of arm) { const p = V3(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]), t = p.clone().sub(Q.S).dot(u) / L, k = THREE.MathUtils.clamp(Math.floor(t * AB), 0, AB - 1); ab[k].c.add(p); ab[k].k++; }
+      for (const b of ab) if (b.k) b.c.divideScalar(b.k);
+      for (const i of arm) { const p = V3(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]), t = p.clone().sub(Q.S).dot(u) / L, b = ab[THREE.MathUtils.clamp(Math.floor(t * AB), 0, AB - 1)]; if (b.k) b.r += p.distanceTo(b.c) / b.k; }
+      let wk = -1, wr = 1e9; for (let k = Math.floor(AB * .6); k <= Math.floor(AB * .88); k++) { const b = ab[k]; if (b.k > 2 && b.r < wr) { wr = b.r; wk = k; } }
+      if (wk > 0) { Q.W = ab[wk].c.clone(); const ek = Math.round(wk * .52), eb = ab[ek].k > 2 ? ab[ek] : null; Q.E = eb ? eb.c.clone() : Q.S.clone().lerp(Q.W, .52); Q.E.z -= .008 * H; let tk = AB - 1; while (tk > wk && !ab[tk].k) tk--; }
+    }
+    Q.cl = V3(s * J.tw * .2, J.shY - .01 * H, J.hz);
+  }
+  // simetri: iki taraf benzerse eklemler aynalanır
+  const cL = J.side[1], cR = J.side[-1];
+  for (const k of ['S', 'E', 'W', 'T', 'hip', 'knee', 'ankle', 'toe', 'toes', 'cl']) { const a = cL[k], b = cR[k]; if (!a || !b) continue; if (Math.abs(a.x + b.x) < .05 * H && Math.abs(a.y - b.y) < .05 * H) { const x = (a.x - b.x) / 2, y = (a.y + b.y) / 2, z = (a.z + b.z) / 2; a.set(x, y, z); b.set(-x, y, z); } }
+  // elle düzeltme kaydırmaları (H'nin oranı; x dışa doğru, iki tarafta aynalı)
+  const map = { sh: ['S', 'cl'], el: ['E'], wr: ['W'], hip: ['hip'], kn: ['knee'], an: ['ankle'], toe: ['toe', 'toes'] };
+  for (const [k, list] of Object.entries(map)) { const d = o(k); if (!d[0] && !d[1] && !d[2]) continue; for (const s of [1, -1]) for (const q of list) if (J.side[s][q]) J.side[s][q].add(V3(d[0] * s * H, d[1] * H, d[2] * H)); }
+  J.hipY += o('hips')[1] * H; J.hzHip = J.hz + o('hips')[2] * H; J.chestOff = V3(0, o('chest')[1] * H, o('chest')[2] * H); J.neckY += o('neck')[1] * H; J.neckZ = o('neck')[2] * H; J.headOff = V3(0, o('head')[1] * H, o('head')[2] * H);
+  return J;
+}
+// el: ayrık parmakları bul (yoksa el tek parça kalır)
+function crigFingers(P, n, H, Q, s) {
+  const u = Q.T.clone().sub(Q.W); const L = u.length(); if (L < .02 * H) return null; u.normalize();
+  const pts = []; for (let i = 0; i < n; i++) { const p = new THREE.Vector3(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]), v = p.clone().sub(Q.W), t = v.dot(u); if (t < -.01 * H || t > L * 1.05) continue; if (v.clone().addScaledVector(u, -t).length() > .09 * H) continue; pts.push([p, t]); }
+  if (pts.length < 60) return null;
+  const m = new THREE.Vector3(); for (const [p] of pts) m.add(p); m.divideScalar(pts.length);
+  const C = [0, 0, 0, 0, 0, 0]; for (const [p] of pts) { const x = p.x - m.x, y = p.y - m.y, z = p.z - m.z; C[0] += x * x; C[1] += x * y; C[2] += x * z; C[3] += y * y; C[4] += y * z; C[5] += z * z; }
+  // en küçük yayılım ekseni = avuç normali (kuvvet yöntemiyle en büyük iki eksen, üçüncüsü dik)
+  const mul = v => new THREE.Vector3(C[0] * v.x + C[1] * v.y + C[2] * v.z, C[1] * v.x + C[3] * v.y + C[4] * v.z, C[2] * v.x + C[4] * v.y + C[5] * v.z);
+  let e1 = u.clone(); for (let k = 0; k < 30; k++) e1 = mul(e1).normalize();
+  let e2 = new THREE.Vector3(.3, .5, .8); for (let k = 0; k < 30; k++) { e2 = mul(e2); e2.addScaledVector(e1, -e2.dot(e1)).normalize(); }
+  { const cen = (a0, a1) => { const c = new THREE.Vector3(); let k = 0; for (const [p, t] of pts) if (t > L * a0 && t <= L * a1) { c.add(p); k++; } return k > 4 ? c.divideScalar(k) : null; }, K = cen(.45, .65), Tc = cen(.88, 1.06);
+    if (K && Tc) { const u2 = Tc.clone().sub(K).normalize(); if (u2.dot(u) > .7) { u.copy(u2); for (const q of pts) q[1] = q[0].clone().sub(Q.W).dot(u); } } }   // parmak yönü: boğum hizasından uçlara
+  let nrm = new THREE.Vector3().crossVectors(e1, e2).normalize();
+  if (Q.out ? nrm.y > 0 : nrm.x * s > 0) nrm.negate();   // T/A duruşunda avuç aşağı, kollar yandaysa içe
+  nrm.addScaledVector(u, -nrm.dot(u)).normalize(); let w = new THREE.Vector3().crossVectors(nrm, u).normalize(); if (w.z < 0) w.negate();   // başparmak tarafı (önde)
+  const dist = pts.filter(q => q[1] > L * .58); if (dist.length < 25) return null;
+  // parmak araları: genişliğe göre sıralı değerlerdeki en büyük boşluklar (her boşluk parmak içindeki aralıklardan belirgin büyük olmalı)
+  const vals = dist.map(([p]) => p.clone().sub(Q.W).dot(w)).sort((a, b) => a - b), span = Math.max(1e-6, vals[vals.length - 1] - vals[0]), wmin = vals[0];
+  const gaps = []; for (let i = 0; i < vals.length - 1; i++) gaps.push([vals[i + 1] - vals[i], i]); gaps.sort((a, b) => b[0] - a[0]);
+  let good = null;
+  for (const G of [3, 4]) {
+    const top = gaps.slice(0, G), nxt = gaps[G] ? gaps[G][0] : 0, mn = Math.min(...top.map(g => g[0]));
+    if (mn < span * .015 || mn < nxt * 1.18) continue;
+    const cuts = top.map(g => g[1]).sort((a, b) => a - b), cl = []; let st = 0; for (const c of cuts) { cl.push([st, c]); st = c + 1; } cl.push([st, vals.length - 1]);
+    if (cl.some(([a, b]) => b - a + 1 < vals.length * .05)) continue;
+    good = cl.map(([a, b]) => ({ lo: vals[a], hi: vals[b] })); break;
+  }
+  if (!good) return null;
+  const fing = good.map(c => { const lo = c.lo, hi = c.hi, mine = pts.filter(([p, t]) => { const a = p.clone().sub(Q.W).dot(w); return a >= lo - span * .02 && a <= hi + span * .02 && t > L * .35; }); return { lo, hi, mid: (lo + hi) / 2, mine }; }).sort((a, b) => b.mid - a.mid);
+  let thumb = null;
+  if (fing.length === 5) thumb = fing.shift();
+  else { const top = fing[0].hi, tp = pts.filter(([p, t]) => p.clone().sub(Q.W).dot(w) > top + span * .03 && t < L * .75); if (tp.length > 12) thumb = { mine: tp }; }
+  const chain = (mine, isT) => { if (mine.length < 6) return null; let tmin = 1e9, tmax = -1e9; for (const [, t] of mine) { tmin = Math.min(tmin, t); tmax = Math.max(tmax, t); }
+    const at = f => { const t0 = tmin + (tmax - tmin) * f, band = mine.filter(([, t]) => Math.abs(t - t0) < (tmax - tmin) * .12 + .002 * H), c = new THREE.Vector3(); if (!band.length) return null; for (const [p] of band) c.add(p); return c.divideScalar(band.length); };
+    const a = at(isT ? .1 : .04), b = at(.45), c = at(.75), e = at(.98); return a && b && c && e ? [a, b, c, e] : null; };
+  const out = { nrm, u, w, F: {} }, names = ['Index', 'Middle', 'Ring', 'Little'];
+  for (let i = 0; i < 4; i++) { const ch = fing[i] && chain(fing[i].mine); if (!ch) return null; out.F[names[i]] = ch; }
+  if (thumb) { const ch = chain(thumb.mine, true); if (ch) { ch[0] = Q.W.clone().lerp(ch[0], .55); out.F.Thumb = ch; } }
+  return out;
+}
+// yumuşatma için köşe komşulukları (dikiş yerlerindeki çift köşeler birleştirilir)
+function crigAdj(gm, H) {
+  const p = gm.attributes.position, N = p.count, q = 1e-4 * H, key = new Map(), wid = new Int32Array(N); let nw = 0;
+  for (let i = 0; i < N; i++) { const k = Math.round(p.getX(i) / q) + ',' + Math.round(p.getY(i) / q) + ',' + Math.round(p.getZ(i) / q); let id = key.get(k); if (id === undefined) { id = nw++; key.set(k, id); } wid[i] = id; }
+  const idx = gm.index ? gm.index.array : null, T = idx ? idx.length : N, nb = Array.from({ length: nw }, () => []);
+  const link = (a, b) => { if (a !== b && !nb[a].includes(b)) nb[a].push(b); };
+  for (let t = 0; t < T; t += 3) { const a = wid[idx ? idx[t] : t], b = wid[idx ? idx[t + 1] : t + 1], c = wid[idx ? idx[t + 2] : t + 2]; link(a, b); link(b, a); link(b, c); link(c, b); link(a, c); link(c, a); }
+  return { wid, nb, nw };
+}
+function crigAuto2(root, flipOv, ov = {}) {
+  root.updateMatrixWorld(true);
+  const parts = []; root.traverse(o => { if (o.isMesh && o.geometry && o.geometry.attributes.position && o.visible !== false) parts.push(o); });
+  if (!parts.length) throw new Error(adT('Modelde çizilecek parça yok'));
+  const geos = parts.map(m => { const gm = m.geometry.clone(); gm.morphAttributes = {}; delete gm.morphTargetsRelative; for (const k of ['skinIndex', 'skinWeight']) if (gm.attributes[k]) gm.deleteAttribute(k); gm.applyMatrix4(m.matrixWorld); return { gm, mat: m.material }; });
+  const box = new THREE.Box3(); for (const q of geos) { q.gm.computeBoundingBox(); box.union(q.gm.boundingBox); }
+  const H = box.max.y - box.min.y; if (!(H > 1e-6)) throw new Error(adT('Model boyutu okunamadı'));
+  let tot = 0; for (const q of geos) tot += q.gm.attributes.position.count; const st = Math.max(1, Math.floor(tot / 60000)), P = new Float32Array(Math.ceil(tot / st) * 3 + 12); let n = 0;
+  for (const q of geos) { const p = q.gm.attributes.position; for (let i = 0; i < p.count; i += st) { P[n * 3] = p.getX(i); P[n * 3 + 1] = p.getY(i); P[n * 3 + 2] = p.getZ(i); n++; } }
+  const y0 = box.min.y, mids = [[], []]; for (let i = 0; i < n; i++) { const f = (P[i * 3 + 1] - y0) / H; if (f > .5 && f < .8) { mids[0].push(P[i * 3]); mids[1].push(P[i * 3 + 2]); } }
+  const med = a => { if (!a.length) return 0; a.sort((x, y) => x - y); return a[a.length >> 1]; }, cx = med(mids[0]), cz = med(mids[1]);
+  let zf = 0, cf = 0, zs = 0, cs = 0; for (let i = 0; i < n; i++) { const f = (P[i * 3 + 1] - y0) / H; if (f < .04) { zf += P[i * 3 + 2]; cf++; } else if (f > .14 && f < .3) { zs += P[i * 3 + 2]; cs++; } }
+  const flip = flipOv != null ? flipOv : (cf && cs && zf / cf < zs / cs - .004 * H);
+  const Mx = new THREE.Matrix4().makeTranslation(-cx, -y0, -cz); if (flip) Mx.premultiply(new THREE.Matrix4().makeRotationY(Math.PI));
+  for (const q of geos) q.gm.applyMatrix4(Mx); for (let i = 0; i < n; i++) { const v = new THREE.Vector3(P[i * 3], P[i * 3 + 1], P[i * 3 + 2]).applyMatrix4(Mx); P[i * 3] = v.x; P[i * 3 + 1] = v.y; P[i * 3 + 2] = v.z; }
+  const J = crigJoints2(P, n, H, ov), L = J.side[1], R = J.side[-1], lerp = THREE.MathUtils.lerp, V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+  const hz = J.hzHip ?? J.hz, co = J.chestOff;
+  const defs = [['hips', null, V3(0, J.hipY, hz)], ['spine', 'hips', V3(0, lerp(J.hipY, J.shY, .3), J.hz)], ['chest', 'spine', V3(0, lerp(J.hipY, J.shY, .62), J.hz).add(co)], ['upperChest', 'chest', V3(0, lerp(J.hipY, J.shY, .86), J.hz).add(co)],
+    ['neck', 'upperChest', V3(0, J.neckY, J.hz + (J.neckZ || 0))], ['head', 'neck', V3(0, J.neckY + .035 * H, J.hz + (J.neckZ || 0)).add(J.headOff)]];
+  const fingers = {};
+  for (const [S, Q, s] of [['left', L, 1], ['right', R, -1]]) {
+    defs.push([S + 'Shoulder', 'upperChest', Q.cl], [S + 'UpperArm', S + 'Shoulder', Q.S], [S + 'LowerArm', S + 'UpperArm', Q.E], [S + 'Hand', S + 'LowerArm', Q.W], [S + 'UpperLeg', 'hips', Q.hip], [S + 'LowerLeg', S + 'UpperLeg', Q.knee], [S + 'Foot', S + 'LowerLeg', Q.ankle], [S + 'Toes', S + 'Foot', Q.toes]);
+    let F = null; try { F = crigFingers(P, n, H, Q, s); } catch (e) { F = null; }
+    if (F) { fingers[S] = F; for (const [fn, ch] of Object.entries(F.F)) { const sg = fn === 'Thumb' ? ['Metacarpal', 'Proximal', 'Distal'] : ['Proximal', 'Intermediate', 'Distal']; defs.push([S + fn + sg[0], S + 'Hand', ch[0]], [S + fn + sg[1], S + fn + sg[0], ch[1]], [S + fn + sg[2], S + fn + sg[1], ch[2]]); } }
+  }
+  const B = {}, W = {}, list = [];
+  for (const [k, par, p] of defs) { const b = new THREE.Bone(); b.name = k; W[k] = p.clone(); b.position.copy(par ? p.clone().sub(W[par]) : p); if (par) B[par].add(b); B[k] = b; list.push(b); }
+  // her kemiğin parçası (başı → çocuğu); uçlar
+  const kid = { hips: 'spine', spine: 'chest', chest: 'upperChest', upperChest: 'neck', neck: 'head' }, ends = { head: V3(0, H, J.hz) };
+  for (const [S, Q] of [['left', L], ['right', R]]) {
+    Object.assign(kid, { [S + 'Shoulder']: S + 'UpperArm', [S + 'UpperArm']: S + 'LowerArm', [S + 'LowerArm']: S + 'Hand', [S + 'UpperLeg']: S + 'LowerLeg', [S + 'LowerLeg']: S + 'Foot', [S + 'Foot']: S + 'Toes' }); ends[S + 'Toes'] = Q.toe;
+    const F = fingers[S]; if (F) { const hc = new THREE.Vector3(); let c = 0; for (const fn of ['Index', 'Middle', 'Ring', 'Little']) { hc.add(F.F[fn][0]); c++; } ends[S + 'Hand'] = hc.divideScalar(c);
+      for (const [fn, ch] of Object.entries(F.F)) { const sg = fn === 'Thumb' ? ['Metacarpal', 'Proximal', 'Distal'] : ['Proximal', 'Intermediate', 'Distal']; kid[S + fn + sg[0]] = S + fn + sg[1]; kid[S + fn + sg[1]] = S + fn + sg[2]; ends[S + fn + sg[2]] = ch[3]; } }
+    else ends[S + 'Hand'] = Q.T;
+  }
+  const segs = list.map((b, bi) => { const k = b.name, a = k === 'hips' ? W.hips.clone().setY(J.hipY - .05 * H) : W[k], e = kid[k] ? W[kid[k]] : ends[k] || W[k].clone().add(V3(0, .02 * H, 0)); const s = /^left/.test(k) ? 1 : /^right/.test(k) ? -1 : 0;
+    return { bi, k, a, ab: e.clone().sub(a), l2: Math.max(1e-9, e.clone().sub(a).lengthSq()), s, leg: /Leg|Foot|Toes/.test(k), arm: /Arm|Hand|Shoulder|Thumb|Index|Middle|Ring|Little/.test(k), fin: /Thumb|Index|Middle|Ring|Little/.test(k), head: k === 'head' || k === 'neck', hand: /Hand$/.test(k) }; });
+  const hipTop = J.hipY + .07 * H, eps2 = (.01 * H) ** 2, armsOut = L.out || R.out, vv = new THREE.Vector3(), qq = new THREE.Vector3();
+  const handZone = (x, y, z, s) => { const Q = J.side[s], u = Q.T.clone().sub(Q.W), l = u.length(); u.normalize(); return (x - Q.W.x) * u.x + (y - Q.W.y) * u.y + (z - Q.W.z) * u.z > -.01 * H; };
+  const weigh = (x, y, z, bi4, w4) => {
+    const top = [[-1, 0], [-1, 0], [-1, 0], [-1, 0]];
+    for (let pass = 0; pass < 2 && top[0][0] < 0; pass++) for (const s of segs) {
+      if (!pass) {
+        if (s.s && x * s.s < -.015 * H) continue;
+        if (s.leg && y > hipTop) continue;
+        if (s.arm && !armsOut && Math.abs(x) < J.tw * .92 && y < J.shY - .03 * H && !/Shoulder/.test(s.k)) continue;
+        if (s.head && y < J.neckY - .04 * H) continue;
+        if (s.fin && !handZone(x, y, z, s.s)) continue;
+      }
+      vv.set(x - s.a.x, y - s.a.y, z - s.a.z); const t = THREE.MathUtils.clamp(vv.dot(s.ab) / s.l2, 0, 1); qq.copy(s.ab).multiplyScalar(t).add(s.a);
+      const d2 = (x - qq.x) ** 2 + (y - qq.y) ** 2 + (z - qq.z) ** 2, w = 1 / ((d2 + eps2 * (s.fin ? .15 : 1)) ** 2);
+      if (w > top[3][1]) { top[3] = [s.bi, w]; top.sort((a, b) => b[1] - a[1]); }
+    }
+    let sum = 0; for (const t of top) if (t[0] >= 0) sum += t[1]; sum = sum || 1;
+    for (let j = 0; j < 4; j++) { bi4[j] = Math.max(0, top[j][0]); w4[j] = top[j][0] >= 0 ? top[j][1] / sum : 0; }
+  };
+  const grp = new THREE.Group(); grp.add(B.hips); grp.updateMatrixWorld(true);
+  const skel = new THREE.Skeleton(list), i4 = [0, 0, 0, 0], w4 = [0, 0, 0, 0], NBn = list.length;
+  for (const g of geos) {
+    const p = g.gm.attributes.position, N = p.count, si = new Uint16Array(N * 4), sw = new Float32Array(N * 4);
+    for (let i = 0; i < N; i++) { weigh(p.getX(i), p.getY(i), p.getZ(i), i4, w4); si.set(i4, i * 4); sw.set(w4, i * 4); }
+    // komşularla yumuşat: eklem yerlerinde deri kırılmadan, yumuşacık bükülür
+    try {
+      const A = crigAdj(g.gm, H), nw = A.nw, ws = new Float32Array(nw * 4), is = new Uint16Array(nw * 4), cnt = new Uint16Array(nw);
+      for (let i = 0; i < N; i++) { const id = A.wid[i]; if (cnt[id]++) continue; for (let j = 0; j < 4; j++) { is[id * 4 + j] = si[i * 4 + j]; ws[id * 4 + j] = sw[i * 4 + j]; } }
+      const it = N > 150000 ? 2 : N > 60000 ? 3 : 5, acc = new Float32Array(NBn), used = [];
+      for (let pass = 0; pass < it; pass++) {
+        const nws = new Float32Array(nw * 4), nis = new Uint16Array(nw * 4);
+        for (let v = 0; v < nw; v++) {
+          used.length = 0; const add = (u, f) => { for (let j = 0; j < 4; j++) { const w = ws[u * 4 + j]; if (w <= 0) continue; const b = is[u * 4 + j]; if (!acc[b]) used.push(b); acc[b] += w * f; } };
+          const nb = A.nb[v]; add(v, 1); const f = nb.length ? .6 / nb.length : 0; for (const u of nb) add(u, f);
+          used.sort((a, b) => acc[b] - acc[a]); let sum = 0; for (let j = 0; j < 4 && j < used.length; j++) sum += acc[used[j]];
+          for (let j = 0; j < 4; j++) { const b = used[j]; nis[v * 4 + j] = b ?? 0; nws[v * 4 + j] = b !== undefined && sum > 0 ? acc[b] / sum : 0; }
+          for (const b of used) acc[b] = 0;
+        }
+        ws.set(nws); is.set(nis);
+      }
+      for (let i = 0; i < N; i++) { const id = A.wid[i]; for (let j = 0; j < 4; j++) { si[i * 4 + j] = is[id * 4 + j]; sw[i * 4 + j] = ws[id * 4 + j]; } }
+    } catch (e) { console.warn('crig smooth', e); }
+    g.gm.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); g.gm.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+    if (!g.gm.attributes.normal) g.gm.computeVertexNormals();
+    const m = new THREE.SkinnedMesh(g.gm, g.mat); m.castShadow = true; m.frustumCulled = false; grp.add(m); m.bind(skel, new THREE.Matrix4());
+  }
+  return { grp, bones: B, flip, H, armsOut, fingers: Object.keys(fingers).length, W, joints: J };
+}
+// parmak bükülme eksenleri (her model için: avuç normali ve parmak yönünden)
+function crigFingerAxes(M) {
+  const B = M.bones; M.fingers = [];
+  for (const S of ['left', 'right']) {
+    const h = B[S + 'Hand'], mp = B[S + 'MiddleProximal'], ip = B[S + 'IndexProximal'], lp = B[S + 'LittleProximal'] || B[S + 'RingProximal']; if (!h || !mp || !ip || !lp) continue;
+    const W0 = M.wrap.getWorldQuaternion(new THREE.Quaternion()).invert(), loc = o => o.getWorldPosition(new THREE.Vector3()).applyQuaternion(W0);
+    const f = loc(mp).sub(loc(h)).normalize(), a = loc(ip).sub(loc(lp)).normalize(), pn = S === 'left' ? new THREE.Vector3().crossVectors(f, a) : new THREE.Vector3().crossVectors(a, f); pn.normalize();
+    const ax = new THREE.Vector3().crossVectors(f, pn).normalize(), tax = f.clone().addScaledVector(a, .35).normalize().multiplyScalar(S === 'left' ? 1 : -1);
+    ['Thumb', 'Index', 'Middle', 'Ring', 'Little'].forEach((F, fi) => (fi ? ['Proximal', 'Intermediate', 'Distal'] : ['Metacarpal', 'Proximal', 'Distal']).forEach((sg, si) => {
+      const k = S + F + sg, b = B[k] || (fi === 0 && si === 0 ? null : null); if (!b || !M.rest[k]) return;
+      M.fingers.push({ b, ax: (fi ? ax : tax).clone().applyQuaternion(M.rest[k].rel.clone().invert()), local: M.rest[k].local, fi, si });
+    }));
+  }
+}
+
 // model hazır: dinlenme duruşunu kaydet, karaktere tak
 function crigFinish(M, wrap, B) {
   const hipY = B.hips.getWorldPosition(VV[0]).y; if (!(hipY > 1e-6)) throw new Error(adT('Kalça bulunamadı'));
@@ -25365,7 +25571,7 @@ function crigFinish(M, wrap, B) {
     M.rest[k] = r; b.userData.vk = k;
   }
   wrap.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; o.frustumCulled = false; } });
-  wrap.visible = false; charHolder.add(wrap); M.wrap = wrap; M.bones = B; M.state = 'ready'; M.gen = (M.gen || 0) + 1; ANIME.vis = null; animeVisual();
+  wrap.visible = false; charHolder.add(wrap); M.wrap = wrap; M.bones = B; try { crigFingerAxes(M); } catch (e) { M.fingers = []; } M.state = 'ready'; M.gen = (M.gen || 0) + 1; ANIME.vis = null; animeVisual();
 }
 async function crigBuild(buf, flipOv) {
   const M = VRMS.custom; if (M.wrap && M.wrap.parent) M.wrap.parent.remove(M.wrap);
@@ -25378,20 +25584,69 @@ async function crigBuild(buf, flipOv) {
     const flip = flipOv != null ? flipOv : lx < rx; if (flip) root.rotation.y = Math.PI;
     const bb = new THREE.Box3().setFromObject(root), c = bb.getCenter(new THREE.Vector3()); root.position.x -= c.x; root.position.z -= c.z; root.position.y -= bb.min.y; wrap.updateMatrixWorld(true);
     root.traverse(o => { if (o.isSkinnedMesh) o.frustumCulled = false; });
-    crigFinish(M, wrap, mapped); CRIG.flip = flip; msg = adT('✓ Modelin kendi iskeleti kullanıldı');
-  } else {   // iskelet yok: otomatik kur
-    const A = crigAuto(root, flipOv); wrap.add(A.grp); crigFinish(M, wrap, A.bones); CRIG.flip = A.flip;
-    msg = adT('✓ Otomatik iskelet kuruldu') + ` (${A.armsOut ? adT('kollar açık') : adT('kollar yanda')})`;
+    crigFinish(M, wrap, mapped); CRIG.flip = flip; CRIG.auto = false; msg = adT('✓ Modelin kendi iskeleti kullanıldı') + ` · ${Object.keys(mapped).length} ${adT('kemik')}` + (mapped.leftIndexProximal ? ' · ' + adT('parmaklar') : '');
+  } else {   // iskelet yok: profesyonel otomatik iskelet
+    const A = crigAuto2(root, flipOv, CRIG.ov || {}); wrap.add(A.grp); crigFinish(M, wrap, A.bones); CRIG.flip = A.flip; CRIG.auto = true; CRIG.H = A.H; CRIG.J = A.joints;
+    msg = adT('✓ Otomatik iskelet kuruldu') + ` · ${Object.keys(A.bones).length} ${adT('kemik')} · ${A.armsOut ? adT('kollar açık') : adT('kollar yanda')}` + (A.fingers ? ' · ' + adT('parmaklar ayrı') : ' · ' + adT('el tek parça'));
   }
   return msg;
 }
+// ---------- 🦴 iskeleti elle düzelt: eklemi seç, oklarla kaydır (iki taraf aynalı), Uygula = deri ağırlıkları yeniden ----------
+const CRED = { k: 'el', pend: {}, mk: [], step: .005 };
+document.head.insertAdjacentHTML('beforeend', `<style>
+#crigEd{position:fixed;right:calc(10px + env(safe-area-inset-right));top:calc(60px + env(safe-area-inset-top));z-index:40;display:none;width:min(330px,92vw);background:rgba(14,18,28,.95);color:#eef3ff;border:1px solid rgba(140,170,255,.3);border-radius:16px;padding:10px 12px;font:13px system-ui,sans-serif;box-shadow:0 10px 36px rgba(0,0,0,.45)}
+#crigEd button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:10px;padding:6px 8px;font:600 12px system-ui,sans-serif;cursor:pointer}
+#crigEd .cj{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:8px 0}#crigEd .cj button.on{background:linear-gradient(135deg,#ffd166,#ff8c42);color:#222;border-color:#ffd166}
+#crigEd .cn{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}#crigEd .ch{font-size:11px;opacity:.75;margin:6px 0;line-height:1.4}#crigEd .cb{display:flex;gap:6px;margin-top:8px}#crigEd .cb button{flex:1}
+#crigEd .go{background:linear-gradient(135deg,#06d6a0,#118ab2);border:none}
+</style>`);
+document.body.insertAdjacentHTML('beforeend', `<div id="crigEd"><b>🦴 ${adT('İskeleti düzelt')}</b><div class="ch">${adT('Sarı nokta seçili eklem. Oklarla kaydır, sağ ve sol taraf birlikte kayar. Bitince Uygula: deri ağırlıkları yeniden hesaplanır.')}</div>
+  <div class="cj" id="crigEdJ"></div>
+  <div class="cn"><button data-ce="y+">⬆ ${adT('Yukarı')}</button><button data-ce="z+">⤒ ${adT('Öne')}</button><button data-ce="x+">↔ ${adT('Dışa')}</button><button data-ce="y-">⬇ ${adT('Aşağı')}</button><button data-ce="z-">⤓ ${adT('Arkaya')}</button><button data-ce="x-">↔ ${adT('İçe')}</button></div>
+  <div class="ch" id="crigEdS"></div>
+  <div class="cb"><button data-ce="rs">↺ ${adT('Bu eklemi sıfırla')}</button><button data-ce="all">↺ ${adT('Hepsi')}</button></div>
+  <div class="cb"><button class="go" data-ce="ok">✓ ${adT('Uygula')}</button><button data-ce="x">✕ ${adT('Kapat')}</button></div></div>`);
+const CRED_B = { hips: ['hips'], chest: ['chest'], neck: ['neck'], head: ['head'], sh: ['leftUpperArm', 'rightUpperArm'], el: ['leftLowerArm', 'rightLowerArm'], wr: ['leftHand', 'rightHand'], hip: ['leftUpperLeg', 'rightUpperLeg'], kn: ['leftLowerLeg', 'rightLowerLeg'], an: ['leftFoot', 'rightFoot'], toe: ['leftToes', 'rightToes'] };
+function credOpen(on = true) {
+  const M = VRMS.custom; if (on && (M.state !== 'ready' || !CRIG.auto)) { showMsg(adT('🦴 Önce iskeletsiz bir GLB yükle (hazır iskeletli modeller düzeltilmez)'), 2); return; }
+  CRIG.edit = on; $('crigEd').style.display = on ? 'block' : 'none';
+  if (on) { CRED.pend = JSON.parse(JSON.stringify(CRIG.ov || {})); if (!(ANIME.on && ANIME.kind === 'custom')) { if (HERO.on) setHero(false, true); setAnime(true, true, 'custom'); } try { if (settingsEl.style.display !== 'none') resumeGame(); } catch (e) {} yaw = facing; pitch = .12; credUI(); }
+  for (const m of CRED.mk) m.visible = on;
+}
+function credUI() {
+  $('crigEdJ').innerHTML = Object.entries(CRIG_OVK).map(([k, t]) => `<button data-cj="${k}" class="${CRED.k === k ? 'on' : ''}">${adT(t)}</button>`).join('');
+  const d = CRED.pend[CRED.k] || [0, 0, 0], f = v => (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%';
+  $('crigEdS').textContent = `${adT(CRIG_OVK[CRED.k])}: ${adT('dışa')} ${f(d[0])} · ${adT('yukarı')} ${f(d[1])} · ${adT('öne')} ${f(d[2])} (${adT('boyunun oranı')})`;
+}
+function credTick() {
+  if (!CRIG.edit) return; const M = VRMS.custom; if (M.state !== 'ready' || !M.wrap || !M.wrap.visible) return; const grp = M.wrap.children[0]; if (!grp) return;
+  const H = CRIG.H || 1; let i = 0; M.wrap.updateMatrixWorld(true);
+  for (const [k, bl] of Object.entries(CRED_B)) for (const bn of bl) { const b = M.bones[bn]; if (!b) continue;
+    let m = CRED.mk[i]; if (!m) { m = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial({ color: 0x4cc9f0, depthTest: false, transparent: true, opacity: .95 })); m.renderOrder = 999; scene.add(m); CRED.mk[i] = m; }
+    const s = /^right/.test(bn) ? -1 : 1, d = CRED.pend[k] || [0, 0, 0], o = (CRIG.ov && CRIG.ov[k]) || [0, 0, 0];
+    const p = grp.worldToLocal(b.getWorldPosition(new THREE.Vector3())); p.x += (d[0] - o[0]) * s * H; p.y += (d[1] - o[1]) * H; p.z += (d[2] - o[2]) * H; grp.localToWorld(p);
+    m.position.copy(p); m.scale.setScalar(.035 * giantS * (k === CRED.k ? 1.5 : 1)); m.material.color.set(k === CRED.k ? 0xffd166 : 0x4cc9f0); m.visible = true; i++; }
+  for (; i < CRED.mk.length; i++) CRED.mk[i].visible = false;
+}
+{
+  const E = $('crigEd'); for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'wheel', 'keydown']) E.addEventListener(ev, e => e.stopPropagation(), { passive: true });
+  E.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; play('ui');
+    if (b.dataset.cj) { CRED.k = b.dataset.cj; credUI(); return; }
+    const a = b.dataset.ce; if (!a) return; const d = CRED.pend[CRED.k] || (CRED.pend[CRED.k] = [0, 0, 0]);
+    if (/^[xyz][+-]$/.test(a)) { const ax = 'xyz'.indexOf(a[0]); d[ax] = THREE.MathUtils.clamp(+(d[ax] + (a[1] === '+' ? 1 : -1) * CRED.step).toFixed(4), -.15, .15); }
+    else if (a === 'rs') delete CRED.pend[CRED.k]; else if (a === 'all') CRED.pend = {};
+    else if (a === 'ok') { CRIG.ov = JSON.parse(JSON.stringify(CRED.pend)); if (CRIG.buf) crigUse(CRIG.buf, CRIG.name, CRIG.flip, true).then(() => { if (CRIG.edit) credUI(); showMsg('🦴 ' + adT('İskelet güncellendi'), 1.6); }); }
+    else if (a === 'x') { credOpen(false); return; }
+    credUI(); });
+}
+
 async function crigUse(buf, name, flipOv, quiet) {
   if (CRIG.busy) return; CRIG.busy = true; crigStatus(adT('🦴 İskelet kuruluyor…'));
   try {
     const msg = await crigBuild(buf, flipOv); CRIG.buf = buf; CRIG.name = name || CRIG.name;
     crigStatus(`${CRIG.name ? CRIG.name + ' · ' : ''}${msg}`);
     if (HERO.on) setHero(false, true); setAnime(true, !!quiet, 'custom');
-    crigStore({ buf, name: CRIG.name, flip: flipOv ?? null });
+    crigStore({ buf, name: CRIG.name, flip: flipOv ?? null, ov: CRIG.ov || {} });
   } catch (e) {
     console.warn('crig', e); VRMS.custom.state = 'none'; crigStatus('⚠️ ' + adT('Model açılamadı') + ': ' + ((e && e.message) || e));
     if (ANIME.on && ANIME.kind === 'custom') setAnime(false, true);
@@ -25401,7 +25656,7 @@ async function crigUse(buf, name, flipOv, quiet) {
 async function crigRestore() {   // sayfa açılınca saklanan model
   const M = VRMS.custom; if (M.state !== 'none' || CRIG.busy) return; if (!M3D.on) { M3D.pend.add(M); return; }
   const v = await crigFetch(); if (!v || !v.buf) { M.state = 'fail'; crigStatus(adT('Henüz model yüklenmedi')); return; }
-  await crigUse(v.buf, v.name, v.flip, true);
+  CRIG.ov = v.ov || {}; await crigUse(v.buf, v.name, v.flip, true);
 }
 function crigPick() {
   play('ui');
@@ -25410,17 +25665,18 @@ function crigPick() {
 }
 function crigUI() {
   const r = $('crigRow'); if (!r) return; const ok = VRMS.custom.state === 'ready';
-  r.querySelector('[data-crig="flip"]').disabled = !ok || CRIG.busy; r.querySelector('[data-crig="del"]').disabled = !ok || CRIG.busy;
+  r.querySelector('[data-crig="flip"]').disabled = !ok || CRIG.busy; { const eb = r.querySelector('[data-crig="edit"]'); if (eb) eb.disabled = !ok || CRIG.busy || !CRIG.auto; } r.querySelector('[data-crig="del"]').disabled = !ok || CRIG.busy;
   const b = document.querySelector('.charPick [data-char="custom"] small'); if (b) b.textContent = ok ? (CRIG.name || adT('Yüklendi')) + ' · ' + adT('seç') : adT('.glb yükle → otomatik iskelet');
 }
 {
   const pick = document.querySelector('.charPick');
   if (pick) {
     pick.insertAdjacentHTML('beforeend', `<button data-char="custom"><span class="ci">🧩</span><b>${adT('Kendi modelim')}</b><small>${adT('.glb yükle → otomatik iskelet')}</small></button>`);
-    pick.insertAdjacentHTML('afterend', `<div id="crigRow" class="setRow" style="flex-wrap:wrap;gap:6px"><span>🧩 ${adT('Kendi 3D modelin')}</span><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-crig="up">📁 ${adT('GLB yükle')}</button><button class="btn" data-crig="flip">↻ ${adT('Çevir')}</button><button class="btn" data-crig="del">🗑️ ${adT('Kaldır')}</button></span></div><div class="hint" id="crigSt">${adT('Bir .glb seç: iskeleti yoksa otomatik kurulur, varsa (Mixamo, Unity, Blender) o kullanılır. Model tarayıcında saklanır.')}</div><input type="file" id="crigFile" accept=".glb,model/gltf-binary" style="display:none">`);
-    $('crigFile').addEventListener('change', async e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return; if (!M3D.on) { m3dSet(true); } if (f.size > 120e6) { crigStatus('⚠️ ' + adT('Dosya çok büyük (en fazla 120 MB)')); return; } crigStatus(adT('📂 Okunuyor…')); const buf = await f.arrayBuffer(); crigUse(buf, f.name.replace(/\.glb$/i, ''), null); });
+    pick.insertAdjacentHTML('afterend', `<div id="crigRow" class="setRow" style="flex-wrap:wrap;gap:6px"><span>🧩 ${adT('Kendi 3D modelin')}</span><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-crig="up">📁 ${adT('GLB yükle')}</button><button class="btn" data-crig="flip">↻ ${adT('Çevir')}</button><button class="btn" data-crig="edit">🦴 ${adT('İskeleti düzelt')}</button><button class="btn" data-crig="del">🗑️ ${adT('Kaldır')}</button></span></div><div class="hint" id="crigSt">${adT('Bir .glb seç: iskeleti yoksa otomatik kurulur, varsa (Mixamo, Unity, Blender) o kullanılır. Model tarayıcında saklanır.')}</div><input type="file" id="crigFile" accept=".glb,model/gltf-binary" style="display:none">`);
+    $('crigFile').addEventListener('change', async e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return; if (!M3D.on) { m3dSet(true); } if (f.size > 120e6) { crigStatus('⚠️ ' + adT('Dosya çok büyük (en fazla 120 MB)')); return; } crigStatus(adT('📂 Okunuyor…')); const buf = await f.arrayBuffer(); CRIG.ov = {}; crigUse(buf, f.name.replace(/\.glb$/i, ''), null); });
     $('crigRow').addEventListener('click', e => { const b = e.target.closest('[data-crig]'); if (!b) return; e.stopPropagation(); play('ui'); const k = b.dataset.crig;
       if (k === 'up') $('crigFile').click();
+      else if (k === 'edit') credOpen(true);
       else if (k === 'flip' && CRIG.buf) crigUse(CRIG.buf, CRIG.name, !CRIG.flip);
       else if (k === 'del') { const M = VRMS.custom; if (ANIME.on && ANIME.kind === 'custom') setAnime(false, true); if (M.wrap && M.wrap.parent) M.wrap.parent.remove(M.wrap); Object.assign(M, { state: 'none', wrap: null, bones: {}, rest: {} }); CRIG.buf = null; CRIG.name = ''; crigStore(null); crigStatus(adT('Model kaldırıldı')); try { localStorage.setItem('copAdamKarakter', 'stick'); } catch (x) {} crigUI(); SETSYNC.forEach(f => f()); } });
     crigUI();
@@ -25553,7 +25809,7 @@ function mpLeave(why) {
   try { MP.peer && MP.peer.destroy(); } catch (e) {}
   Object.assign(MP, { on: false, host: false, code: '', peer: null, conns: {}, hc: null, players: {}, started: false, region: 'hub', vote: null, spec: null, ctlBy: null, ctlTgt: null, locked: false, plock: false, heldBy: null, holding: null, follow: null, calls: {}, auds: {}, myHouse: '', npcCtl: 0 });
   if (carried && carried.type === 'mp') carried = null;
-  mpClearHouses(); try { mpFunReset(); } catch (e) {} MP_LK.sig = ''; MP_LK.msg = null; document.body.classList.remove('mpOn', 'mpCtl'); mpHud(false); $('mpVote').style.display = 'none'; $('mpCtlBan').style.display = 'none'; $('mpHeld').style.display = 'none';
+  mpClearHouses(); try { mpFunReset(); } catch (e) {} try { mpxReset(); } catch (e) {} MP_LK.sig = ''; MP_LK.msg = null; document.body.classList.remove('mpOn', 'mpCtl'); mpHud(false); $('mpVote').style.display = 'none'; $('mpCtlBan').style.display = 'none'; $('mpHeld').style.display = 'none';
   if (why) mpNote(why, 4); mpStatus(why || adT('Odadan çıktın')); mpUI();
 }
 // ---------- gelen mesajlar ----------
@@ -25614,6 +25870,7 @@ function mpState() {
   const m = { t: 's', p: [r2(p.x), r2(p.y), r2(p.z)], ry: r2(charHolder.rotation.y), rx: r2(charHolder.rotation.x), rz: r2(charHolder.rotation.z), s: r2(s), a: curKey, h: inHouse ? MP.myHouse : '', j, lv: MP_LK.v, tk: MP.talk ? 1 : 0, iv: ADM.invis ? 1 : 0, dd: dead ? 1 : 0, tr: MPF.trail ? 1 : 0 };
   if (carried && carried.type === 'mp') { const o = carried.ref.av && carried.ref.av.holder; if (o) m.hp = [r2(o.position.x), r2(o.position.y), r2(o.position.z)]; }
   const ob = mpObjOut(); if (ob.length) m.ob = ob;
+  try { const vr = mpxVrMode(); if (vr) m.vr = vr; const xf = mpxFlags(); if (xf) m.x = xf; if (MPX.sign && mpxHas('sign')) m.sg = MPX.sign; mpxHandsOut(m); } catch (e) {}   // ✨ süsler, 🥽 VR, eller
   return m;
 }
 function mpAvatar(p) {
@@ -25628,7 +25885,7 @@ function mpTxtSprite(txt, bg, w = 512, fs = 34) {
 }
 function mpAvLabel(p) {
   const av = p.av; if (!av) return; if (av.lab) { av.holder.remove(av.lab); av.lab.material.map.dispose(); }
-  const c = new THREE.Color(p.color); av.lab = mpTxtSprite(`${p.admin ? '👑 ' : ''}${p.owner ? '🏠 ' : ''}${p.name}${p.talk ? ' 🎤' : ''}`, `rgba(${(c.r * 160) | 0},${(c.g * 160) | 0},${(c.b * 160) | 0},.9)`); av.lab.position.y = 2.15; av.holder.add(av.lab); av.labTk = p.talk;
+  const c = new THREE.Color(p.color); av.lab = mpTxtSprite(`${p.admin ? '👑 ' : ''}${p.owner ? '🏠 ' : ''}${p.name}${p.talk ? ' 🎤' : ''}${p.vr ? ' 🥽' : ''}`, `rgba(${(c.r * 160) | 0},${(c.g * 160) | 0},${(c.b * 160) | 0},.9)`); av.lab.position.y = 2.15; av.holder.add(av.lab); av.labTk = p.talk; av.labVr = p.vr || '';
 }
 function mpAvTick(p, dt) {
   const st = p.st; if (!st) return; const av = p.av || mpAvatar(p), H = av.holder;
@@ -25638,9 +25895,11 @@ function mpAvTick(p, dt) {
   H.rotation.x += (st.rx - H.rotation.x) * k; H.rotation.z += (st.rz - H.rotation.z) * k; const sc = H.scale.x + (st.s - H.scale.x) * k; H.scale.setScalar(sc); p.facing = H.rotation.y;
   const j = st.j, J = av.jn || mpJ(av.rig); if (j && j.length > 3) { const n = Math.min(J.length, (j.length - 1) / 3 | 0); if (J[0]) J[0].position.y += (j[0] - J[0].position.y) * k; for (let i = 0; i < n; i++) { const o = J[i]; if (!o) continue; o.rotation.x += (j[1 + i * 3] - o.rotation.x) * k; o.rotation.y += (j[2 + i * 3] - o.rotation.y) * k; o.rotation.z += (j[3 + i * 3] - o.rotation.z) * k; } }
   if (st.lv != null && st.lv !== p.lookV && elapsed - (p.lkq || -9) > 4) { p.lkq = elapsed; mpTo(p.id, { t: 'lkq' }); }
+  av.hq = st.hq; av.fg = st.fg; av.k = k;
   if (av.want && !av.vw) mpAvVrm(p); if (av.vw) { H.updateMatrixWorld(true); mpVrmPose(av); }
   if (av.lab) av.lab.visible = !mpHideLabel(p);
-  if (av.labTk !== p.talk) mpAvLabel(p);
+  p.vr = st.vr || ''; if (av.labTk !== p.talk || av.labVr !== p.vr) mpAvLabel(p);
+  try { mpxRemote(p, av, st, dt); } catch (e) { console.warn('mpx', e); }
   if (av.bub && (av.bubT -= dt) <= 0) { H.remove(av.bub); av.bub.material.map.dispose(); av.bub = null; }
   if (av.emo && (av.emoT -= dt) <= 0) { H.remove(av.emo); av.emo.material.map.dispose(); av.emo = null; }
   if (st.ob) mpObjIn(st.ob);
@@ -25649,6 +25908,7 @@ function mpAvTick(p, dt) {
 function mpTick(dt) {
   try { mpNear(); } catch (e) {}
   if (!MP.on) return;
+  try { mpxPost(dt); } catch (e) { console.warn('mpx', e); }
   try {
     MP.admChk = (MP.admChk || 0) - dt; if (MP.admChk <= 0) { MP.admChk = 1; const me = MP.players[MP.me.id]; if (me && me.admin !== mpIsAdm()) { me.admin = mpIsAdm(); mpSend({ t: 'admf', on: me.admin }); } }
     MP.sendT -= dt; if (MP.sendT <= 0) { MP.sendT = 1 / 12; mpSend(mpState()); }
@@ -25911,10 +26171,11 @@ function mpAdmCmd(m) {   // hedef oyuncu: admin komutunu uygular
     case 'follow': MP.follow = a.on ? m.f : null; mpNote(a.on ? `🚶 ${adT('Admini takip ediyorsun')}` : adT('Takip bitti'), 2); break;
     case 'item': try { if (a.take) { INV.eq = null; mpNote('🎒 ' + adT('Admin eşyanı aldı'), 2); } else { const it = curItem && curItem(); mpNote('🎁 ' + adT('Admin sana eşya verdi'), 2); if (typeof invGiveRandom === 'function') invGiveRandom(); } } catch (e) {} break;
     case 'getset': { const vals = {}; document.querySelectorAll('#settings input[id], #settings select[id]').forEach(el => { vals[el.id] = el.type === 'checkbox' ? !!el.checked : el.value; }); mpTo(m.f, { t: 'adr', c: 'set', vals, from: MP.me.id }); break; }
+    case 'x': mpxRun(a, m.f); break;
     case 'set1': { const el = $(a.id); if (el && el.closest('#settings')) { if (el.type === 'checkbox') el.checked = !!a.v; else el.value = a.v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } break; }
   }
 }
-function mpAdmReply(m) { if (m.c === 'set') mpSetEditor(m.from, m.vals); }
+function mpAdmReply(m) { if (m.c === 'set') mpSetEditor(m.from, m.vals); else if (m.c === 'qz') { mpNote(`❓ ${mpName(m.f)}: ${String(m.ans || '').slice(0, 24)}`, 6); play('ding', { gain: .5 }); } }
 function mpAdmApply(m) {   // admin panelinde yapılan herkese aynı uygulanır
   const from = MP.players[m.f]; if (!from || !from.admin) return; MP.admApplying = true;
   try { const f = ADM_F[m.id]; if (!f) return; if (f.fn) admPress(m.id); else admSet(m.id, !!m.on); } finally { MP.admApplying = false; }
@@ -26078,7 +26339,7 @@ function mpAdmUI() {
   const ps = Object.values(MP.players).sort((a, b) => a.slot - b.slot); if (!MP.adSel || !MP.players[MP.adSel]) MP.adSel = (ps.find(p => p.id !== MP.me.id) || ps[0]).id; MP.annTo = MP.annTo || {};
   const sel = MP.adSel, P = MP.players[sel], S = MP.set, B = (a, t, on) => `<button data-ma="${a}"${on ? ' class="on"' : ''}>${t}</button>`;
   E.innerHTML = `<h4 style="margin-top:0">👥 ${adT('Çok oyunculu — admin')} <button data-ma="close" style="float:right">✕</button></h4>
-  <div class="pls">${ps.map(p => `<button data-ma="sel" data-id="${p.id}" class="${p.id === sel ? 'sel' : ''}">${p.admin ? '👑' : ''}${mpEsc(p.name)}${p.id === MP.me.id ? ' (' + adT('sen') + ')' : ''}</button>`).join('')}</div>
+  <div class="pls">${ps.map(p => `<button data-ma="sel" data-id="${p.id}" class="${p.id === sel ? 'sel' : ''}">${p.admin ? '👑' : ''}${mpEsc(p.name)}${p.st && p.st.vr ? '🥽' : ''}${p.id === MP.me.id ? ' (' + adT('sen') + ')' : ''}</button>`).join('')}</div>
   <h4>🎯 ${mpEsc(P ? P.name : '')}</h4><div class="g">
   ${B('spec', MP.spec === sel ? '👀 ' + adT('İzlemeyi bırak') : '👀 ' + adT('İzle'), MP.spec === sel)}${B('goto', '✨ ' + adT('Yanına ışınlan'))}${B('bring', '🧲 ' + adT('Yanıma ışınla'))}${B('map', '🗺️ ' + adT('Haritadan ışınla'))}
   ${B('ctl', MP.ctlTgt === sel ? '🎮 ' + adT('Kontrolü bırak') : '🎮 ' + adT('Karakterini kontrol et'), MP.ctlTgt === sel)}${B('lock', '🔒 ' + adT('Kilitle'))}${B('unlock', '🔓 ' + adT('Kilidi aç'))}${B('launch', '🚀 ' + adT('Havaya uçur'))}
@@ -26090,6 +26351,7 @@ function mpAdmUI() {
   ${B('mute', '🔇 ' + adT('Mikrofon + sohbet sustur'))}${B('unmute', '🔊 ' + adT('Susturmayı kaldır'))}${B('kick', '🚫 ' + adT('Odadan at'))}${B('ban', '⛔ ' + adT('At ve yasakla'))}
   ${B('follow', '🚶 ' + adT('Beni takip etsin'))}${B('unfollow', '🛑 ' + adT('Takibi bitir'))}${B('protect', S.protect[sel] ? '🛡️ ' + adT('Korumayı kaldır') : '🛡️ ' + adT('Oda sahibi atamasın'), S.protect[sel])}${B('rename', '✏️ ' + adT('Adını değiştir'))}
   </div><div id="mpSetEd"></div>
+  ${mpxAdmUI(sel, P)}
   <h4>🌍 ${adT('Herkes')}</h4><div class="g">${B('freezeAll', '🧊 ' + adT('Herkesi dondur'))}${B('unfreezeAll', '🔥 ' + adT('Herkesi çöz'))}${B('bringAll', '🧲 ' + adT('Herkesi yanıma ışınla'))}${B('restore', '🔄 ' + adT('Yıkılanları eski haline getir'))}
   ${B('voteNo', '🗳️❌ ' + adT('Oylamayı iptal et'))}${B('voteYes', '🗳️✅ ' + adT('Oylamayı geçir'))}${B('collide', (S.collide ? '✅ ' : '⬜ ') + adT('Oyuncu çarpışması'), S.collide)}${B('pvp', (S.pvp ? '✅ ' : '⬜ ') + adT('Oyuncular birbirine vurabilir'), S.pvp)}
   ${B('ownerKick', (S.ownerKick ? '✅ ' : '⬜ ') + adT('Oda sahibi atabilir'), S.ownerKick)}${B('grab', (S.grab ? '✅ ' : '⬜ ') + adT('Oyuncu tutma (izinle)'), S.grab)}</div>
@@ -26248,6 +26510,7 @@ function mpVrmPose(av) {   // (arkadaş sistemindeki eşlemenin her model için 
   const wp = (o, y) => o.localToWorld(new THREE.Vector3(0, y, 0));
   for (const [S, sd] of [['left', r.armL], ['right', r.armR]]) { const U = Bn[S + 'UpperArm'], Lo = Bn[S + 'LowerArm']; if (!U || !Lo || !R[S + 'UpperArm']) continue; const a = sd.sh.getWorldPosition(new THREE.Vector3()), e = sd.el.getWorldPosition(new THREE.Vector3()), h = wp(sd.el, -.32); mpAim(U, e.clone().sub(a).normalize(), R); mpAim(Lo, h.sub(e).normalize(), R); }
   for (const [S, lg] of [['left', r.legL], ['right', r.legR]]) { const U = Bn[S + 'UpperLeg'], Lo = Bn[S + 'LowerLeg']; const a = lg.hip.getWorldPosition(new THREE.Vector3()), k = lg.kn.getWorldPosition(new THREE.Vector3()), f = wp(lg.kn, -.47); if (U && R[S + 'UpperLeg']) mpAim(U, k.clone().sub(a).normalize(), R); if (Lo && R[S + 'LowerLeg']) mpAim(Lo, f.sub(k).normalize(), R); }
+  try { mpxHandsIn(av, Bn, R, M, Rw); } catch (e) {}   // 🥽 el yönü ve parmaklar
   if (av.cons && av.cons.length) vrmConsApply(av.cons);
 }
 // ---------- 🎉 eğlence: 10 özellik (👥 menüsünde) ----------
@@ -26283,6 +26546,8 @@ function mpFx(m) {
   if (m.k === 'ping') { const g = new THREE.Group(), c = new THREE.Color(col); const beam = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, 40, 10, 1, true), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: .45, depthWrite: false, side: THREE.DoubleSide }));
     beam.position.y = 20; g.add(beam); const ring = new THREE.Mesh(new THREE.RingGeometry(.7, 1.1, 32), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: .8, side: THREE.DoubleSide, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = .06; g.add(ring);
     const lab = mpTxtSprite('📍 ' + nm, `#${c.getHexString()}`); lab.position.y = 3; lab.scale.multiplyScalar(1.2); g.add(lab); g.position.set(m.p[0], m.p[1], m.p[2]); g.userData.a = curKey; scene.add(g); MPF.pings.push({ g, t: 14, nm, ring }); play('ding', { gain: .5 }); mpNote(`📍 ${nm} ${adT('bir yer işaretledi')}`, 2); return; }
+  if (m.k === 'bolt' && m.p) { mpxBolt(new THREE.Vector3(+m.p[0] || 0, +m.p[1] || 0, +m.p[2] || 0), m.seed); mpNote(`⚡ ${nm}`, 1.4); return; }
+  if (m.k === 'conf' && m.p) { mpxConfetti(new THREE.Vector3(+m.p[0] || 0, +m.p[1] || 0, +m.p[2] || 0)); mpNote(`🎉 ${nm}`, 1.4); return; }
   if (m.k === 'fw') { mpFireworks(new THREE.Vector3(m.p[0], m.p[1], m.p[2]), m.seed || 1); mpNote(`🎆 ${nm}`, 1.6); return; }
   if (m.k === 'sfx') { play(m.id, { gain: .8 }); const e = MP_SFX.find(x => x[0] === m.id); mpNote(`🔊 ${nm}: ${e ? e[1] + ' ' + adT(e[2]) : ''}`, 1.6); if (P && P.av && m.f !== MP.me.id) mpEmoteShowIcon(P, e ? e[1] : '🔊'); return; }
   if (m.k === 'photo') { MPF.photoT = 3.99; MPF.photoBy = nm; return; }
@@ -27448,6 +27713,310 @@ function deskArea() {
 }
 try { $('admX').insertAdjacentHTML('beforebegin', `<button id="admDesk" title="${adT('Masa odası')}" style="background:#8d5a34;border:1px solid #ffcc80;color:#fff;border-radius:8px;padding:3px 7px;cursor:pointer">🗄️</button>`); $('admDesk').addEventListener('click', e => { e.stopPropagation(); deskGo(); }); } catch (e) {}
 
+/* ---------- ✨ ÇOK OYUNCULU ADMİN: 50 YENİ ÖZELLİK + 🥽 VR ÇOK OYUNCULUDA ----------
+   Admin paneli → 👥 Çok oyunculu → ✨ bölümü. Komut hedef oyuncunun cihazında çalışır ('ad' mesajı, c: 'x').
+   Taç, kafes, bulut, balon, spot, tabela gibi görünen şeyler oyuncunun durum mesajıyla (x bayrakları) herkese gider.
+   VR açık oyuncunun başında 🥽 gözlük görünür, adının yanında 🥽 yazar; anime modellerde el yönü ve parmaklar da herkese gider. */
+const MPX = { t: {}, keep: {}, sign: '', deco: {}, parts: [], sw: null, by: {}, iceP: null, cageP: null, cnt: 0, d0: 0, rs: false };
+const MPX_DUR = { ice: 10, balloon: 8, invert: 20, slow: 15, jump: 30, moon: 30, magnet: 6, bubble: 20, ghost: 15, rainbow: 30, spot: 20, cloud: 20, blind: 5, zoom: 15, fp: 20, flip: 10, fog: 25, bighead: 30, cage: 15, arrow: 30, spin: 6, chute: 40, sign: 25, feather: 10 };
+const MPX_ADM = { slow: 'slowWalk', jump: 'jump', moon: 'moon', ghost: 'ghost', zoom: 'narrow', flip: 'flip', bighead: 'bighead', spin: 'spin', bubble: 'bubbleShield', feather: 'featherFall' };   // admin panelindeki hazır özellik + süre
+const MPX_CHARS = [['stick', '🕴️ Çöp adam'], ['pati', '🐾 Pati'], ['roach', '🪳 Hamam böceği'], ['anime', '🎀 Anime kız'], ['girlA', '🌸 Anime kız: Mia'], ['girlB', '🌙 Anime kız: Luna'], ['girlC', '🖤 Anime kız: Mita'], ['boy', '🧢 Anime erkek']];
+const MPX_LIST = [   // seçili oyuncuya (🎭 karakter seçimiyle birlikte 44)
+  ['mkadm', '👑', 'Admin yap'], ['vroff', '🥽', "VR'sini kapat"], ['vrask', '🥽', 'VR açmasını iste'], ['ice', '🧊', 'Buz heykeli (10 sn)'],
+  ['balloon', '🎈', 'Balonla uçur'], ['spin', '🌀', 'Fırıldak gibi döndür'], ['invert', '🔄', 'Ters kontrol (20 sn)'], ['slow', '🐌', 'Yavaşlat'],
+  ['jump', '🦘', 'Süper zıplama'], ['moon', '🌙', 'Ay yerçekimi'], ['magnet', '🧲', 'Yanıma çek'], ['swap', '🔀', 'Yer değiştir'],
+  ['rtp', '🎲', 'Rastgele ışınla'], ['home', '🏡', 'Köye gönder'], ['space', '🚀', 'Uzaya fırlat + paraşüt'], ['bubble', '🫧', 'Baloncuk kalkanı'],
+  ['ghost', '👻', 'Hayalet (duvardan geçer)'], ['rainbow', '🌈', 'Gökkuşağı iz'], ['crown', '👑', 'Taç tak / çıkar'], ['wings', '🪽', 'Melek kanatları'],
+  ['halo', '😇', 'Hale'], ['cape', '🦸', 'Pelerin'], ['partyHat', '🥳', 'Parti şapkası'], ['spot', '🔦', 'Spot ışığı'],
+  ['fw', '🎆', 'Havai fişek'], ['bolt', '⚡', 'Yıldırım (zararsız)'], ['cloud', '🌧️', 'Yağmur bulutu'], ['dance', '🕺', 'Dans ettir'],
+  ['sign', '🪧', 'Başına tabela'], ['blind', '🙈', 'Ekranı karart (5 sn)'], ['zoom', '🔭', 'Yakın çekim'], ['fp', '👁️', 'Birinci şahıs'],
+  ['flip', '🙃', 'Ekranı ters çevir'], ['fog', '🌫️', 'Sis perdesi'], ['night', '🌃', 'Ona gece yap'], ['coins', '🪙', '100 para ver'],
+  ['bighead', '🎃', 'Koca kafa'], ['cage', '🧱', 'Kafese koy (15 sn)'], ['confetti', '🎉', 'Konfeti'], ['arrow', '🧭', 'Bana ok göster'],
+  ['ping', '🔔', 'Dikkat çek'], ['quiz', '❓', 'Soru sor'], ['music', '🎵', 'Müzik çal']];
+const MPX_ALL = [['vr', '🥽', "Herkesin VR'sini kapat"], ['night', '🌃', 'Herkese gece'], ['count', '⏱️', 'Geri sayım (10)'], ['dance', '🕺', 'Herkes dans etsin'], ['ring', '⭕', 'Herkesi çembere diz'], ['balloon', '🎈', 'Herkes balonla uçsun']];
+const MPX_DK = new Set(['ice', 'balloon', 'chute', 'spot', 'cloud', 'cage', 'bubble', 'ghost', 'vr', 'crown', 'wings', 'halo', 'cape', 'tophat', 'partyHat', 'sign']);   // herkese görünen süsler
+const MPX_A0 = { head: new THREE.Vector3(0, 1.8, 0), back: new THREE.Vector3(0, 1.3, -.12) };
+const MPXQ = [new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion(), new THREE.Quaternion()], MPXV = [new THREE.Vector3(), new THREE.Vector3()], r3 = v => Math.round(v * 1000) / 1000;
+const mpxOn = (k, d) => { MPX.t[k] = elapsed + (d || MPX_DUR[k] || 10); };
+const mpxHas = k => MPX.t[k] > elapsed;
+function vrBanned() { if (!window.__vrBan) return false; showMsg('🥽 ' + adT("Admin VR'ını kapattı"), 1.8); return true; }
+function mpxTimed(k, d) { const id = MPX_ADM[k]; if (id && !mpxHas(k)) { MPX.keep[k] = !!ADM[id]; if (!ADM[id]) admSet(id, true, true); } mpxOn(k, d); }
+function mpxVrMode() { return GV3.on ? 'v3' : V4.on ? 'v4' : V5.on ? 'v5' : HT.on ? 'ht' : GV.on ? 'gv' : FM.on ? 'fm' : ''; }
+function mpxVrOff() { for (const f of [() => GV3.on && gv3Set(false), () => HT.on && htStop(true), () => V4.on && v4Stop(true), () => V5.on && v5Stop(true), () => GV.on && gvToggle(false), () => FM.on && fmToggle(FM.mode)]) try { f(); } catch (e) {} }
+// ---------- admin tarafı: panel ve düğmeler ----------
+function mpxAdmUI(sel, P) {
+  MP.vrB = MP.vrB || {}; const ch = MP.mxChar || 'stick';
+  return `<h4>✨ ${adT('Yeni özellikler')} — ${mpEsc(P ? P.name : '')}${P && P.st && P.st.vr ? ' 🥽' : ''}</h4>
+  <div style="display:flex;gap:4px;margin-bottom:5px"><select id="mpxChar" style="flex:1">${MPX_CHARS.map(([k, t]) => `<option value="${k}"${k === ch ? ' selected' : ''}>${adT(t)}</option>`).join('')}</select><button data-mx="char">🎭 ${adT('Karakterini değiştir')}</button></div>
+  <div class="g">${MPX_LIST.map(([k, ic, t]) => { const on = k === 'vroff' && MP.vrB[sel]; return `<button data-mx="${k}"${on ? ' class="on"' : ''}>${ic} ${on ? adT('VR serbest bırak') : adT(t)}</button>`; }).join('')}</div>
+  <h4>✨🌍 ${adT('Herkese')}</h4><div class="g">${MPX_ALL.map(([k, ic, t]) => { const on = k === 'vr' && MP.vrAll; return `<button data-mx="all:${k}"${on ? ' class="on"' : ''}>${ic} ${on ? adT('Herkese VR serbest') : adT(t)}</button>`; }).join('')}</div>`;
+}
+function mpxAdmin(k, id) {
+  const P = MP.players[id], st = P && P.st, me = player.position, far = () => mpNote('📍 ' + adT('Aynı bölgede değilsiniz'), 2);
+  const at = () => st && st.a === curKey && st.p ? st.p : null;
+  const fxAt = kind => { const p = at(); if (!p) { far(); return false; } const m = { t: 'fx', k: kind, p: p.slice(0, 3), seed: Math.random() * 1e6 | 0 }; mpSend(m); mpFx(Object.assign({ f: MP.me.id }, m)); return true; };
+  if (k.startsWith('all:')) {
+    const g = k.slice(4); MP.vrB = MP.vrB || {};
+    if (g === 'vr') { MP.vrAll = !MP.vrAll; for (const q in MP.players) if (q !== MP.me.id) MP.vrB[q] = MP.vrAll; mpAdmAll('x', { k: 'vroff', on: MP.vrAll }, true); mpNote(MP.vrAll ? '🥽 ' + adT("Herkesin VR'ı kapatıldı") : '🥽 ' + adT('VR herkese serbest'), 2); }
+    else if (g === 'ring') { const ids = Object.keys(MP.players).filter(q => q !== MP.me.id), R = 4 * Math.max(1, giantS); ids.forEach((q, i) => { const a = i / ids.length * Math.PI * 2; mpAdm(q, 'tp', { k: curKey, p: [r2(me.x + Math.sin(a) * R), r2(me.y), r2(me.z + Math.cos(a) * R)], hint: { reg: ANK.key } }); }); mpNote('⭕ ' + adT('Herkes çevrene dizildi'), 2); }
+    else mpAdmAll('x', { k: g, n: 10 }, g === 'balloon');
+    return;
+  }
+  switch (k) {
+    case 'char': MP.mxChar = $('mpxChar').value; mpAdm(id, 'x', { k, v: MP.mxChar }); break;
+    case 'vroff': MP.vrB = MP.vrB || {}; MP.vrB[id] = !MP.vrB[id]; mpAdm(id, 'x', { k, on: MP.vrB[id] }); break;
+    case 'home': { const x = 1.5 * (P ? P.slot : 0) - 3; mpAdm(id, 'tp', { k: 'hub', p: [x, r2(terrH(x, 9.5)), 9.5] }); break; }
+    case 'swap': { const p = at(); if (!p || id === MP.me.id) { far(); break; } mpAdm(id, 'tp', { k: curKey, p: [r2(me.x), r2(me.y), r2(me.z)] }); player.position.set(p[0], p[1], p[2]); vel.set(0, 0, 0); vy = 0; break; }
+    case 'fw': fxAt('fw'); break;
+    case 'confetti': fxAt('conf'); break;
+    case 'bolt': if (fxAt('bolt')) mpAdm(id, 'x', { k }); break;
+    case 'sign': { const v = prompt(adT('Tabelada ne yazsın? (en fazla 24 harf)'), '⭐ ' + adT('Yıldız oyuncu')); if (v && v.trim()) mpAdm(id, 'x', { k, v: v.trim().slice(0, 24) }); break; }
+    case 'quiz': { const v = prompt(adT('Soru | 1. şık | 2. şık'), adT('Pizza mı makarna mı? | 🍕 Pizza | 🍝 Makarna')); if (!v) break; const s = v.split('|').map(x => x.trim()).filter(Boolean); if (s.length < 3) { mpNote('❓ ' + adT('Biçim: Soru | şık | şık'), 2.4); break; } mpAdm(id, 'x', { k, q: s[0].slice(0, 80), o: [s[1].slice(0, 24), s[2].slice(0, 24)] }); mpNote('❓ ' + adT('Soru gönderildi'), 1.6); break; }
+    default: mpAdm(id, 'x', { k });
+  }
+}
+// ---------- hedef oyuncu: komutu uygular ----------
+function mpxRun(a, from) {
+  const k = a.k, nm = mpName(from), N = (t, d) => mpNote(t, d || 2.4);
+  switch (k) {
+    case 'mkadm': ADM_UNLOCK = true; try { admLockApply(); } catch (e) {} mpSend({ t: 'admf', on: true }); N('👑 ' + adT('Admin oldun! (bu oturum için)'), 3.5); break;
+    case 'char': if (MPX_CHARS.some(c => c[0] === a.v)) { pickChar(a.v); N('🎭 ' + adT('Admin karakterini değiştirdi')); } break;
+    case 'vroff': window.__vrBan = !!a.on; if (a.on) mpxVrOff(); N(a.on ? '🥽 ' + adT("Admin VR'ını kapattı") : '🥽 ' + adT('VR yine serbest'), 2.6); break;
+    case 'vrask': if (window.__vrBan) break; mpxAsk('🥽 ' + nm + ': ' + adT('VR açar mısın?'), [['🥽 VR 3 (360°)', () => gv3Set(true)], ['🧍 VR 4 (' + adT('tüm vücut') + ')', () => v4Start()], ['✖ ' + adT('Hayır'), null]]); break;
+    case 'ice': MPX.iceP = player.position.clone(); mpxOn('ice'); play('magic', { gain: .5 }); N('🧊 ' + adT('Buz heykeli oldun! (10 sn)')); break;
+    case 'balloon': mpxOn('balloon'); play('balloon'); N('🎈 ' + adT('Balonlar seni uçuruyor!')); break;
+    case 'spin': mpxTimed('spin'); break;
+    case 'invert': mpxOn('invert'); N('🔄 ' + adT('Kontroller ters! (20 sn)')); break;
+    case 'slow': mpxTimed('slow'); N('🐌 ' + adT('Yavaşladın')); break;
+    case 'jump': mpxTimed('jump'); N('🦘 ' + adT('Süper zıplama! (30 sn)')); break;
+    case 'moon': mpxTimed('moon'); N('🌙 ' + adT('Ay yerçekimi! (30 sn)')); break;
+    case 'magnet': MPX.by.magnet = from; mpxOn('magnet'); N('🧲 ' + adT('Admin seni yanına çekiyor')); break;
+    case 'rtp': { const S = Math.max(1, giantS), an = Math.random() * 6.283, r = (25 + Math.random() * 45) * S, P = player.position; P.x += Math.sin(an) * r; P.z += Math.cos(an) * r; P.y += 25 * S; vel.set(0, 0, 0); vy = 0; onGround = false; mpxTimed('feather', 9); play('portal'); N('🎲 ' + adT('Rastgele bir yere ışınlandın')); break; }
+    case 'space': vy = 55 * Math.sqrt(Math.max(1, giantS)); onGround = false; mpxOn('chute'); MPX.chT = elapsed; play('fwlaunch'); N('🚀 ' + adT('Uzaya! İnerken paraşüt açılır')); break;
+    case 'bubble': mpxTimed('bubble'); break;
+    case 'ghost': mpxTimed('ghost'); if (!ADM.noclip) { admSet('noclip', true, true); MPX.nc = true; } N('👻 ' + adT('Hayalet oldun: duvardan geçersin (15 sn)')); break;
+    case 'rainbow': if (!MPF.trail) { MPF.trail = true; MPX.tr = true; } mpxOn('rainbow'); break;
+    case 'crown': case 'wings': case 'halo': case 'cape': case 'partyHat': admSet(k, !ADM[k]); break;
+    case 'spot': mpxOn('spot'); N('🔦 ' + adT('Spot ışığı sende!')); break;
+    case 'bolt': vy = Math.max(vy, 9); onGround = false; shake = Math.max(shake, .5); N('⚡ ' + adT('Zararsız yıldırım!')); break;
+    case 'cloud': mpxOn('cloud'); N('🌧️ ' + adT('Başının üstünde bulut var')); break;
+    case 'dance': try { mpEmote('dance'); } catch (e) {} break;
+    case 'sign': MPX.sign = String(a.v || '').slice(0, 24); mpxOn('sign'); break;
+    case 'blind': mpxOn('blind'); break;
+    case 'zoom': mpxTimed('zoom'); break;
+    case 'fp': if (!mpxHas('fp')) MPX.d0 = dist; dist = .2; mpxOn('fp'); break;
+    case 'flip': mpxTimed('flip'); break;
+    case 'fog': mpxOn('fog'); break;
+    case 'night': admTime(23); N('🌃 ' + adT('Gece oldu')); break;
+    case 'coins': admCoins(100); play('coin'); N('🪙 ' + adT('Admin sana 100 para verdi')); break;
+    case 'bighead': mpxTimed('bighead'); break;
+    case 'cage': MPX.cageP = player.position.clone(); mpxOn('cage'); play('slam', { gain: .4 }); N('🧱 ' + adT('Kafestesin! (15 sn)')); break;
+    case 'arrow': MPX.by.arrow = from; mpxOn('arrow'); break;
+    case 'ping': for (let i = 0; i < 3; i++) setTimeout(() => play('ding', { gain: .9 }), i * 260); mpxFlash(); try { navigator.vibrate && navigator.vibrate([120, 60, 120]); } catch (e) {} mpAnnounce('🔔 ' + adT('Admin seni çağırıyor!'), from); break;
+    case 'quiz': mpxAsk('❓ ' + String(a.q || '').slice(0, 80), (a.o || []).slice(0, 2).map(o => [String(o).slice(0, 24), () => { mpTo(from, { t: 'adr', c: 'qz', q: String(a.q || '').slice(0, 80), ans: String(o).slice(0, 24) }); }])); break;
+    case 'music': play(['tetris', 'hbd', 'guitar'][Math.random() * 3 | 0], { gain: .9 }); N('🎵 ' + adT('Admin sana müzik çaldı'), 2); break;
+    case 'count': MPX.cnt = Math.max(1, Math.min(30, +a.n || 10)); break;
+  }
+}
+function mpxEnd(k) {   // süre bitti
+  const id = MPX_ADM[k]; if (id && !MPX.keep[k] && ADM[id]) admSet(id, false, true);
+  if (k === 'ghost' && MPX.nc) { MPX.nc = false; admSet('noclip', false, true); }
+  if (k === 'balloon') { play('bubblepop'); if (!MPX.rs) mpxTimed('feather', 10); }
+  if (k === 'rainbow' && MPX.tr) { MPX.tr = false; MPF.trail = false; }
+  if (k === 'fp') dist = MPX.d0 > 1 ? MPX.d0 : 6;
+  if (k === 'sign') MPX.sign = '';
+  if (k === 'ice' || k === 'cage') play('pop');
+}
+function mpxFlash() { const fl = $('mpFlash'); if (!fl) return; fl.classList.remove('on'); void fl.offsetWidth; fl.classList.add('on'); }
+function mpxAsk(title, opts) {   // iki-üç düğmeli soru (yazılar textContent: admin metni HTML olamaz)
+  const e = $('mpxAsk'); e.innerHTML = ''; const h = document.createElement('div'); h.className = 'q'; h.textContent = title; e.appendChild(h);
+  for (const [t, fn] of opts) { const b = document.createElement('button'); b.textContent = t; b.addEventListener('click', ev => { ev.stopPropagation(); play('ui'); e.classList.remove('on'); clearTimeout(MPX.askT); try { if (fn) fn(); } catch (x) { console.warn(x); } }); e.appendChild(b); }
+  e.classList.add('on'); if (isLocked()) document.exitPointerLock(); clearTimeout(MPX.askT); MPX.askT = setTimeout(() => e.classList.remove('on'), 20000);
+}
+// her karede, hareketten önce: ters kontrol / buz (tuşlar o kare için değiştirilir, hareketten hemen sonra geri konur)
+function mpxPre() {
+  MPX.sw = null; if (!MP.on) return; const inv = mpxHas('invert'), frz = mpxHas('ice'); if (!inv && !frz) return;
+  const K = keys, sv = MPX.sw = { W: K.KeyW, S: K.KeyS, A: K.KeyA, D: K.KeyD, U: K.ArrowUp, Dn: K.ArrowDown, L: K.ArrowLeft, R: K.ArrowRight, Sp: K.Space, jx: joy.x, jy: joy.y };
+  if (frz) { K.KeyW = K.KeyS = K.KeyA = K.KeyD = K.ArrowUp = K.ArrowDown = K.ArrowLeft = K.ArrowRight = K.Space = false; joy.x = joy.y = 0; }
+  else { K.KeyW = sv.S; K.KeyS = sv.W; K.KeyA = sv.D; K.KeyD = sv.A; K.ArrowUp = sv.Dn; K.ArrowDown = sv.U; K.ArrowLeft = sv.R; K.ArrowRight = sv.L; joy.x = -sv.jx; joy.y = -sv.jy; }
+}
+function mpxRestore() { const sv = MPX.sw; if (!sv) return; MPX.sw = null; const K = keys; K.KeyW = sv.W; K.KeyS = sv.S; K.KeyA = sv.A; K.KeyD = sv.D; K.ArrowUp = sv.U; K.ArrowDown = sv.Dn; K.ArrowLeft = sv.L; K.ArrowRight = sv.R; K.Space = sv.Sp; joy.x = sv.jx; joy.y = sv.jy; }
+// her karede (mpTick): süreler, fizik, ekran efektleri, süsler
+function mpxPost(dt) {
+  for (const k in MPX.t) if (MPX.t[k] <= elapsed) { delete MPX.t[k]; try { mpxEnd(k); } catch (e) { console.warn(e); } }
+  const P = player.position, S = Math.max(1, giantS), sq = Math.sqrt(S);
+  if (mpxHas('ice') && MPX.iceP) { P.copy(MPX.iceP); vel.set(0, 0, 0); vy = 0; }
+  if (mpxHas('cage') && MPX.cageP) { const c = MPX.cageP, dx = P.x - c.x, dz = P.z - c.z, d = Math.hypot(dx, dz), R = .45 * S; if (d > R) { P.x = c.x + dx / d * R; P.z = c.z + dz / d * R; vel.x *= .2; vel.z *= .2; } }
+  if (mpxHas('balloon')) { vy = Math.max(vy, 3.2 * sq); onGround = false; }
+  if (mpxHas('chute')) { if (vy < -3.2 * sq) vy = -3.2 * sq; if (onGround && elapsed - (MPX.chT || 0) > 1.2) delete MPX.t.chute; }
+  if (mpxHas('magnet')) { const q = MP.players[MPX.by.magnet], H = q && q.av && q.av.holder.visible ? q.av.holder.position : null; if (H) { const dx = H.x - P.x, dz = H.z - P.z, d = Math.hypot(dx, dz); if (d > 2.2 * S) { const sp = Math.min(d - 2 * S, 14 * S * dt); P.x += dx / d * sp; P.z += dz / d * sp; facing = Math.atan2(dx, dz); } } }
+  const b = mpxHas('blind'), f = mpxHas('fog'); if (MPX.ob !== b) { MPX.ob = b; $('mpxBlind').classList.toggle('on', b); } if (MPX.of !== f) { MPX.of = f; $('mpxFog').classList.toggle('on', f); }
+  try { mpxLocalDeco(dt); } catch (e) { console.warn(e); } mpxParts(dt); mpxArrow(); mpxCount(dt);
+}
+function mpxArrow() {
+  const e = $('mpxArrow'), on = mpxHas('arrow'), q = on && MP.players[MPX.by.arrow], H = q && q.av && q.av.holder.visible ? q.av.holder.position : null;
+  if (!H) { if (e.style.display !== 'none') e.style.display = 'none'; return; }
+  const P = player.position, cf = camera.getWorldDirection(MPXV[0]), rel = wrapAng(Math.atan2(H.x - P.x, H.z - P.z) - Math.atan2(cf.x, cf.z));
+  e.style.display = 'block'; e.firstChild.style.transform = `rotate(${(-rel).toFixed(3)}rad)`; e.lastChild.textContent = `👑 ${q.name} · ${Math.round(Math.hypot(H.x - P.x, H.z - P.z) / Math.max(1, giantS))} m`;
+}
+function mpxCount(dt) {
+  if (MPX.cnt <= 0) return; const e = $('mpBig'), was = Math.ceil(MPX.cnt); MPX.cnt -= dt; const now = Math.ceil(MPX.cnt);
+  if (MPX.cnt <= 0) { MPX.cnt = 0; e.textContent = '🚀 ' + adT('BAŞLA!'); e.classList.add('on'); play('airhorn', { gain: .6 }); setTimeout(() => e.classList.remove('on'), 1300); return; }
+  if (now !== was || !e.classList.contains('on')) { e.textContent = '⏱️ ' + now; e.classList.add('on'); play('ding', { gain: .4 }); }
+}
+function mpxReset() {   // odadan çıkınca her şey eski haline
+  MPX.rs = true; for (const k of Object.keys(MPX.t)) { delete MPX.t[k]; try { mpxEnd(k); } catch (e) {} } MPX.rs = false;
+  window.__vrBan = false; MPX.cnt = 0; MPX.sign = ''; mpxRestore();
+  for (const k in MPX.deco) { charHolder.remove(MPX.deco[k]); mpxFree(k, MPX.deco[k]); } MPX.deco = {};
+  for (const q of MPX.parts) scene.remove(q.o); MPX.parts = [];
+  for (const id of ['mpxBlind', 'mpxFog', 'mpxAsk']) { const e = $(id); if (e) e.classList.remove('on'); } MPX.ob = MPX.of = false; const ar = $('mpxArrow'); if (ar) ar.style.display = 'none';
+  MP.vrB = {}; MP.vrAll = false;
+}
+// ---------- 🎆 herkese görünen anlık efektler (mpFx'ten) ----------
+function mpxBolt(p, seed) {
+  let s = seed || 1; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647, pts = [], n = 14;
+  for (let i = 0; i <= n; i++) { const f = i / n, j = i && i < n; pts.push(new THREE.Vector3(p.x + (j ? (rnd() - .5) * 3 : 0), p.y + 42 * (1 - f) + .3, p.z + (j ? (rnd() - .5) * 3 : 0))); }
+  const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.2, 3), transparent: true, depthWrite: false, toneMapped: false });
+  const o = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'catmullrom', .1), 70, .1, 5, false), mat); o.frustumCulled = false; scene.add(o);
+  MPX.parts.push({ o, t: 0, life: .55, upd: (dt, q) => { mat.opacity = Math.max(0, 1 - q.t / .55) * (Math.sin(q.t * 70) > -.3 ? 1 : .3); } });
+  play('thunder', { gain: .7 }); if (player.position.distanceTo(p) < 45 * Math.max(1, giantS)) mpxFlash();
+}
+function mpxConfetti(p) {
+  const N = 180, pos = new Float32Array(N * 3), col = new Float32Array(N * 3), vl = [], C = [0xff4d6d, 0xffd23f, 0x3ec1ff, 0x7cff6b, 0xc77dff, 0xffffff].map(c => new THREE.Color(c));
+  for (let i = 0; i < N; i++) { pos.set([p.x, p.y + 1.6, p.z], i * 3); const c = C[i % C.length]; col.set([c.r, c.g, c.b], i * 3); const an = Math.random() * 6.283, r = 1 + Math.random() * 3.5; vl.push(new THREE.Vector3(Math.cos(an) * r, 4 + Math.random() * 6, Math.sin(an) * r)); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const o = new THREE.Points(geo, new THREE.PointsMaterial({ size: .16, vertexColors: true, transparent: true, depthWrite: false })); o.frustumCulled = false; scene.add(o);
+  MPX.parts.push({ o, t: 0, life: 3.2, upd: (dt, q) => { for (let i = 0; i < N; i++) { const v = vl[i]; v.y -= 6 * dt; v.multiplyScalar(1 - 1.6 * dt); pos[i * 3] += v.x * dt; pos[i * 3 + 1] += v.y * dt; pos[i * 3 + 2] += v.z * dt; } geo.attributes.position.needsUpdate = true; o.material.opacity = Math.min(1, (q.life - q.t) / .8); } });
+  play('pop', { gain: .6 });
+}
+function mpxParts(dt) { for (let i = MPX.parts.length - 1; i >= 0; i--) { const q = MPX.parts[i]; q.t += dt; try { if (q.upd) q.upd(dt, q); } catch (e) {} if (q.t >= q.life) { scene.remove(q.o); q.o.traverse(x => { if (x.geometry) x.geometry.dispose(); if (x.material) x.material.dispose(); }); MPX.parts.splice(i, 1); } } }
+// ---------- 👑 süsler: kendinde ve arkadaşlarında aynı ----------
+const MPXG = {}; const mpxC = (k, mk) => MPXG[k] || (MPXG[k] = mk());   // ortak geometri / malzeme (silinmez, tekrar kullanılır)
+function mpxMk(k, sign) {
+  if (!MPX_DK.has(k)) return null;
+  const g = new THREE.Group(), add = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
+  const ST = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .45 }, o || {})), BA = (c, op) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  switch (k) {
+    case 'ice': add(mpxC('gIce', () => new THREE.BoxGeometry(1, 2.1, 1)), mpxC('mIce', () => ST(0xa6ecff, { transparent: true, opacity: .42, roughness: .06, metalness: .1, emissive: 0x0c3a4a, depthWrite: false })), 0, 1.05, 0).renderOrder = 3; break;
+    case 'cage': { const bar = mpxC('gBar', () => new THREE.CylinderGeometry(.025, .025, 2.2, 6)), ring = mpxC('gRing', () => new THREE.TorusGeometry(.6, .035, 6, 28)), m = mpxC('mBar', () => ST(0x90a4ae, { metalness: .85, roughness: .3 }));
+      for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; add(bar, m, Math.cos(a) * .6, 1.1, Math.sin(a) * .6); } for (const y of [.02, 2.2]) add(ring, m, 0, y, 0).rotation.x = Math.PI / 2; break; }
+    case 'balloon': { const sp = mpxC('gBal', () => new THREE.SphereGeometry(.22, 14, 10)), str = mpxC('mStr', () => new THREE.LineBasicMaterial({ color: 0xeeeeee }));
+      [[0xe53935, 0, .4, 0], [0xfdd835, -.24, .22, .06], [0x1e88e5, .22, .25, -.06]].forEach(([c, x, y, z]) => { add(sp, mpxC('mBal' + c, () => ST(c, { roughness: .25, emissive: c, emissiveIntensity: .15 })), x, y, z).scale.set(1, 1.18, 1); g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, y - .26, z), new THREE.Vector3(0, -.55, 0)]), str)); }); break; }
+    case 'chute': { add(mpxC('gChute', () => new THREE.SphereGeometry(1.25, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2.4)), mpxC('mChute', () => ST(0xff7043, { side: THREE.DoubleSide, roughness: .7 })), 0, -.5, 0);
+      const str = mpxC('mStr', () => new THREE.LineBasicMaterial({ color: 0xeeeeee })); for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + .78; g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(Math.cos(a) * 1.05, 0, Math.sin(a) * 1.05), new THREE.Vector3(0, -1.25, 0)]), str)); } break; }
+    case 'spot': add(mpxC('gCone', () => new THREE.ConeGeometry(1, 9, 24, 1, true).translate(0, 4.5, 0)), mpxC('mCone', () => BA(0xfff3b0, .14))); add(mpxC('gDisc', () => new THREE.CircleGeometry(1, 32)), mpxC('mDisc', () => BA(0xfff7cc, .35)), 0, .04, 0).rotation.x = -Math.PI / 2; break;
+    case 'cloud': { const sp = mpxC('gCld', () => new THREE.SphereGeometry(.42, 12, 8)), m = mpxC('mCld', () => ST(0x90a4ae, { roughness: 1 })); [[0, 0, 0, 1.1], [-.45, -.05, .1, .85], [.45, -.04, -.05, .9], [.15, .18, .2, .8], [-.2, .12, -.25, .75]].forEach(([x, y, z, s]) => add(sp, m, x, y, z).scale.setScalar(s));
+      const n = 26, pa = new Float32Array(n * 6); for (let i = 0; i < n; i++) { const x = (Math.random() - .5) * 1.1, z = (Math.random() - .5) * 1.1, y = -Math.random() * 2; pa.set([x, y, z, x, y - .22, z], i * 6); }
+      const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.BufferAttribute(pa, 3)); const rain = new THREE.LineSegments(rg, mpxC('mRain', () => new THREE.LineBasicMaterial({ color: 0x90caf9, transparent: true, opacity: .8 }))); rain.frustumCulled = false; g.add(rain); g.userData.rain = rain; break; }
+    case 'bubble': add(mpxC('gSph', () => new THREE.SphereGeometry(1, 24, 16)), mpxC('mBub', () => ST(0x9be7ff, { transparent: true, opacity: .2, roughness: .05, emissive: 0x0a2a3a, depthWrite: false }))).renderOrder = 3; break;
+    case 'ghost': add(mpxC('gSph', () => new THREE.SphereGeometry(1, 24, 16)), mpxC('mGho', () => BA(0xe0f7ff, .16))); break;
+    case 'vr': { add(mpxC('gGog', () => new THREE.BoxGeometry(.26, .1, .1)), mpxC('mGog', () => ST(0x1b1f2a, { roughness: .35 }))); add(mpxC('gLens', () => new THREE.PlaneGeometry(.22, .065)), mpxC('mLens', () => new THREE.MeshBasicMaterial({ color: 0x4fc3f7 })), 0, 0, .051); break; }
+    case 'sign': { const sp = mpTxtSprite('👑🪧 ' + sign, 'rgba(230,145,20,.95)'); sp.userData.txt = sign; return sp; }
+    default: { const A = admAccInit(), it = A.items[k]; if (!it) return null; const ud = it.g.userData; it.g.userData = {}; const c = it.g.clone(); it.g.userData = ud;   // admin panelindeki taç, kanat… (aynı geometri)
+      c.visible = true; c.userData.at = it.at; c.userData.y = it.y || 0; if (k === 'wings') { c.rotation.x = -.15; for (const p of c.children) p.rotation.y = (p.position.x < 0 ? -1 : 1) * .35; } if (k === 'cape' && c.children[0]) c.children[0].rotation.x = .25; return c; }
+  }
+  return g;
+}
+function mpxFree(k, o) { if (k === 'sign' && o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } else if (k === 'cloud' && o.userData.rain) o.userData.rain.geometry.dispose(); else if (k === 'balloon' || k === 'chute') o.traverse(x => { if (x.isLine) x.geometry.dispose(); }); }
+function mpxGoggles(av, o, hs) {   // VR gözlüğü başın önünde, başla birlikte döner
+  let hb = null, rest = null; const off = MPXV[1];
+  if (av.vw && av.vb && av.vb.head && av.vm && av.vm.rest.head) { hb = av.vb.head; rest = av.vm.rest.head.rel; off.set(0, .07, .1); }
+  else if (!av.snap || (av.jn && av.jn.length === 12)) { hb = av.snap ? av.jn[3] : av.rig.look; off.set(0, .29, .15); }
+  if (!hb) { o.visible = false; return; } o.visible = true; const H = av.holder;
+  const q = H.getWorldQuaternion(MPXQ[0]).invert().multiply(hb.getWorldQuaternion(MPXQ[1])); if (rest) q.multiply(MPXQ[2].copy(rest).invert());
+  hb.getWorldPosition(o.position); H.worldToLocal(o.position); o.position.add(off.multiplyScalar(hs).applyQuaternion(q)); o.quaternion.copy(q); o.scale.setScalar(hs);
+}
+function mpxPlace(k, o, A, dt, av, hs) {
+  const h = Math.max(.4, A.head.y), t = elapsed;
+  switch (k) {
+    case 'ice': o.scale.set(Math.max(.6, h * .5), (h + .12) / 2.1, Math.max(.6, h * .5)); break;
+    case 'cage': o.scale.set(Math.max(.7, h * .45), (h + .3) / 2.2, Math.max(.7, h * .45)); break;
+    case 'balloon': o.position.set(.32, h + .45, 0); o.rotation.z = Math.sin(t * 2) * .08; break;
+    case 'chute': o.position.set(0, h + 1.25, 0); o.rotation.z = Math.sin(t * 1.3) * .07; break;
+    case 'spot': o.scale.set(Math.max(.8, h * .55), Math.max(1, h * .55), Math.max(.8, h * .55)); break;
+    case 'cloud': { o.position.set(0, h + 1.05, 0); const R = o.userData.rain; if (R) { const pa = R.geometry.attributes.position; for (let i = 0; i < pa.count; i += 2) { let y = pa.getY(i) - dt * 7; if (y < -h - .9) y = -.1; pa.setY(i, y); pa.setY(i + 1, y - .22); } pa.needsUpdate = true; } break; }
+    case 'bubble': o.position.set(0, h * .5, 0); o.scale.setScalar(h * .62 + .1); break;
+    case 'ghost': o.position.set(0, h * .5, 0); o.scale.set(h * .4 + .1, h * .58, h * .4 + .1); break;
+    case 'sign': o.position.set(0, h + .7, 0); break;
+    case 'vr': if (av) mpxGoggles(av, o, hs || 1); break;
+    default: if (o.userData.at === 'head') o.position.set(A.head.x, A.head.y + o.userData.y + (hs > 1.5 ? .25 : 0), A.head.z); else if (o.userData.at === 'back') o.position.copy(A.back); if (k === 'halo') o.rotation.y += dt * 1.5;
+  }
+}
+function mpxDecoSync(store, parent, keys2, sign, A, dt, av, hs) {
+  const want = new Set(keys2.filter(k => MPX_DK.has(k) && k !== 'sign')); if (sign) want.add('sign');
+  for (const k in store) if (!want.has(k) || (k === 'sign' && store[k].userData.txt !== sign)) { parent.remove(store[k]); mpxFree(k, store[k]); delete store[k]; }
+  for (const k of want) { let o = store[k]; if (!o) { o = mpxMk(k, sign); if (!o) continue; store[k] = o; parent.add(o); } mpxPlace(k, o, A, dt, av, hs); }
+}
+function mpxLocalDeco(dt) {   // kendi süslerin (taç vb. admin panelinin kendi çizimiyle zaten görünür)
+  const ks = ['ice', 'balloon', 'chute', 'spot', 'cloud', 'cage'].filter(mpxHas), sg = mpxHas('sign') ? MPX.sign : '';
+  if (!ks.length && !sg) { if (Object.keys(MPX.deco).length) mpxDecoSync(MPX.deco, charHolder, [], '', MPX_A0, dt, null, 1); return; }
+  admAnchors(); const A = MPX.la || (MPX.la = { head: new THREE.Vector3(), back: new THREE.Vector3() }); A.head.copy(ADM_V[0]); A.back.copy(ADM_V[1]);
+  mpxDecoSync(MPX.deco, charHolder, ks, sg, A, dt, null, 1);
+}
+function mpxFlags() {   // durum mesajına: herkese görünen süsler
+  const o = ['ice', 'balloon', 'chute', 'spot', 'cloud', 'cage'].filter(mpxHas);
+  if (ADM.bubbleShield) o.push('bubble'); if (ADM.ghost) o.push('ghost');
+  for (const k of ['crown', 'wings', 'halo', 'cape', 'tophat', 'partyHat', 'bighead', 'smallhead']) if (ADM[k]) o.push(k);
+  return o.join(',');
+}
+function mpxAnchorsRemote(av) {
+  const H = av.holder, A = av.xa || (av.xa = { head: new THREE.Vector3(), back: new THREE.Vector3() });
+  let hb = null, hUp = .42, bb = null, bUp = .42, bZ = -.1;
+  if (av.vw && av.vb) { hb = av.vb.head; hUp = .27; bb = av.vb.upperChest || av.vb.chest; bUp = .02; bZ = -.13; }
+  else if (av.snap) { if (av.jn && av.jn.length === 12) { hb = av.jn[3]; bb = av.jn[1]; } }
+  else { hb = av.rig.look; bb = av.rig.torso; }
+  if (hb) { hb.getWorldPosition(A.head); H.worldToLocal(A.head); A.head.y += hUp; }
+  else { if (av.snap && av.topOf !== av.snap) { H.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(av.snap); av.topY = isFinite(b.max.y) ? (b.max.y - H.position.y) / (H.scale.y || 1) : 1; av.topOf = av.snap; } A.head.set(0, av.topY || 1.8, 0); }
+  if (bb) { bb.getWorldPosition(A.back); H.worldToLocal(A.back); A.back.y += bUp; A.back.z += bZ; } else A.back.set(0, A.head.y * .7, -.15);
+  return A;
+}
+function mpxRemote(p, av, st, dt) {   // arkadaşın süsleri, koca kafası, VR gözlüğü
+  const ks = st.x ? String(st.x).split(',').slice(0, 20) : []; if (st.vr) ks.push('vr');
+  const sg = st.sg ? String(st.sg).slice(0, 24) : '', hs = ks.includes('bighead') ? 2.1 : ks.includes('smallhead') ? .5 : 1;
+  const hb = (av.vw && av.vb && av.vb.head) || (av.snap ? (av.jn && av.jn.length === 12 ? av.jn[3] : null) : av.rig.look);
+  if (hb && Math.abs(hb.scale.x - hs) > .01) hb.scale.setScalar(hs);
+  if (!ks.length && !sg && !av.xd) return;
+  av.holder.updateMatrixWorld(true);
+  mpxDecoSync(av.xd || (av.xd = {}), av.holder, ks, sg, ks.length || sg ? mpxAnchorsRemote(av) : MPX_A0, dt, av, hs);
+}
+// ---------- 🥽 VR: el yönü ve parmaklar (anime modeller) ----------
+function mpxHandsOut(m) {
+  const M = VRMA; if (!(ANIME.on && !HERO.on && ANIME.kind !== 'custom' && M && M.state === 'ready' && M.wrap && M.wrap.visible && M.bones.leftHand && M.bones.rightHand)) return;
+  const fg = []; let big = 0;
+  for (const f of M.fingers) { const q = MPXQ[0].copy(f.local).invert().multiply(f.b.quaternion), v = r2(wrapAng(2 * Math.atan2(q.x * f.ax.x + q.y * f.ax.y + q.z * f.ax.z, q.w))); fg.push(v); big = Math.max(big, Math.abs(v)); }
+  if (!m.vr && big < .08) return;   // VR kapalı ve eller boşta: gönderme
+  const Wi = M.wrap.getWorldQuaternion(MPXQ[1]).invert(), hq = [];
+  for (const S of ['left', 'right']) { const q = MPXQ[2].copy(Wi).multiply(M.bones[S + 'Hand'].getWorldQuaternion(MPXQ[3])); if (q.w < 0) { q.x = -q.x; q.y = -q.y; q.z = -q.z; q.w = -q.w; } hq.push(r3(q.x), r3(q.y), r3(q.z), r3(q.w)); }
+  m.hq = hq; m.fg = fg;
+}
+function mpxHandsIn(av, Bn, R, M, Rw) {   // mpVrmPose içinden, kısıtlardan önce
+  const k = av.k || .3;
+  if (Array.isArray(av.hq) && av.hq.length === 8) {
+    const C = av.hqC || (av.hqC = [null, null]);
+    ['left', 'right'].forEach((S, i) => { const b = Bn[S + 'Hand']; if (!b || !b.parent) return; const t = MPXQ[0].set(+av.hq[i * 4] || 0, +av.hq[i * 4 + 1] || 0, +av.hq[i * 4 + 2] || 0, +av.hq[i * 4 + 3] || 1).normalize();
+      const c = C[i] || (C[i] = t.clone()); c.slerp(t, k); vrmSetWorld(b, MPXQ[1].copy(Rw).multiply(c)); });
+    av.hqOn = true;
+  } else if (av.hqOn) { av.hqOn = false; av.hqC = null; for (const S of ['left', 'right']) { const b = Bn[S + 'Hand'], r = R[S + 'Hand']; if (b && r) b.quaternion.copy(r.local); } }
+  const F = M.fingers || [];
+  if (Array.isArray(av.fg) && av.fg.length === F.length && F.length) {
+    const C = av.fgC && av.fgC.length === F.length ? av.fgC : (av.fgC = av.fg.map(v => +v || 0));
+    for (let i = 0; i < F.length; i++) { const f = F[i], b = Bn[f.b.userData.vk]; if (!b) continue; C[i] += ((+av.fg[i] || 0) - C[i]) * k; b.quaternion.copy(f.local).multiply(MPXQ[2].setFromAxisAngle(f.ax, C[i])); }
+    av.fgOn = true;
+  } else if (av.fgOn) { av.fgOn = false; av.fgC = null; for (const f of F) { const b = Bn[f.b.userData.vk]; if (b) b.quaternion.copy(f.local); } }
+}
+// ---------- arayüz ----------
+document.head.insertAdjacentHTML('beforeend', `<style>
+#mpxAsk{position:fixed;left:50%;top:calc(150px + env(safe-area-inset-top));transform:translateX(-50%);z-index:63;display:none;background:rgba(14,20,34,.95);border:1px solid #ffd166;border-radius:14px;padding:10px 14px;color:#fff;font:14px system-ui,sans-serif;text-align:center;min-width:240px;max-width:92vw}
+#mpxAsk.on{display:block}#mpxAsk .q{font-weight:700;margin-bottom:6px;word-break:break-word}#mpxAsk button{margin:4px;padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;font:inherit;font-size:15px;cursor:pointer}
+#mpxBlind{position:fixed;inset:0;z-index:56;background:#000;display:none;align-items:center;justify-content:center;font-size:80px;pointer-events:none}#mpxBlind.on{display:flex}
+#mpxFog{position:fixed;inset:0;z-index:55;pointer-events:none;opacity:0;transition:opacity 1.2s;background:radial-gradient(circle at 50% 50%,rgba(230,236,240,.35) 0%,rgba(225,232,238,.9) 38%,rgba(220,228,235,.98) 70%)}#mpxFog.on{opacity:1}
+#mpxArrow{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top));transform:translateX(-50%);z-index:44;display:none;text-align:center;pointer-events:none;color:#ffd166;font:700 13px system-ui,sans-serif;text-shadow:0 2px 6px #000}#mpxArrow i{display:block;font-style:normal;font-size:44px;line-height:1}
+</style>`);
+document.body.insertAdjacentHTML('beforeend', '<div id="mpxAsk"></div><div id="mpxBlind">🙈</div><div id="mpxFog"></div><div id="mpxArrow"><i>⬆️</i><span></span></div>');
+for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'wheel']) $('mpxAsk').addEventListener(ev, e => e.stopPropagation(), { passive: true });
+$('mpAdm').addEventListener('click', e => { const b = e.target.closest('[data-mx]'); if (!b) return; e.stopPropagation(); play('ui'); try { mpxAdmin(b.dataset.mx, MP.adSel); } catch (x) { console.warn('mpx', x); } setTimeout(mpAdmUI, 60); });
+$('mpAdm').addEventListener('change', e => { if (e.target.id === 'mpxChar') MP.mxChar = e.target.value; });
+
 /* ---------- 🏷️ herkesin etiketi: bir kişiye sol tıkla / dokun → adı, yaşı, işi (köy, şehir, Ankara; okulda da) ---------- */
 const NPCL = { list: [] };
 function npcLblText(n) {
@@ -27597,7 +28166,7 @@ renderer.setAnimationLoop(() => {
   DT_LAST = dt;
   FRAME++; updateDynRes(); updateCull(dt); updateRTree();
   if (photoMode) updatePhoto(dt);        // foto modu: oyun donuk, sadece kamera hareket eder
-  else if (!paused) { try { fbPre(); tmpRotUndo(); } catch (e) { sftErr(e); } vehUpdate(dt); update(dt); if (ADM.fast) update(dt); }          // menü açıkken oyun donar · admin: hızlı zaman
+  else if (!paused) { try { fbPre(); tmpRotUndo(); } catch (e) { sftErr(e); } try { try { mpxPre(); } catch (e) {} vehUpdate(dt); update(dt); if (ADM.fast) update(dt); } finally { try { mpxRestore(); } catch (e) {} } }          // menü açıkken oyun donar · admin: hızlı zaman
   admUpdate(paused || photoMode ? 0 : dt);
   if (ANIME.on || ANIME.vis) animeVisual();
   if (VRMA.state === 'ready' && VRMA.wrap.visible) { player.updateMatrixWorld(true); vrmUpdate(paused || photoMode ? 0 : dt); } vrmItemHold();   // anime kız modeli (menüde de duruşu doğru kalır)
