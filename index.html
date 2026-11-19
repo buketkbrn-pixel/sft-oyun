@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.13</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.13-b</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -28455,7 +28455,7 @@ setInterval(() => { try { achxTick(); } catch (e) {} }, 1000);
    Hamam böceği ve arkadaşlar zarar görmez: hamam böceği rastgele bir yöne fırlar ve birkaç saniye hızlanır.
    Patlamanın yerinde mantar bulutu yükselir, etrafa sis yayılır, sonra her şey yavaşça eski haline döner. */
 const RC = { on: false, t: 0, me: false, p: null, a: '', S: 1, plane: null, bombs: [], cloud: null, ring: null, phone: null, audio: null, cd: 0, boost: 0, fogK: 0, bw: false, rel: false, here: false, self: 0, boomT: 0 };
-const RC_T = { bw0: .6, bw1: 2.3, phone: 5.6, plane: 5.0, drop: 6.4, end: 46 };
+const RC_T = { bw0: .6, bw1: 9.7, phone: 5.6, plane: 5.0, drop: 6.4, end: 46 };
 const RCV = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], RCG = {};
 function rcSrc() { return window.SFT_KURBAN || 'audio/kurban.mp3'; }
 function roachCall() {
@@ -28568,7 +28568,7 @@ function rcCloudTick(dt) {
 function rcTick(dt) {
   const ro = HERO.on && HERO.kind === 'roach'; if (RC.ro !== ro) { RC.ro = ro; document.body.classList.toggle('roachOn', ro); }
   if (!RC.on) return; const now = performance.now(), gdt = dt; dt = Math.min(.1, Math.max(0, (now - (RC.last || now)) / 1000)); RC.last = now; RC.t += dt; const t = RC.t, S = RC.S;   // gerçek saat: sesle aynı anda
-  const bw = t >= RC_T.bw0 && t < RC_T.bw1; if (RC.bw !== bw) { RC.bw = bw; document.body.classList.toggle('rcBW', bw); }   // "kurban olduğum…"
+  const au = RC.audio, bwEnd = au && isFinite(au.duration) && au.duration > 1 ? au.duration : RC_T.bw1, bw = t >= RC_T.bw0 && t < bwEnd && !(au && au.ended); if (RC.bw !== bw) { RC.bw = bw; document.body.classList.toggle('rcBW', bw); }   // "kurban olduğum…" ile başlar, ses bitene kadar siyah-beyaz
   if (RC.me && HERO.on && HERO.rig && t < RC_T.phone) { const R = HERO.rig, k = Math.min(1, t * 4); R.armR.sh.rotation.set(-2.35 * k, 0, .4 * k); R.armR.el.rotation.set(-1.85 * k, 0, 0); R.head.rotation.z = .22 * k; }
   if (RC.phone && t >= RC_T.phone) { if (RC.phone.parent) RC.phone.parent.remove(RC.phone); RC.phone = null; }
   const dk = t < RC_T.plane ? 0 : t < RC_T.plane + 3 ? (t - RC_T.plane) / 3 : t < 36 ? 1 : Math.max(0, 1 - (t - 36) / 7);   // hava kararır
