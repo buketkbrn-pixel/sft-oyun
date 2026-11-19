@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.12</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.13</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -9727,7 +9727,7 @@ function showMsg(text, dur = 1.6) {
   clearTimeout(showMsg.t); showMsg.t = setTimeout(() => { el.style.display = 'none'; }, dur * 1000);
 }
 function damagePlayer(dmg, dir) {
-  if (dead || ADM.god || ADM.bubbleShield) return;   // admin: ölümsüzlük / baloncuk kalkanı
+  if (dead || ADM.god || ADM.bubbleShield || window.__rcSafe > elapsed) return;   // 📞 hava desteği sırasında zarar yok   // admin: ölümsüzlük / baloncuk kalkanı
   if (HR.on && HR.shield) { hrShieldHit(); return; }   // 🛡️ el kalkanı
   if (ADM.ch_reflect) { dmg *= .5; const Q = player.position; nvBlast(Q.x, Q.y, Q.z, 3.5, 30 + dmg * 4, 0, 7); }
   hp = Math.max(0, hp - dmg); lastHurt = elapsed; hurtFlash = 1; shake = Math.max(shake, .3); play('hit', { oof: true }); play('monster', { gain: .5 });
@@ -13194,7 +13194,7 @@ function setHero(on, quiet, kind) {
   } else if (HERO.prevEq) equip(HERO.prevEq);
   heroVisual(true);
   touchUIState = '';
-  if (!quiet) showMsg(on ? (HERO.kind === 'roach' ? '🪳 Hamam böceği! A: zıpla · B: saldır · havada A basılı: süzül' : '🐾 Pati! A: zıpla · B: saldır') : '🕴️ Çöp adam', 1.8);
+  if (!quiet) showMsg(on ? (HERO.kind === 'roach' ? '🪳 Hamam böceği! A: zıpla · B: saldır · havada A basılı: süzül · T / 📞: ara' : '🐾 Pati! A: zıpla · B: saldır') : '🕴️ Çöp adam', 1.8);
   SETSYNC.forEach(f => f());
 }
 function heroVisual(force) {
@@ -13220,6 +13220,7 @@ function heroB() {
 }
 function heroSpinStart() { HERO.spin = { t: 0, hit: new Set() }; HERO.cool = .48; play('swing'); }
 function heroKey(code) {   // Pati modunda tuşlar: Boşluk = A, E = B; çöp adama ait yetenek tuşları kapalı
+  if (code === 'KeyT' && HERO.kind === 'roach' && !inHome) { roachCall(); return true; }   // 📞 ara
   if (code === 'Space') { heroA(); return true; }
   if (code === 'KeyE') { heroB(); return true; }
   return ['KeyQ', 'KeyB', 'KeyG', 'KeyC', 'KeyL', 'KeyY', 'KeyZ', 'KeyX', 'KeyI', 'KeyK', 'KeyO', 'KeyU', 'Equal', 'NumpadAdd', 'BracketRight', 'Minus', 'NumpadSubtract', 'Slash', 'BracketLeft'].includes(code) || (code === 'KeyT' && !inHome);
@@ -25859,6 +25860,7 @@ function mpOnMsg(m) {
       MP.allowTp = true; try { teleportTo('hub', 1.5 * MP.me.slot - 3, 9.5, Math.PI, adT('🏡 Köy meydanı')); } finally { MP.allowTp = false; } mpUI(); break;
     case 's': if (pl) { pl.st = m; pl.stT = elapsed; pl.talk = !!m.tk; } break;
     case 'ch': mpChatShow(f, m.text, !!m.to); break;
+    case 'fo': case 'fa': case 'fc': case 'fe': case 'fz': try { mpxFileMsg(m); } catch (e) { console.warn('mpd', e); } break;
     case 'note': mpNote(m.text, 3); break;
     case 'em': mpEmoteShow(f, m.id); if (m.to === MP.me.id && m.ask) mpEmoteAsk(f, m.id); break;
     case 'emr': mpEmoteResult(f, m); break;
@@ -26009,6 +26011,7 @@ function mpChatShow(f, text, priv, to) {
   const log = $('mpChatLog'), d = document.createElement('div'), p = MP.players[f]; d.className = 'mpcl' + (priv ? ' pv' : '');
   const col = '#' + new THREE.Color(p ? p.color : 0xffffff).getHexString(); d.innerHTML = `<b style="color:${col}">${priv ? '🔒 ' : ''}${mpEsc(p ? p.name : '?')}${priv && to ? ' → ' + mpEsc(mpName(to)) : ''}:</b> ${mpEsc(text)}`;
   log.appendChild(d); while (log.children.length > 60) log.firstChild.remove(); log.scrollTop = log.scrollHeight;
+  if (priv) try { mpdAddMsg(f === MP.me.id ? to : f, f, text); } catch (e) {}
   if (f !== MP.me.id) { $('mpBtnChat').classList.add('new'); if (!priv || true) mpBubble(f, (priv ? '🔒 ' : '') + text); play('pop', { gain: .3 }); if (!$('mpChat').classList.contains('on')) mpNote(`💬 ${p ? p.name : '?'}: ${text.slice(0, 40)}`, 3); }
 }
 const mpEsc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -26581,6 +26584,7 @@ function mpFx(m) {
   if (m.k === 'ping') { const g = new THREE.Group(), c = new THREE.Color(col); const beam = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, 40, 10, 1, true), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: .45, depthWrite: false, side: THREE.DoubleSide }));
     beam.position.y = 20; g.add(beam); const ring = new THREE.Mesh(new THREE.RingGeometry(.7, 1.1, 32), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: .8, side: THREE.DoubleSide, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = .06; g.add(ring);
     const lab = mpTxtSprite('📍 ' + nm, `#${c.getHexString()}`); lab.position.y = 3; lab.scale.multiplyScalar(1.2); g.add(lab); g.position.set(m.p[0], m.p[1], m.p[2]); g.userData.a = curKey; scene.add(g); MPF.pings.push({ g, t: 14, nm, ring }); play('ding', { gain: .5 }); mpNote(`📍 ${nm} ${adT('bir yer işaretledi')}`, 2); return; }
+  if (m.k === 'call' && Array.isArray(m.p)) { rcStart(m, false); return; }
   if (m.k === 'emo' && m.p) { mpxEmoRain(new THREE.Vector3(+m.p[0] || 0, +m.p[1] || 0, +m.p[2] || 0), String(m.e || '').slice(0, 12)); return; }
   if (m.k === 'bolt' && m.p) { mpxBolt(new THREE.Vector3(+m.p[0] || 0, +m.p[1] || 0, +m.p[2] || 0), m.seed); mpNote(`⚡ ${nm}`, 1.4); return; }
   if (m.k === 'conf' && m.p) { mpxConfetti(new THREE.Vector3(+m.p[0] || 0, +m.p[1] || 0, +m.p[2] || 0)); mpNote(`🎉 ${nm}`, 1.4); return; }
@@ -27915,6 +27919,7 @@ function mpxReset() {   // odadan çıkınca her şey eski haline
   for (const q of MPX.parts) scene.remove(q.o); MPX.parts = [];
   for (const id of ['mpxBlind', 'mpxFog', 'mpxAsk']) { const e = $(id); if (e) e.classList.remove('on'); } MPX.ob = MPX.of = false; const ar = $('mpxArrow'); if (ar) ar.style.display = 'none';
   MP.vrB = {}; MP.vrAll = false;
+  try { mpdOpen(false); $('mpdVid').classList.remove('on'); } catch (e) {}
   MPX.run = null; if (MPX.gift) { scene.remove(MPX.gift.g); MPX.gift = null; } document.body.classList.remove('mpxHue'); MPX.hueOn = false; const cd = $('mpxCard'); if (cd) cd.classList.remove('on'); try { mpx2GameClear(); mpx2Pop(null); } catch (e) {}
 }
 // ---------- 🎆 herkese görünen anlık efektler (mpFx'ten) ----------
@@ -28002,7 +28007,7 @@ function mpxLocalDeco(dt) {   // kendi süslerin (taç vb. admin panelinin kendi
 }
 function mpxFlags() {   // durum mesajına: herkese görünen süsler
   const o = mpxVisKeys();
-  if (ADM.bubbleShield) o.push('bubble'); if (ADM.ghost) o.push('ghost');
+  if (ADM.bubbleShield) o.push('bubble'); if (ADM.ghost) o.push('ghost'); try { if (RC.on && RC.me && RC.t < RC_T.phone) o.push('phone'); } catch (e) {}
   for (const k of ['crown', 'wings', 'halo', 'cape', 'tophat', 'partyHat', 'bighead', 'smallhead']) if (ADM[k]) o.push(k);
   return o.join(',');
 }
@@ -28070,7 +28075,7 @@ $('mpAdm').addEventListener('change', e => { if (e.target.id === 'mpxChar') MP.m
 Object.assign(MPX_DUR, { jet: 30, bounce: 20, gflip: 6, speed: 20, ufo: 5, tornado: 5, hop: 15, tread: 8, repel: 5, orbit: 8, horn: 60, shades: 60, wizard: 60, aura: 30, fireA: 20, snowc: 20, bulb: 10, notes: 15, zzz: 12, shield2: 20, bird: 60, lantern: 60, hue: 10, oldtv: 15, wobble: 10, disco1: 20, party: 12, runspd: 40 });
 Object.assign(MPX_ADM, { jet: 'jetBoots', bounce: 'bounce', gflip: 'gravFlip', speed: 'speed', shield2: 'god', oldtv: 'oldTV', wobble: 'drunk', disco1: 'disco', party: 'disco', runspd: 'speed' });
 const MPX2_VIS = { ufo: 'ufo', tornado: 'tornado', horn: 'horn', shades: 'shades', wizard: 'wizard', aura: 'aura', fireA: 'fireA', snowc: 'snowc', bulb: 'bulb', notes: 'notes', zzz: 'zzz', shield2: 'orbitS', bird: 'bird', lantern: 'lantern' };   // süre anahtarı → herkese görünen süs
-for (const k of Object.values(MPX2_VIS)) MPX_DK.add(k);
+for (const k of Object.values(MPX2_VIS)) MPX_DK.add(k); MPX_DK.add('phone');
 const MPX2_LIST = [   // seçili oyuncuya (44)
   ['jet', '🔥', 'Jet botlar (30 sn)'], ['bounce', '🏀', 'Lastik top gibi seksin'], ['gflip', '🔃', 'Ters yerçekimi (6 sn)'], ['speed', '⚡', 'Süper hız (20 sn)'],
   ['ufo', '🛸', 'UFO kaçırsın'], ['tornado', '🌪️', 'Hortum (zararsız)'], ['hop', '🐇', 'Tavşan gibi zıplasın'], ['tread', '🏃', 'Durmadan koşsun (8 sn)'],
@@ -28225,6 +28230,7 @@ function mpx2Mk(k) {
     case 'orbitS': { const sh = mpxC('gShd', () => new THREE.CylinderGeometry(.22, .22, .04, 18).rotateZ(Math.PI / 2)), m = mpxC('mShd', () => ST(0x42a5f5, { metalness: .6, roughness: .25, emissive: 0x0d47a1, emissiveIntensity: .4 })); g.userData.sh = [0, 1, 2].map(() => add(sh, m)); break; }
     case 'bird': { const m = mpxC('mBird', () => ST(0x29b6f6, { roughness: .5 })); add(mpxC('gBirdB', () => new THREE.SphereGeometry(.09, 10, 8).scale(1, .85, 1.35)), m); add(mpxC('gBirdH', () => new THREE.SphereGeometry(.06, 10, 8)), m, 0, .07, .09); add(mpxC('gBeak', () => new THREE.ConeGeometry(.02, .06, 6).rotateX(Math.PI / 2)), mpxC('mBeak', () => ST(0xffa000)), 0, .065, .16);
       const wg = mpxC('gWing', () => new THREE.BoxGeometry(.12, .015, .1)); g.userData.w = [add(wg, m, -.09, .02, 0), add(wg, m, .09, .02, 0)]; break; }
+    case 'phone': { add(mpxC('gPh', () => new THREE.BoxGeometry(.06, .12, .015)), mpxC('mPh', () => ST(0x15171c, { metalness: .4, roughness: .35 }))); add(mpxC('gPhS', () => new THREE.PlaneGeometry(.05, .1)), mpxC('mPhS', () => new THREE.MeshBasicMaterial({ color: 0x64b5f6 })), 0, 0, .009); break; }
     case 'lantern': { add(mpxC('gLan', () => new THREE.BoxGeometry(.14, .2, .14)), mpxC('mLan', () => ST(0xff8f00, { emissive: 0xff6f00, emissiveIntensity: 1.3, transparent: true, opacity: .9 }))); add(mpxC('gLanT', () => new THREE.ConeGeometry(.12, .08, 4).rotateY(Math.PI / 4)), mpxC('mLanT', () => ST(0x3e2723)), 0, .14, 0); add(mpxC('gGlow', () => new THREE.SphereGeometry(.3, 12, 8)), mpxC('mLanG', () => BA(0xffb74d, .25))); break; }
     default: return null;
   }
@@ -28249,6 +28255,7 @@ function mpx2Place(k, o, A, dt, av, hs) {
     case 'notes': case 'zzz': for (const s of o.userData.fl || []) { const u = (t * .45 + s.userData.ph) % 1; s.position.set((k === 'zzz' ? .15 : Math.sin(u * 9) * .25) + u * .25, h + .1 + u * .9, 0); s.material.opacity = Math.sin(u * Math.PI); } return true;
     case 'orbitS': (o.userData.sh || []).forEach((m, i) => { const a = t * 2.2 + i * 2.094; m.position.set(Math.cos(a) * .75, h * .55, Math.sin(a) * .75); m.rotation.y = -a; }); return true;
     case 'bird': o.position.set(A.head.x + .22 * hs, A.head.y - .3 * hs, A.head.z); const fl = Math.sin(t * 25) * (Math.sin(t * .7) > .6 ? .7 : .08); if (o.userData.w) { o.userData.w[0].rotation.z = fl; o.userData.w[1].rotation.z = -fl; } return true;
+    case 'phone': o.position.set(A.head.x + .12 * hs, A.head.y - .12 * hs, A.head.z + .03); o.rotation.y = .4; return true;
     case 'lantern': o.position.set(.34, h * .5, .18); o.rotation.z = Math.sin(t * 2.2) * .12; return true;
   }
   return false;
@@ -28442,6 +28449,318 @@ document.head.insertAdjacentHTML('beforeend', `<style>#achv .axg{display:grid;gr
 #achv .ax.on{opacity:1;background:rgba(255,211,107,.13);border:1px solid rgba(255,211,107,.35)}#achv .ax i{font-style:normal;font-size:22px}#achv .ax b{font-size:12px;color:#ffe08a}#achv .ax small{font-size:10.5px;opacity:.75}</style>`);
 setInterval(() => { try { achxTick(); } catch (e) {} }, 1000);
 
+/* ---------- 📞 HAMAM BÖCEĞİ "ARA" (T tuşu / 📞 düğmesi, sadece hamam böceğiyken) ----------
+   Telefonu kulağına götürür, ses odadaki herkese gelir; "kurban olduğum…" derken ekran siyah-beyaz olur.
+   Hava kararır, bir uçak geçer: yakındaki her canlıya bir bomba, hamam böceğine altı bomba düşer. Bombalar tek atar.
+   Hamam böceği ve arkadaşlar zarar görmez: hamam böceği rastgele bir yöne fırlar ve birkaç saniye hızlanır.
+   Patlamanın yerinde mantar bulutu yükselir, etrafa sis yayılır, sonra her şey yavaşça eski haline döner. */
+const RC = { on: false, t: 0, me: false, p: null, a: '', S: 1, plane: null, bombs: [], cloud: null, ring: null, phone: null, audio: null, cd: 0, boost: 0, fogK: 0, bw: false, rel: false, here: false, self: 0, boomT: 0 };
+const RC_T = { bw0: .6, bw1: 2.3, phone: 5.6, plane: 5.0, drop: 6.4, end: 46 };
+const RCV = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], RCG = {};
+function rcSrc() { return window.SFT_KURBAN || 'audio/kurban.mp3'; }
+function roachCall() {
+  if (!HERO.on || HERO.kind !== 'roach') { showMsg('🪳 ' + adT('Ara sadece hamam böceğinde'), 1.6); return; }
+  if (RC.on) return; if (elapsed < RC.cd) { showMsg(`📞 ${adT('Hat meşgul')} — ${Math.ceil(RC.cd - elapsed)} ${adT('sn')}`, 1.4); return; }
+  if (!admOutdoor() || curArea.box) { showMsg(adT('🏠 Dışarı çık'), 1.4); return; }
+  const P = player.position, m = { t: 'fx', k: 'call', p: [r2(P.x), r2(P.y), r2(P.z)], a: curKey, S: r2(Math.max(1, giantS)) };
+  RC.cd = elapsed + 40; if (MP.on) mpSend(m); rcStart(Object.assign({ f: MP.me.id }, m), true);
+}
+function rcStart(m, mine) {
+  rcStop(true);
+  Object.assign(RC, { on: true, t: 0, last: 0, planeDone: false, fly: null, me: mine, from: m.f, p: new THREE.Vector3(+m.p[0] || 0, +m.p[1] || 0, +m.p[2] || 0), a: String(m.a || ''), S: THREE.MathUtils.clamp(+m.S || 1, 1, 300), rel: false, self: 0, boost: 0, fogK: 0, boomT: 0 });
+  RC.here = RC.a === curKey; RC.fc0 = scene.fog ? scene.fog.color.clone() : null;
+  try { const au = RC.audio = new Audio(rcSrc()); au.volume = ADM.mute ? 0 : Math.min(1, (AU.vol.master ?? .8) * 1.25); const pr = au.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {}
+  if (mine) { RC.phone = rcPhone(); if (HERO.rig && HERO.rig.armR) HERO.rig.armR.paw.add(RC.phone); showMsg('📞 ' + adT('Arıyor…'), 2); }
+  else mpNote(`📞 ${mpName(m.f)}: ${adT('hava desteği çağırdı!')}`, 3.2);
+  if (RC.here) window.__rcSafe = elapsed + 30;   // arkadaşlar ve hamam böceği zarar görmez
+}
+function rcStop(quiet) {
+  if (RC.audio && (quiet || RC.audio.ended || RC.audio.paused)) { try { RC.audio.pause(); } catch (e) {} } RC.audio = null;
+  if (RC.phone && RC.phone.parent) RC.phone.parent.remove(RC.phone); RC.phone = null;
+  for (const o of [RC.plane && RC.plane.g, RC.cloud && RC.cloud.g, RC.ring]) if (o && o.parent) o.parent.remove(o);
+  for (const b of RC.bombs) if (b.g.parent) b.g.parent.remove(b.g);
+  RC.plane = RC.cloud = RC.ring = null; RC.bombs = []; RC.on = false; RC.fogK = 0;
+  document.body.classList.remove('rcBW'); RC.bw = false; const d = $('rcDark'); if (d) d.style.opacity = 0;
+  if (RC.fc0 && scene.fog) scene.fog.color.copy(RC.fc0);
+}
+function rcMat(k, mk) { return RCG[k] || (RCG[k] = mk()); }
+function rcPhone() {
+  const g = new THREE.Group(), b = new THREE.Mesh(rcMat('phB', () => new THREE.BoxGeometry(.05, .1, .012)), rcMat('phM', () => new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: .35, metalness: .4 })));
+  const s = new THREE.Mesh(rcMat('phS', () => new THREE.PlaneGeometry(.042, .084)), rcMat('phSM', () => new THREE.MeshBasicMaterial({ color: 0x64b5f6 }))); s.position.z = .0065; g.add(b, s); g.position.set(0, -.02, .03); g.rotation.set(.2, 0, 0); return g;
+}
+function rcSmokeTex() {
+  if (RCG.smoke) return RCG.smoke; const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  for (let i = 0; i < 7; i++) { const x = 64 + (Math.random() - .5) * 40, y = 64 + (Math.random() - .5) * 40, r = 30 + Math.random() * 26, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(.55, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return RCG.smoke = t;
+}
+function rcPlane() {   // koyu bombardıman uçağı, bölgenin üstünden geçer
+  const g = new THREE.Group(), m = rcMat('plM', () => new THREE.MeshStandardMaterial({ color: 0x3b4148, roughness: .5, metalness: .5 })), d = rcMat('plD', () => new THREE.MeshStandardMaterial({ color: 0x1d2126, roughness: .4 }));
+  const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); g.add(o); return o; };
+  add(new THREE.CylinderGeometry(.9, .7, 12, 14), m, 0, 0, 0, Math.PI / 2); add(new THREE.SphereGeometry(.9, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), d, 0, 0, 6, Math.PI / 2);
+  add(new THREE.BoxGeometry(16, .22, 2.6), m, 0, -.1, .6); add(new THREE.BoxGeometry(6, .16, 1.4), m, 0, .2, -5.4); add(new THREE.BoxGeometry(.18, 2.4, 1.8), m, 0, 1.3, -5.3);
+  for (const x of [-5, -2.6, 2.6, 5]) { add(new THREE.CylinderGeometry(.42, .42, 2, 10), d, x, -.35, 1.3, Math.PI / 2); add(new THREE.CylinderGeometry(.05, .05, 2.2, 6), d, x, -.35, 2.35, 0, 0, Math.PI / 2); }
+  const S = RC.S, a = Math.random() * 6.283, dir = new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), y = RC.p.y + 55 * S;
+  g.scale.setScalar(S * 1.2); g.rotation.y = a; scene.add(g);
+  return { g, from: RC.p.clone().addScaledVector(dir, -200 * S).setY(y), to: RC.p.clone().addScaledVector(dir, 200 * S).setY(y), t0: RC.t, dur: 4.6 };
+}
+function rcTargets() {   // yakındaki canlılar (çocuklar, evcil hayvanlar ve oyuncular hariç)
+  const P = RC.p, R = 70 * RC.S, out = [];
+  for (const n of npcs) { if (!n || !n.holder || !n.holder.visible || n.dead || n.isKid || n.bossProxy || n.state === 'held' || n.state === 'thrown' || n.state === 'down') continue; const q = n.holder.position, d = Math.hypot(q.x - P.x, q.z - P.z); if (d < R) out.push({ k: 'npc', o: n, d }); }
+  for (const mo of monsters) if (monAlive(mo)) { const q = mo.holder.position, d = Math.hypot(q.x - P.x, q.z - P.z); if (d < R) out.push({ k: 'mon', o: mo, d }); }
+  try { if (bossAlive() && Math.hypot(BOSS.x - P.x, BOSS.z - P.z) < R + BOSS.R) out.push({ k: 'boss', d: 0 }); } catch (e) {}
+  out.sort((a, b) => a.d - b.d); return out.slice(0, 40);
+}
+function rcTgtPos(T, v) { if (T.k === 'boss') return v.set(BOSS.x, BOSS.y, BOSS.z); if (T.k === 'self') return v.copy(T.p); return v.copy(T.o.holder.position); }
+function rcDrop() {
+  const L = RC.here ? rcTargets() : [], S = RC.S, list = L.slice();
+  for (let i = 0; i < 6; i++) { const a = i / 6 * 6.283 + Math.random() * .6, r = i ? (1.5 + Math.random() * 2.5) * S : 0; list.push({ k: 'self', p: RC.p.clone().add(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)), i }); }
+  const geo = rcMat('bG', () => new THREE.CapsuleGeometry(.28, .9, 4, 10)), fin = rcMat('bF', () => new THREE.BoxGeometry(.7, .04, .3)), mat = rcMat('bM', () => new THREE.MeshStandardMaterial({ color: 0x2b2f2a, roughness: .5, metalness: .4 }));
+  list.forEach((T, i) => { const g = new THREE.Group(), b = new THREE.Mesh(geo, mat); g.add(b); for (const r of [0, Math.PI / 2]) { const f = new THREE.Mesh(fin, mat); f.position.y = .6; f.rotation.y = r; g.add(f); } g.scale.setScalar(S); g.visible = false; scene.add(g);
+    RC.bombs.push({ g, T, t: -(i * Math.min(.07, 1.4 / list.length)) - (T.k === 'self' ? .35 : 0), dur: 1.45 + Math.random() * .25, s: null }); });
+  play('fwlaunch', { gain: .6 });
+}
+function rcBoom(b, at) {
+  const S = RC.S, x = at.x, z = at.z, y = at.y, F = admFxInit();
+  for (let i = 0; i < 70; i++) { const u = Math.random(), a = Math.random() * 6.283, sp = (4 + Math.random() * 10) * Math.sqrt(S); admEmit(F.sp, x, y + .5 * S, z, Math.cos(a) * sp * (1 - u * .5), (2 + u * 11) * Math.sqrt(S), Math.sin(a) * sp * (1 - u * .5), 2.8, 1 + Math.random() * .6, .25, .7 + Math.random() * .8, 9, .8 * S); }
+  for (let i = 0; i < 14; i++) spawnDust(x, y, z, 2.2 * S, 2.4 * S, 0, 0, groundDust());
+  play('boom', { at: { x, y, z }, range: 400 * S, gain: .9 }); const dP = player.position.distanceTo(at); shake = Math.max(shake, Math.max(.15, .9 - dP / (90 * S)));
+  const T = b.T, dir = RCV[2].set(x - RC.p.x, 0, z - RC.p.z); if (dir.lengthSq() < .01) dir.set(Math.random() - .5, 0, Math.random() - .5); dir.normalize();
+  try {
+    if (T.k === 'npc') { const n = T.o; if (!n.dead && n.holder.visible) { if (n.city) cyHurt(n, 1e6, 'bomb'); if (n.state !== 'thrown' && n.state !== 'held') { n.state = 'thrown'; flyers.push({ type: 'npc', ref: n, vel: dir.clone().multiplyScalar(7 + Math.random() * 5), vy: 9 + Math.random() * 4, strong: false }); } } }
+    else if (T.k === 'mon' && monAlive(T.o)) damageMonster(T.o, 1e6, dir.clone());
+    else if (T.k === 'boss') bossBlast(x, y, z, 10 * S, 1e6);
+    if (T.k !== 'boss') bossBlast(x, y, z, 5 * S, 140);   // şehir / Ankara binaları da hasar alır (boss yoksa sadece binalar)
+    squashAt(x, z, 2.2 * S);
+  } catch (e) { console.warn('rc', e); }
+  if (T.k === 'self') { RC.self++;
+    if (RC.self === 1 && RC.me) {   // hamam böceği zarar görmez: rastgele bir yöne fırlar, anlık hız
+      const P0 = player.position.clone(), A = curArea; let to = null;
+      for (let k = 0; k < 12 && !to; k++) { const a = Math.random() * 6.283, r = (85 + Math.random() * 35) * S, x = P0.x + Math.cos(a) * r, z = P0.z + Math.sin(a) * r; if (A && A.r && !A.box && Math.hypot(x - A.cx, z - A.cz) > (A.rFn ? A.rFn(Math.atan2(z - A.cz, x - A.cx)) : A.r) - 6) continue; to = new THREE.Vector3(x, terrH(x, z), z); }
+      if (to) RC.fly = { a: P0, b: to, t: 0, dur: 2.8, h: 30 * S, dir: Math.atan2(to.x - P0.x, to.z - P0.z) };
+      RC.boost = 4.5; window.__rcSafe = elapsed + 25; play('boing'); showMsg('🪳💨 ' + adT('Fırladın!'), 1.4);
+    }
+    if (RC.self === 6) rcMushroom(); }
+}
+function rcMushroom() {   // mantar bulutu, şok dalgası, parlama
+  if (RC.cloud) return; const S = RC.S, p = RC.p, g = new THREE.Group(); g.position.copy(p); scene.add(g);
+  const tex = rcSmokeTex(), parts = [], add = (role, a, r, h, size) => { const m = new THREE.SpriteMaterial({ map: tex, color: 0xffaa55, transparent: true, depthWrite: false, opacity: 0, fog: false }); const s = new THREE.Sprite(m); s.frustumCulled = false; g.add(s); parts.push({ s, m, role, a, r, h, size, sp: .5 + Math.random() }); };
+  for (let i = 0; i < 28; i++) add('stem', Math.random() * 6.283, Math.random(), i / 28, 10 + Math.random() * 6);
+  for (let i = 0; i < 70; i++) add('cap', Math.random() * 6.283, Math.sqrt(Math.random()), Math.random(), 15 + Math.random() * 11);
+  for (let i = 0; i < 42; i++) add('skirt', i / 42 * 6.283 + Math.random() * .12, 1, Math.random(), 11 + Math.random() * 7);
+  for (let i = 0; i < 26; i++) add('ball', Math.random() * 6.283, Math.random(), Math.random(), 12 + Math.random() * 9);
+  RC.cloud = { g, parts, t: 0 };
+  const ring = new THREE.Mesh(rcMat('rgG', () => new THREE.RingGeometry(.86, 1, 64).rotateX(-Math.PI / 2)), new THREE.MeshBasicMaterial({ color: 0xfff3d6, transparent: true, opacity: .8, side: THREE.DoubleSide, depthWrite: false, fog: false })); ring.position.set(p.x, p.y + .4 * S, p.z); scene.add(ring); RC.ring = ring; RC.ringT = 0;
+  mpxFlash(); play('boom', { gain: 1.2 }); play('thunder', { gain: 1 }); shake = Math.max(shake, 1.2); RC.boomT = RC.t;
+}
+function rcCloudTick(dt) {
+  const C = RC.cloud; C.t += dt; const t = C.t, S = RC.S, H = 72 * S * (1 - Math.exp(-t / 3.2)), capR = 25 * S * Math.min(1, .22 + t / 9), fade = t < 26 ? 1 : Math.max(0, 1 - (t - 26) / 12), fire = Math.max(0, 1 - t / 4.5);
+  for (const q of C.parts) { let x, y, z, sz = q.size * S, op;
+    if (q.role === 'ball') { const r = (3 + t * 13) * S * q.r; x = Math.cos(q.a) * r; z = Math.sin(q.a) * r; y = (2 + H * .85 * q.h * Math.min(1, t / 1.4)); op = Math.max(0, 1 - t / 3.2); sz *= 1 + t * .5; }
+    else if (q.role === 'stem') { const rr = (2.5 + q.r * 4.5) * S * (1 + t * .02), a = q.a + t * .2 * q.sp; x = Math.cos(a) * rr; z = Math.sin(a) * rr; y = Math.max(1, H * q.h * .9); op = Math.min(.92, t * .8); }
+    else if (q.role === 'cap') { const a = q.a + t * .22 * q.sp, rr = capR * q.r; x = Math.cos(a) * rr; z = Math.sin(a) * rr; y = H + (q.h - .45) * capR * .55 - q.r * q.r * capR * .3; op = Math.min(.95, t * .9); }
+    else { const rr = Math.min(140 * S, (6 + t * 10) * S); x = Math.cos(q.a) * rr; z = Math.sin(q.a) * rr; y = (1.5 + q.h * 3) * S; op = Math.max(0, Math.min(.85, t) - t / 34); sz *= 1 + t * .1; }
+    q.s.position.set(x, y, z); q.s.scale.setScalar(sz); const cd = camera.position.distanceTo(RCV[0].set(x + C.g.position.x, y + C.g.position.y, z + C.g.position.z)), nf = Math.min(1, cd / (sz * .9)); q.m.opacity = Math.max(0, op * fade * nf * nf);   // kameraya çok yakınsa saydamlaşır (ekran kararmasın)
+    const k = q.role === 'skirt' ? fire * .3 : q.role === 'stem' ? fire * .7 * (1 - q.h * .5) : fire * (q.role === 'cap' ? (1 - q.r * .6) : 1); q.m.color.setRGB(.44 + 2.3 * k, .38 + 1.05 * k, .33 + .3 * k);
+  }
+  if (RC.ring) { RC.ringT += dt; const r = (4 + RC.ringT * 70) * S; RC.ring.scale.setScalar(r); RC.ring.material.opacity = Math.max(0, .8 - RC.ringT / 2); if (RC.ringT > 2.2) { scene.remove(RC.ring); RC.ring.material.dispose(); RC.ring = null; } }
+  if (fade <= 0) { scene.remove(C.g); for (const q of C.parts) q.m.dispose(); RC.cloud = null; }
+}
+function rcTick(dt) {
+  const ro = HERO.on && HERO.kind === 'roach'; if (RC.ro !== ro) { RC.ro = ro; document.body.classList.toggle('roachOn', ro); }
+  if (!RC.on) return; const now = performance.now(), gdt = dt; dt = Math.min(.1, Math.max(0, (now - (RC.last || now)) / 1000)); RC.last = now; RC.t += dt; const t = RC.t, S = RC.S;   // gerçek saat: sesle aynı anda
+  const bw = t >= RC_T.bw0 && t < RC_T.bw1; if (RC.bw !== bw) { RC.bw = bw; document.body.classList.toggle('rcBW', bw); }   // "kurban olduğum…"
+  if (RC.me && HERO.on && HERO.rig && t < RC_T.phone) { const R = HERO.rig, k = Math.min(1, t * 4); R.armR.sh.rotation.set(-2.35 * k, 0, .4 * k); R.armR.el.rotation.set(-1.85 * k, 0, 0); R.head.rotation.z = .22 * k; }
+  if (RC.phone && t >= RC_T.phone) { if (RC.phone.parent) RC.phone.parent.remove(RC.phone); RC.phone = null; }
+  const dk = t < RC_T.plane ? 0 : t < RC_T.plane + 3 ? (t - RC_T.plane) / 3 : t < 36 ? 1 : Math.max(0, 1 - (t - 36) / 7);   // hava kararır
+  const D = $('rcDark'); if (D) D.style.opacity = RC.here ? (dk * .6).toFixed(3) : 0;
+  if (!RC.here) { if (t > 12) rcStop(); return; }
+  if (t >= RC_T.plane && !RC.plane && !RC.planeDone) RC.plane = rcPlane();
+  if (RC.plane) { const Q = RC.plane, u = (t - Q.t0) / Q.dur; if (u >= 1) { scene.remove(Q.g); RC.plane = null; RC.planeDone = true; } else Q.g.position.lerpVectors(Q.from, Q.to, u); }
+  if (t >= RC_T.drop && !RC.rel) { RC.rel = true; rcDrop(); }
+  for (let i = RC.bombs.length - 1; i >= 0; i--) {
+    const b = RC.bombs[i]; b.t += dt; if (b.t < 0) continue;
+    if (!b.s) { b.s = (RC.plane ? RC.plane.g.position : RC.p.clone().setY(RC.p.y + 55 * S)).clone().add(RCV[0].set((Math.random() - .5) * 3 * S, -1.5 * S, (Math.random() - .5) * 3 * S)); b.g.visible = true; }
+    const u = Math.min(1, b.t / b.dur), tp = rcTgtPos(b.T, RCV[1]); const x = b.s.x + (tp.x - b.s.x) * u, z = b.s.z + (tp.z - b.s.z) * u, y = b.s.y + (tp.y - b.s.y) * u * u;
+    const pv = b.g.position.clone(); b.g.position.set(x, y, z); const vv = b.g.position.clone().sub(pv); if (vv.lengthSq() > 1e-6) b.g.quaternion.setFromUnitVectors(RCV[0].set(0, -1, 0), vv.normalize());
+    if (u >= 1) { scene.remove(b.g); RC.bombs.splice(i, 1); rcBoom(b, tp.clone()); }
+  }
+  if (RC.cloud) rcCloudTick(dt);
+  if (RC.boomT) { const tb = t - RC.boomT; RC.fogK = tb < 9 ? tb / 9 : t < 34 ? 1 : Math.max(0, 1 - (t - 34) / 10); }   // etrafa sis yayılır
+  if (RC.fogK > 0 && scene.fog) { const k = RC.fogK; scene.fog.near = THREE.MathUtils.lerp(scene.fog.near, 4 * S, k); scene.fog.far = THREE.MathUtils.lerp(scene.fog.far, 170 * S, k * .9); if (RC.fc0) scene.fog.color.copy(RC.fc0).lerp(RCG.fogC || (RCG.fogC = new THREE.Color(.5, .46, .42)), k * .8); }
+  if (RC.fly && RC.me) { const F = RC.fly; F.t += dt; const u = Math.min(1, F.t / F.dur), P = player.position; P.lerpVectors(F.a, F.b, u); P.y += Math.sin(u * Math.PI) * F.h; vel.set(Math.sin(F.dir) * 18, 0, Math.cos(F.dir) * 18); vy = 0; onGround = false; facing = F.dir + Math.PI; { const dx = RC.p.x - P.x, dz = RC.p.z - P.z; yaw += wrapAng(Math.atan2(-dx, -dz) - yaw) * Math.min(1, dt * 5); pitch += (-.08 - pitch) * Math.min(1, dt * 3); dist += (Math.max(dist, 12) - dist) * Math.min(1, dt * 2); } if (u >= 1) { RC.fly = null; vel.set(Math.sin(F.dir) * 6, 0, Math.cos(F.dir) * 6); } }   // rastgele bir yere uçar
+  else if (RC.boost > 0 && RC.me) { RC.boost -= dt; const P = player.position; P.x += vel.x * 1.6 * gdt; P.z += vel.z * 1.6 * gdt; }   // anlık hız
+  if (t > RC_T.end && !RC.cloud) rcStop();
+}
+document.head.insertAdjacentHTML('beforeend', `<style>body.rcBW canvas{filter:grayscale(1) contrast(1.3) brightness(.95)!important}
+#rcDark{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 50% 115%,rgba(90,40,10,.35),rgba(10,8,12,.9) 70%)}
+#tbCall{display:none;width:66px;height:66px;right:calc(30px + env(safe-area-inset-right));bottom:calc(136px + env(safe-area-inset-bottom));font-size:30px;background:radial-gradient(circle at 35% 30%,rgba(120,180,255,.95),rgba(30,80,170,.85));border-width:3px}
+body.hero.roachOn #tbCall{display:flex}</style>`);
+document.body.insertAdjacentHTML('beforeend', '<div id="rcDark"></div>');
+{ const tu = $('tbA'); if (tu) { tu.insertAdjacentHTML('afterend', `<button class="tb heroBtn" id="tbCall" aria-label="${adT('Ara')}">📞</button>`); const b = $('tbCall');
+  b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); b.classList.add('pressed'); roachCall(); }); for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => b.classList.remove('pressed')); } }
+
+/* ---------- 💬📁 ÖZEL SOHBET VE DOSYA ALIŞVERİŞİ (çok oyunculu üst çubukta 📁) ----------
+   Birini seç, özel yaz; 📎 ile mp3 / wav / ogg / m4a, mp4 / webm / mov ya da glb gönder (en fazla 30 MB). Karşı taraf "Al" deyince gider.
+   Ses ve video sadece açılır ve durdurulur; glb sadece gösterilir, istersen önüne ya da masa odasına oyuncak olarak konur.
+   Dosyalar tarayıcıdan tarayıcıya gider (oda sahibinin bağlantısı üzerinden), hiçbir yere yüklenmez. */
+const MPD = { to: null, th: {}, out: {}, inn: {}, placed: [], au: null, auId: null, unread: {} };
+const MPD_MAX = 30 * 1024 * 1024, MPD_CH = 48 * 1024;
+const MPD_EXT = { mp3: ['audio', 'audio/mpeg'], wav: ['audio', 'audio/wav'], ogg: ['audio', 'audio/ogg'], m4a: ['audio', 'audio/mp4'], aac: ['audio', 'audio/aac'],
+  mp4: ['video', 'video/mp4'], m4v: ['video', 'video/mp4'], webm: ['video', 'video/webm'], mov: ['video', 'video/quicktime'], glb: ['glb', 'model/gltf-binary'] };
+const mpdExt = n => { const m = /\.([a-z0-9]{2,4})$/i.exec(String(n || '')); return m ? m[1].toLowerCase() : ''; };
+const mpdSize = s => s > 1048576 ? (s / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(s / 1024)) + ' KB';
+const mpdIc = k => k === 'audio' ? '🎵' : k === 'video' ? '🎬' : '🧊';
+function mpdTh(id) { return MPD.th[id] || (MPD.th[id] = []); }
+function mpdOpen(on = !$('mpDm').classList.contains('on')) {
+  $('mpDm').classList.toggle('on', on); if (!on) return; if (isLocked()) document.exitPointerLock();
+  if (!MPD.to || !MP.players[MPD.to]) { const u = Object.keys(MPD.unread).find(i => MPD.unread[i] && MP.players[i]); MPD.to = u || (Object.keys(MP.players).find(i => i !== MP.me.id) || null); }
+  mpdUI();
+}
+function mpdUI() {
+  const P = $('mpDmPpl'); if (!P) return; P.innerHTML = '';
+  for (const p of Object.values(MP.players).sort((a, b) => a.slot - b.slot)) { if (p.id === MP.me.id) continue; const b = document.createElement('button'); b.dataset.dmp = p.id; b.className = p.id === MPD.to ? 'sel' : ''; b.textContent = (MPD.unread[p.id] ? '🔴 ' : '') + p.name; P.appendChild(b); }
+  if (!P.childElementCount) { const s = document.createElement('small'); s.textContent = adT('Odada başka kimse yok'); P.appendChild(s); }
+  if (MPD.to) MPD.unread[MPD.to] = 0; $('mpBtnDm').classList.toggle('new', Object.values(MPD.unread).some(Boolean));
+  const L = $('mpDmLog'); L.innerHTML = ''; for (const it of (MPD.to ? mpdTh(MPD.to) : [])) L.appendChild(mpdItem(it)); L.scrollTop = L.scrollHeight;
+}
+function mpdItem(it) {
+  const d = document.createElement('div'), mine = it.f === MP.me.id; d.className = 'dmi' + (mine ? ' me' : '');
+  if (it.text != null) { const b = document.createElement('b'); b.textContent = (mine ? adT('Sen') : mpName(it.f)) + ': '; d.append(b, document.createTextNode(it.text)); return d; }
+  const F = it.file, h = document.createElement('div'); h.className = 'fh'; h.textContent = `${mpdIc(F.k)} ${F.n} · ${mpdSize(F.s)}`; d.appendChild(h);
+  const row = document.createElement('div'); row.className = 'fr'; const B = (a, t) => { const b = document.createElement('button'); b.dataset.dma = a; b.dataset.fid = F.id; b.textContent = t; row.appendChild(b); };
+  const st = document.createElement('small'); st.className = 'fs';
+  if (F.st === 'offer' && !mine) { B('take', '✅ ' + adT('Al')); B('no', '✖ ' + adT('Reddet')); }
+  else if (F.st === 'offer') st.textContent = '⏳ ' + adT('Kabul etmesi bekleniyor…');
+  else if (F.st === 'go') st.textContent = `📶 ${mine ? adT('Gönderiliyor') : adT('Geliyor')} %${Math.floor((F.p || 0) * 100)}`;
+  else if (F.st === 'rej') st.textContent = '✖ ' + adT('Reddedildi');
+  else if (F.st === 'err') st.textContent = '⚠️ ' + adT('Yarıda kaldı');
+  else if (F.st === 'done') {
+    if (mine && !F.url) st.textContent = '✅ ' + adT('Gönderildi');
+    else if (F.k === 'audio') { const pl = MPD.auId === F.id && MPD.au && !MPD.au.paused; B(pl ? 'pause' : 'play', pl ? '⏸ ' + adT('Durdur') : '▶ ' + adT('Aç')); }
+    else if (F.k === 'video') B('video', '▶ ' + adT('Videoyu aç'));
+    else { B('view', '👁️ ' + adT('Göster')); B('put', '📦 ' + adT('Önüme koy')); B('desk', '🪑 ' + adT('Masaya oyuncak')); }
+  }
+  if (st.textContent) row.appendChild(st); d.appendChild(row); return d;
+}
+function mpdFind(id) { return MPD.out[id] || MPD.inn[id]; }
+function mpdSay() {
+  const i = $('mpDmIn'), t = (i.value || '').trim().slice(0, 300); if (!t || !MPD.to) return; i.value = '';
+  if (MP.muteMe) { mpNote('🔇 ' + adT('Admin seni susturdu'), 2); return; }
+  mpSend({ t: 'ch', text: t, to: MPD.to }); mpChatShow(MP.me.id, t, true, MPD.to);
+}
+function mpdAddMsg(peer, f, text) { if (!peer) return; mpdTh(peer).push({ f, text: String(text) }); if (f !== MP.me.id && !($('mpDm').classList.contains('on') && MPD.to === peer)) MPD.unread[peer] = 1; if ($('mpDm').classList.contains('on')) mpdUI(); else $('mpBtnDm').classList.toggle('new', true); }
+function mpdPick() {
+  if (!MPD.to || !MP.players[MPD.to]) { mpNote('👤 ' + adT('Önce kime göndereceğini seç'), 2); return; }
+  if (MP.muteMe) { mpNote('🔇 ' + adT('Admin seni susturdu'), 2); return; }
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = Object.keys(MPD_EXT).map(e => '.' + e).join(',');
+  inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) mpdOffer(f); }; inp.click();
+}
+function mpdOffer(file) {
+  const e = MPD_EXT[mpdExt(file.name)]; if (!e) { mpNote('⚠️ ' + adT('Sadece mp3, mp4 ve glb gibi dosyalar'), 2.4); return; }
+  if (file.size > MPD_MAX) { mpNote('⚠️ ' + adT('Dosya çok büyük (en fazla 30 MB)'), 2.4); return; }
+  const id = Math.random().toString(36).slice(2, 10), F = { id, n: file.name.slice(-60), s: file.size, k: e[0], mt: e[1], st: 'offer', file, to: MPD.to };
+  MPD.out[id] = F; mpdTh(MPD.to).push({ f: MP.me.id, file: F }); mpSend({ t: 'fo', to: MPD.to, id, n: F.n, s: F.s }); mpdUI();
+}
+async function mpdSendFile(F) {
+  F.st = 'go'; F.p = 0; mpdUI(); let buf; try { buf = await F.file.arrayBuffer(); } catch (e) { F.st = 'err'; mpdUI(); return; }
+  const n = Math.ceil(buf.byteLength / MPD_CH), conn = () => MP.host ? MP.conns[F.to] : MP.hc;
+  for (let i = 0; i < n; i++) {
+    if (!MP.on || !MP.players[F.to] || F.st !== 'go') { F.st = 'err'; mpdUI(); return; }
+    const dc = conn() && conn().dataChannel; while (dc && dc.bufferedAmount > 1.5e6 && MP.on) await new Promise(r => setTimeout(r, 25));
+    mpSend({ t: 'fc', to: F.to, id: F.id, i, d: buf.slice(i * MPD_CH, Math.min(buf.byteLength, (i + 1) * MPD_CH)) });
+    if (i % 8 === 7) { F.p = (i + 1) / n; mpdUI(); await new Promise(r => setTimeout(r, 0)); }
+  }
+  mpSend({ t: 'fe', to: F.to, id: F.id, n }); F.st = 'done'; F.p = 1; mpdUI(); mpNote(`📤 ${F.n} ${adT('gönderildi')}`, 2);
+}
+function mpxFileMsg(m) {   // gelen dosya mesajları
+  const f = m.f; if (!MP.players[f]) return;
+  if (m.t === 'fo') {
+    const e = MPD_EXT[mpdExt(m.n)], s = +m.s || 0; if (!e || !(s > 0) || s > MPD_MAX || Object.values(MPD.inn).filter(x => x.st === 'offer' || x.st === 'go').length > 4) return;
+    const F = { id: String(m.id || '').slice(0, 12), n: String(m.n || 'dosya').slice(-60), s, k: e[0], mt: e[1], st: 'offer', from: f, parts: [], got: 0 }; if (!F.id || MPD.inn[F.id]) return;
+    MPD.inn[F.id] = F; mpdTh(f).push({ f, file: F }); MPD.unread[f] = 1; play('ding', { gain: .5 });
+    mpNote(`📁 ${mpName(f)}: ${mpdIc(F.k)} ${F.n} (${mpdSize(s)}) — ${adT('📁 düğmesinden al')}`, 4); if ($('mpDm').classList.contains('on')) mpdUI(); else $('mpBtnDm').classList.add('new'); return;
+  }
+  if (m.t === 'fa') { const F = MPD.out[m.id]; if (!F || F.to !== f || F.st !== 'offer') return; if (m.ok) mpdSendFile(F); else { F.st = 'rej'; mpdUI(); mpNote(`✖ ${mpName(f)} ${adT('dosyayı almadı')}`, 2); } return; }
+  const F = MPD.inn[m.id]; if (!F || F.from !== f) return;
+  if (m.t === 'fz') { F.st = 'err'; mpdUI(); return; }
+  if (m.t === 'fc' && F.st === 'go') { const d = m.d instanceof ArrayBuffer ? new Uint8Array(m.d) : ArrayBuffer.isView(m.d) ? new Uint8Array(m.d.buffer, m.d.byteOffset, m.d.byteLength) : null; const i = m.i | 0;
+    if (!d || i < 0 || i > 1e5 || F.parts[i]) return; F.parts[i] = d; F.got += d.byteLength; if (F.got > F.s + MPD_CH) { F.st = 'err'; F.parts = []; mpdUI(); return; } const p = F.got / F.s; if (p - (F.p || 0) > .04) { F.p = p; mpdUI(); } return; }
+  if (m.t === 'fe' && F.st === 'go') { const n = m.n | 0; if (F.parts.length !== n || F.parts.some(x => !x)) { F.st = 'err'; mpdUI(); return; }
+    F.blob = new Blob(F.parts, { type: F.mt }); F.parts = []; F.url = URL.createObjectURL(F.blob); F.st = 'done'; F.p = 1; mpdUI(); play('coin', { gain: .5 }); mpNote(`📥 ${F.n} ${adT('geldi')}`, 2); }
+}
+function mpdAct(a, id) {
+  const F = mpdFind(id); if (!F) return;
+  if (a === 'take' && F.st === 'offer') { F.st = 'go'; F.p = 0; mpSend({ t: 'fa', to: F.from, id: F.id, ok: true }); mpdUI(); return; }
+  if (a === 'no' && F.st === 'offer') { F.st = 'rej'; mpSend({ t: 'fa', to: F.from, id: F.id, ok: false }); mpdUI(); return; }
+  if (!F.url) return;
+  if (a === 'play') { if (MPD.au && MPD.auId !== F.id) { MPD.au.pause(); } if (!MPD.au || MPD.auId !== F.id) { MPD.au = new Audio(F.url); MPD.auId = F.id; MPD.au.onended = () => mpdUI(); } MPD.au.play().catch(() => {}); mpdUI(); return; }
+  if (a === 'pause') { if (MPD.au) MPD.au.pause(); mpdUI(); return; }
+  if (a === 'video') { const V = $('mpdVid'), v = V.querySelector('video'); if (MPD.au) MPD.au.pause(); v.src = F.url; V.querySelector('.vt').textContent = '🎬 ' + F.n; V.classList.add('on'); v.play().catch(() => {}); mpdVidBtn(); return; }
+  if (a === 'view') { mpdGlbView(F); return; }
+  if (a === 'put' || a === 'desk') { mpdGlbLoad(F, src => a === 'put' ? mpdPut(src, F) : mpdDesk(src, F)); }
+}
+function mpdVidBtn() { const v = $('mpdVid').querySelector('video'); $('mpdVid').querySelector('[data-vv="pp"]').textContent = v.paused ? '▶ ' + adT('Oynat') : '⏸ ' + adT('Durdur'); }
+// 🧊 glb: göster · önüne koy · masaya oyuncak
+function mpdGlbLoad(F, cb) { if (F.gl) { cb(F.gl); return; } F.blob.arrayBuffer().then(buf => new GLTFLoader().parse(buf, '', g => { F.gl = g.scene; cb(F.gl); }, () => mpNote('⚠️ ' + adT('GLB açılamadı'), 2))).catch(() => mpNote('⚠️ ' + adT('GLB açılamadı'), 2)); }
+function mpdNorm(src, H) { const o = SkeletonUtils.clone(src); o.updateMatrixWorld(true); const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), k = H / (Math.max(sz.x, sz.y, sz.z) || 1), g = new THREE.Group(); o.position.set(-c.x * k, -bb.min.y * k, -c.z * k); o.scale.setScalar(k); g.add(o); o.traverse(q => { if (q.isMesh) { q.castShadow = true; q.frustumCulled = false; } }); return { g, sz: sz.multiplyScalar(k) }; }
+function mpdPut(src, F) {
+  if (MPD.placed.length >= 12) { const old = MPD.placed.shift(); if (old.parent) old.parent.remove(old); }
+  const S = Math.max(1, giantS), { g } = mpdNorm(src, 1.6 * S), P = player.position; g.position.set(P.x + Math.sin(facing) * 2.5 * S, terrH(P.x + Math.sin(facing) * 2.5 * S, P.z + Math.cos(facing) * 2.5 * S), P.z + Math.cos(facing) * 2.5 * S); g.rotation.y = facing + Math.PI;
+  if (curKey !== 'hub') g.position.y = P.y; scene.add(g); MPD.placed.push(g); mpNote('📦 ' + F.n + ' ' + adT('önüne kondu'), 2); mpdOpen(false);
+}
+function mpdDesk(src, F) {
+  const mk = () => { const { g, sz } = mpdNorm(src, .065); return { g, J: {}, r: Math.max(.012, Math.max(sz.x, sz.z) * .5), h: sz.y }; };
+  (DESK.glb ||= []).push({ mk, name: F.n });
+  if (DESK.on) { deskToyAdd('glb', (Math.random() - .5) * .5, DESK.cz + .1, mk()); mpNote('🪑 ' + adT('Oyuncağın masada') + ': ' + F.n, 2); mpdOpen(false); }
+  else mpNote('🪑 ' + adT('Masa odasına gidince oyuncakların arasında olacak'), 2.6);
+}
+function mpdGlbView(F) {
+  const V = $('mpdGlb'); V.classList.add('on'); V.querySelector('.vt').textContent = '🧊 ' + F.n; MPD.vf = F;
+  mpdGlbLoad(F, src => {
+    if (!MPD.vr) { const cv = V.querySelector('canvas'); MPD.vr = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); MPD.vr.setPixelRatio(Math.min(2, devicePixelRatio || 1)); MPD.vs = new THREE.Scene(); MPD.vc = new THREE.PerspectiveCamera(40, 1, .01, 100);
+      MPD.vs.add(new THREE.HemisphereLight(0xffffff, 0x445566, 2.2)); const dl = new THREE.DirectionalLight(0xffffff, 2); dl.position.set(2, 3, 2); MPD.vs.add(dl); MPD.vrot = 0; MPD.vpit = .25; }
+    if (MPD.vo) MPD.vs.remove(MPD.vo); MPD.vo = mpdNorm(src, 1).g; MPD.vs.add(MPD.vo); const r = V.querySelector('canvas').getBoundingClientRect(); MPD.vr.setSize(r.width, r.height, false); MPD.vc.aspect = r.width / Math.max(1, r.height); MPD.vc.updateProjectionMatrix();
+    const loop = () => { if (!V.classList.contains('on')) return; if (!MPD.vdrag) MPD.vrot += .01; const d = 2.2; MPD.vc.position.set(Math.sin(MPD.vrot) * d * Math.cos(MPD.vpit), .5 + Math.sin(MPD.vpit) * d, Math.cos(MPD.vrot) * d * Math.cos(MPD.vpit)); MPD.vc.lookAt(0, .5, 0); MPD.vr.render(MPD.vs, MPD.vc); requestAnimationFrame(loop); }; loop();
+  });
+}
+// ---------- arayüz ----------
+document.head.insertAdjacentHTML('beforeend', `<style>
+#mpDm{position:fixed;right:calc(8px + env(safe-area-inset-right));top:calc(58px + env(safe-area-inset-top));z-index:62;width:min(380px,94vw);max-height:78vh;display:none;flex-direction:column;background:rgba(14,20,34,.96);border:1px solid #9fd0ff;border-radius:14px;padding:8px;color:#fff;font:13px system-ui,sans-serif}
+#mpDm.on{display:flex}#mpDm .dh{display:flex;align-items:center;gap:6px;margin-bottom:6px}#mpDm .dh b{flex:1;color:#9fd0ff}
+#mpDm button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:9px;padding:6px 9px;font:inherit;cursor:pointer}#mpDm button.sel{background:#1565c0;border-color:#64b5f6}
+#mpDmPpl{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}#mpDmLog{flex:1;min-height:120px;max-height:46vh;overflow:auto;background:rgba(0,0,0,.18);border-radius:10px;padding:6px;margin-bottom:6px;overscroll-behavior:contain}
+.dmi{margin:4px 0;padding:5px 7px;border-radius:9px;background:rgba(255,255,255,.06);word-break:break-word;max-width:88%}.dmi.me{margin-left:auto;background:rgba(21,101,192,.35)}
+.dmi .fh{font-weight:700}.dmi .fr{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center}.dmi .fr button{padding:4px 8px;font-size:12px}.dmi .fs{opacity:.8}
+#mpDm .dr{display:flex;gap:4px}#mpDm .dr input{flex:1;min-width:0;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:9px;padding:7px;font:inherit}
+#mpDm .hint{opacity:.6;font-size:11px;margin-top:5px}
+#mpdVid,#mpdGlb{position:fixed;inset:0;z-index:66;display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:rgba(0,0,0,.78);color:#fff;font:14px system-ui,sans-serif}
+#mpdVid.on,#mpdGlb.on{display:flex}#mpdVid video{max-width:min(92vw,900px);max-height:68vh;border-radius:12px;background:#000}#mpdGlb canvas{width:min(84vw,420px);height:min(84vw,420px);border-radius:14px;background:radial-gradient(circle,#2b3a52,#101826);touch-action:none}
+#mpdVid button,#mpdGlb button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:10px;padding:8px 14px;font:inherit;cursor:pointer}#mpdVid .vb,#mpdGlb .vb{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+</style>`);
+document.body.insertAdjacentHTML('beforeend', `<div id="mpDm"><div class="dh"><b>💬📁 ${adT('Özel sohbet ve dosya')}</b><button data-dm="x">✕</button></div><div id="mpDmPpl"></div><div id="mpDmLog"></div>
+  <div class="dr"><button data-dm="file" title="${adT('Dosya gönder')}">📎</button><input id="mpDmIn" maxlength="300" placeholder="${adT('Özel mesaj…')}"><button data-dm="send">➤</button></div>
+  <div class="hint">📎 mp3 · wav · ogg · m4a · mp4 · webm · mov · glb — ${adT('en fazla 30 MB, karşı taraf kabul edince gider')}</div></div>
+  <div id="mpdVid"><div class="vt"></div><video playsinline></video><div class="vb"><button data-vv="pp">▶</button><button data-vv="x">✕ ${adT('Kapat')}</button></div></div>
+  <div id="mpdGlb"><div class="vt"></div><canvas></canvas><div class="vb"><button data-vg="put">📦 ${adT('Önüme koy')}</button><button data-vg="desk">🪑 ${adT('Masaya oyuncak')}</button><button data-vg="clr">🧹 ${adT('Koyduklarımı kaldır')}</button><button data-vg="x">✕ ${adT('Kapat')}</button></div></div>`);
+$('mpHud').insertAdjacentHTML('beforeend', `<button id="mpBtnDm" title="${adT('Özel sohbet ve dosya')}">📁</button>`);
+for (const id of ['mpDm', 'mpdVid', 'mpdGlb']) for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'wheel', 'keydown']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
+for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $('mpBtnDm').addEventListener(ev, e => e.stopPropagation(), { passive: true });
+$('mpBtnDm').addEventListener('click', e => { e.stopPropagation(); play('ui'); mpdOpen(); });
+$('mpDm').addEventListener('click', e => {
+  const t = e.target.closest('[data-dm],[data-dmp],[data-dma]'); if (!t) return; e.stopPropagation(); play('ui');
+  if (t.dataset.dmp) { MPD.to = t.dataset.dmp; mpdUI(); return; } if (t.dataset.dma) { mpdAct(t.dataset.dma, t.dataset.fid); return; }
+  const a = t.dataset.dm; if (a === 'x') mpdOpen(false); else if (a === 'send') mpdSay(); else if (a === 'file') mpdPick();
+});
+$('mpDmIn').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); mpdSay(); } });
+$('mpdVid').addEventListener('click', e => { const b = e.target.closest('[data-vv]'); if (!b) return; e.stopPropagation(); const v = $('mpdVid').querySelector('video'); if (b.dataset.vv === 'x') { v.pause(); $('mpdVid').classList.remove('on'); return; } if (v.paused) v.play().catch(() => {}); else v.pause(); mpdVidBtn(); });
+$('mpdVid').querySelector('video').addEventListener('pause', mpdVidBtn); $('mpdVid').querySelector('video').addEventListener('play', mpdVidBtn);
+$('mpdGlb').addEventListener('click', e => { const b = e.target.closest('[data-vg]'); if (!b) return; e.stopPropagation(); play('ui'); const a = b.dataset.vg, F = MPD.vf;
+  if (a === 'x') { $('mpdGlb').classList.remove('on'); return; } if (a === 'clr') { for (const g of MPD.placed) if (g.parent) g.parent.remove(g); MPD.placed = []; mpNote('🧹 ' + adT('Kaldırıldı'), 1.4); return; }
+  if (F) { $('mpdGlb').classList.remove('on'); mpdGlbLoad(F, src => a === 'put' ? mpdPut(src, F) : mpdDesk(src, F)); } });
+{ const cv = $('mpdGlb').querySelector('canvas'); let d = null; cv.addEventListener('pointerdown', e => { d = { x: e.clientX, y: e.clientY, r: MPD.vrot, p: MPD.vpit }; MPD.vdrag = true; try { cv.setPointerCapture(e.pointerId); } catch (x) {} });
+  cv.addEventListener('pointermove', e => { if (!d) return; MPD.vrot = d.r - (e.clientX - d.x) * .01; MPD.vpit = THREE.MathUtils.clamp(d.p + (e.clientY - d.y) * .008, -1.2, 1.3); });
+  for (const ev of ['pointerup', 'pointercancel']) cv.addEventListener(ev, () => { d = null; MPD.vdrag = false; }); }
+
 /* ---------- 🏷️ herkesin etiketi: bir kişiye sol tıkla / dokun → adı, yaşı, işi (köy, şehir, Ankara; okulda da) ---------- */
 const NPCL = { list: [] };
 function npcLblText(n) {
@@ -28600,7 +28919,7 @@ renderer.setAnimationLoop(() => {
   try { lockLate(paused || photoMode ? 0 : dt); } catch (e) {}
   try { npcMgrTick(paused || photoMode ? 0 : dt); possLate(); } catch (e) { sftErr(e); }
   try { deskTick(paused ? 0 : dt); deskLate(dt); } catch (e) { sftErr(e); }
-  try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); if (window.__mp) window.__mp.tick(dt); npcLblTick(paused ? 0 : dt); if (curKey !== 'ankara') ankDebrisTick(paused || photoMode ? 0 : dt); cyUltraTick(); gvDualLate(); if (inCity && CITY.built) { cyVariety(); cyVarietySync(); } } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
+  try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); if (window.__mp) window.__mp.tick(dt); try { rcTick(dt); } catch (e) { console.warn('rc', e); } npcLblTick(paused ? 0 : dt); if (curKey !== 'ankara') ankDebrisTick(paused || photoMode ? 0 : dt); cyUltraTick(); gvDualLate(); if (inCity && CITY.built) { cyVariety(); cyVarietySync(); } } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
   try { buddyUpdate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🤝 arkadaş: senin pozunu kopyalar
   updateDay(paused || photoMode || ADM.freeze ? 0 : dt * (ADM.daySpeed ? 40 : 1));
   updateWeather(paused || photoMode || ADM.freeze ? 0 : dt);
