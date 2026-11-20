@@ -1,8 +1,6 @@
 name: miami-verisi
 on:
-  push:
-    paths: ['tools/miami.py', '.github/workflows/miami.yml']
-  workflow_dispatch:
+  workflow_dispatch:   # elle çalıştırılır (site dalına itince kendiliğinden çalışmasın)
 permissions:
   contents: write
 jobs:

@@ -1,8 +1,6 @@
 name: ankara-verisi
 on:
-  push:
-    paths: ['tools/ankara.py', '.github/workflows/ankara.yml']
-  workflow_dispatch:
+  workflow_dispatch:   # elle çalıştırılır (site dalına itince kendiliğinden çalışmasın)
 permissions:
   contents: write
 jobs:
