@@ -346,7 +346,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.13-c</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.13-d</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -20375,6 +20375,7 @@ function admSet7(id, on) {
 }
 function admUpdate7(dt) { try { hrUpdate(dt); } catch (e) { sftErr(e); } try { gpUpdate(dt); gvPre(dt); gpLeftPre(dt); fmTick(dt); nv3Pre(dt); v4Pre(dt); vr3BodyPre(); v5Pre(dt); gnEatTick(dt); } catch (e) { sftErr(e); } try { bossUpdate(dt); } catch (e) { sftErr(e); } if (dt > 0) { ch7Update(dt); au7Update(dt); pt7Update(dt); wr7Update(dt); } }
 Object.assign(L_EN, { 'Hile barları': 'Cheat sliders', 'Sıfırla': 'Reset', '💥 KRİTİK!': '💥 CRITICAL!', '🗼 Taş kule!': '🗼 Stone tower!', '🔺 Piramit!': '🔺 Pyramid!', '🌉 Kemer köprü!': '🌉 Arch bridge!', '🌬️ Yel değirmeni!': '🌬️ Windmill!', '🗼 Deniz feneri!': '🗼 Lighthouse!', '🧊 İglo!': '🧊 Igloo!', '⛺ Kamp çadırı ve ateş!': '⛺ Camping tent and fire!', '🌳 Ağaç ev!': '🌳 Treehouse!', '🪨 Taş çember!': '🪨 Stone circle!', '🗿 Totem direği!': '🗿 Totem pole!', '♟️ Dev satranç taşları!': '♟️ Giant chess pieces!', '🎲 Dev zar! Ona koşarak çarp': '🎲 Giant dice! Run into it', '🍄 Mantar ev!': '🍄 Mushroom house!', '🪣 Dilek kuyusu! İçine bak': '🪣 Wishing well! Walk up to it', '🪣 Dileğin kabul oldu!': '🪣 Your wish came true!' });
+Object.assign(L_EN, { 'deneme': 'try', 'Sunucu cevap vermedi — tekrar deneniyor': 'Server didn\'t answer — trying again', 'OpenStreetMap sunucusundan indirildi (güncel)': 'Downloaded from the OpenStreetMap server (up to date)', 'Sunucu 2 denemede cevap vermedi': 'Server didn\'t answer in 2 tries', 'OpenStreetMap sunucusundan (güncel)': 'from the OpenStreetMap server (up to date)', 'güncel': 'up to date', 'kayıtlı': 'saved', 'son indirilen kopya': 'last downloaded copy', 'bugün': 'today', 'gün önce': 'days ago', 'hazır': 'built-in', 'oyundaki hazır kopya': 'built-in copy in the game' });
 Object.assign(L_EN, { '🎛️ Hile barları sıfırlandı': '🎛️ Cheat sliders reset', '⚡ Yerinde dirildin!': '⚡ Revived on the spot!', '🧹 Hazır yapılar temizlendi': '🧹 Ready builds cleared', '🧹 Temizlenecek yapı yok': '🧹 Nothing to clear', '🔝 Tüm barlar en üstte!': '🔝 All sliders maxed!', 'seninle takılır, kendi yolunu seçer': 'hangs out with you, picks its own path' });
 admRender();
 
@@ -24443,7 +24444,12 @@ function v4Gestures(P, dt) {   // P: karakter uzayında yumuşatılmış noktala
    Harita verisi oyun açıkken internetten indirilir (© OpenStreetMap katkıcıları). claude.ai bağlantısında internet kapalıdır — GitHub sitesinde çalışır.
    ===================================================================== */
 AREAS.ankara = { cx: 20000, cz: -20000, r: 2600, bg: 0xbfd6ea, fog: [260, 2400], sky: 0xdfeaf6, gnd: 0x8c8a80, sunC: 0xfff2dd, sunI: 2.5, sunVis: 0xfff3d6 };
-const ANK = { ldT: 0, g: null, reg: null, bld: [], chunks: [], obs: [], obsIn: false, busy: false, dead: 0, data: {}, spawn: null };
+const ANK = { ldT: 0, g: null, reg: null, bld: [], chunks: [], obs: [], obsIn: false, busy: false, dead: 0, data: {}, src: {}, spawn: null };
+function ankSrcTxt(k, short) {   // haritanın nereden geldiği
+  const o = ANK.src[k] || {}; if (o.s === 'srv') return short ? '🌐 ' + adT('güncel') : '🌐 ' + adT('OpenStreetMap sunucusundan (güncel)');
+  if (o.s === 'cache') { const d = Math.floor((Date.now() - o.t) / 864e5); return short ? '💾 ' + adT('kayıtlı') : '💾 ' + adT('son indirilen kopya') + ` (${d < 1 ? adT('bugün') : d + ' ' + adT('gün önce')})`; }
+  return short ? '📦 ' + adT('hazır') : '📦 ' + adT('oyundaki hazır kopya');
+}
 const ANK_REG = {
   kizilay: { n: 'Kızılay', lat: 39.9208, lon: 32.8541 }, ulus: { n: 'Ulus', lat: 39.9419, lon: 32.8543 },
   anitkabir: { n: 'Anıtkabir', lat: 39.9250, lon: 32.8369 }, cankaya: { n: 'Çankaya · Atakule', lat: 39.8856, lon: 32.8558 }
@@ -24460,23 +24466,27 @@ function ankLoad(on, txt) {   // indirme göstergesi (süre sayar)
   if (!ANK.dStop && window.SFT_DINO) ANK.dStop = SFT_DINO(el.querySelector('canvas'));
   const t0 = performance.now(), tx = el.querySelector('.ankTx'); el.style.display = 'block'; const draw = () => { tx.innerHTML = txt + `<br><small style="opacity:.75">⏳ ${Math.round((performance.now() - t0) / 1000)} sn · © OpenStreetMap</small>`; }; draw(); ANK.ldT = setInterval(draw, 500);
 }
-async function ankFetch(R) {
+async function ankFetch(R) {   // 🔁 1. deneme: sunucu 1+2, sonra 3+4 · olmazsa 2. deneme: dördü birden · o da olmazsa hata (ankGo hazır kopyaya geçer)
   const dl = .0045, dn = .0059, S = (R.lat - dl).toFixed(5), N = (R.lat + dl).toFixed(5), W = (R.lon - dn).toFixed(5), E = (R.lon + dn).toFixed(5);   // ~1 km × 1 km
   const q = `[out:json][timeout:45];(way["building"](${S},${W},${N},${E});way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|pedestrian|service|primary_link|secondary_link)$"](${S},${W},${N},${E}););out geom;`;
   const SV = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'], errs = [];
-  for (let i = 0; i < SV.length; i += 2) {   // iki sunucu aynı anda: önce gelen kazanır
-    ankLoad(true, `🗺️ ${adT('Gerçek Ankara indiriliyor')} — ${R.n}<br><small>OpenStreetMap · ${adT('sunucu')} ${i + 1}–${Math.min(i + 2, SV.length)}/${SV.length}</small>`);
-    const ac = typeof AbortController !== 'undefined' ? new AbortController() : null, to = setTimeout(() => { try { ac && ac.abort(); } catch (x) {} }, 30000);
-    const one = async u => { const r = SV.indexOf(u) % 2 ? await fetch(u + '?data=' + encodeURIComponent(q), { signal: ac && ac.signal }) : await fetch(u, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ac && ac.signal });
-      if (!r.ok) throw new Error('HTTP ' + r.status); const j = await r.json(); if (!(j && j.elements && j.elements.length)) throw new Error('boş'); return j; };
-    try { const j = await Promise.any(SV.slice(i, i + 2).map(one)); clearTimeout(to); try { ac && ac.abort(); } catch (x) {} return j; }
-    catch (e) { for (const x of (e && e.errors) || [e]) errs.push(x && x.name === 'AbortError' ? adT('zaman aşımı') : (x && x.message) || 'hata'); }
-    clearTimeout(to);
+  const one = async (u, ac) => { const r = SV.indexOf(u) % 2 ? await fetch(u + '?data=' + encodeURIComponent(q), { signal: ac && ac.signal }) : await fetch(u, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ac && ac.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status); const j = await r.json(); if (!(j && j.elements && j.elements.length)) throw new Error('boş'); return j; };
+  const group = async (ids, ms, at) => {   // birkaç sunucu aynı anda: önce gelen kazanır
+    ankLoad(true, `🗺️ ${adT('Gerçek Ankara indiriliyor')} — ${R.n}<br><small>OpenStreetMap · ${adT('deneme')} ${at}/2 · ${adT('sunucu')} ${ids.map(i => i + 1).join('+')}</small>`);
+    const ac = typeof AbortController !== 'undefined' ? new AbortController() : null, to = setTimeout(() => { try { ac && ac.abort(); } catch (x) {} }, ms);
+    try { return await Promise.any(ids.map(i => one(SV[i], ac))); }
+    catch (e) { for (const x of (e && e.errors) || [e]) errs.push(x && x.name === 'AbortError' ? adT('zaman aşımı') : (x && x.message) || 'hata'); return null; }
+    finally { clearTimeout(to); try { ac && ac.abort(); } catch (x) {} }
+  };
+  for (const [ids, ms, at] of [[[0, 1], 15000, 1], [[2, 3], 15000, 1], [[0, 1, 2, 3], 20000, 2]]) {
+    if (at === 2) { ankLoad(true, `🔁 ${adT('Sunucu cevap vermedi — tekrar deneniyor')}…<br><small>${adT('deneme')} 2/2</small>`); await new Promise(r => setTimeout(r, 1500)); }
+    const j = await group(ids, ms, at); if (j) return j;
   }
-  const err = new Error(errs.join(', ')); err.list = errs; throw err;
+  const err = new Error(errs.slice(-4).join(', ')); err.list = errs; throw err;
 }
 function ankIDB() { return ANK.idb || (ANK.idb = new Promise((res, rej) => { try { const r = indexedDB.open('sftAnkara', 1); r.onupgradeneeded = () => r.result.createObjectStore('d'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } })); }
-async function ankCacheGet(k) { try { const db = await ankIDB(); return await new Promise(res => { const q = db.transaction('d').objectStore('d').get(k); q.onsuccess = () => { const v = q.result; res(v && v.t && Date.now() - v.t < 30 * 864e5 && v.d && v.d.elements ? v.d : null); }; q.onerror = () => res(null); }); } catch (e) { return null; } }
+async function ankCacheGet(k) { try { const db = await ankIDB(); return await new Promise(res => { const q = db.transaction('d').objectStore('d').get(k); q.onsuccess = () => { const v = q.result; res(v && v.t && v.d && v.d.elements ? v : null); }; q.onerror = () => res(null); }); } catch (e) { return null; } }
 function ankCachePut(k, d) { ankIDB().then(db => { try { db.transaction('d', 'readwrite').objectStore('d').put({ t: Date.now(), d }, k); } catch (e) {} }).catch(() => {}); }
 function ankHash(n) { n = (n ^ 61) ^ (n >>> 16); n = n + (n << 3); n = n ^ (n >>> 4); n = Math.imul(n, 0x27d4eb2d); n = n ^ (n >>> 15); return ((n >>> 0) % 1000) / 1000; }
 function ankHeight(t, id) {
@@ -24506,7 +24516,7 @@ function ankBuild(data, R) {
     if (!t.building || el.geometry.length < 4) continue;
     let pts = el.geometry.map(toXZ); if (pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1]) pts.pop(); if (pts.length < 3) continue;
     let area = 0; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; area += a[0] * b[1] - b[0] * a[1]; } if (Math.abs(area) / 2 < 10) continue;
-    const h = ankHeight(t, el.id), wc = ANK_WALL[(ankHash(el.id + 7) * ANK_WALL.length) | 0], rc = ANK_ROOF[(ankHash(el.id + 3) * ANK_ROOF.length) | 0];
+    const hid = el.id % 100000, h = ankHeight(t, hid), wc = ANK_WALL[(ankHash(hid + 7) * ANK_WALL.length) | 0], rc = ANK_ROOF[(ankHash(hid + 3) * ANK_ROOF.length) | 0];   // hazır kopyayla birebir aynı görünüm
     if (chunk.bl.length >= 260) newChunk();
     const C = chunk, b = { h, w0: C.wp.length / 3, r0: C.rp.length / 3, c: C, alive: true, minx: 1e9, maxx: -1e9, minz: 1e9, maxz: -1e9, nm: t.name || '' };
     let cx = 0, cz = 0; for (const [x, z] of pts) { cx += x; cz += z; b.minx = Math.min(b.minx, x); b.maxx = Math.max(b.maxx, x); b.minz = Math.min(b.minz, z); b.maxz = Math.max(b.maxz, z); } cx /= pts.length; cz /= pts.length;
@@ -24552,11 +24562,12 @@ async function ankGo(key) {
     if (ANK.reg !== R || !ANK.g) {
       let data = ANK.data[key];
       if (!data) {   // 🗺️ eski hali: gerçek Ankara OpenStreetMap'ten indirilir (bir kez indirileni tarayıcı saklar); internet yoksa oyundaki hazır kopya
-        if (!ANK.srv) data = await ankCacheGet(key);
-        if (!data) { try { data = await ankFetch(R); ANK.srv = false; ankCachePut(key, data); } catch (e) { data = ankEmbedded(key); if (!data) throw e; showMsg(adT('🌐 Sunucuya ulaşılamadı — oyundaki hazır Ankara açılıyor'), 2.6); } }
-        ANK.data[key] = data; }
+        let src = 'srv', ct = 0;   // 🌐 önce sunucu (2 deneme) → 💾 son indirilen kopya → 📦 oyundaki hazır kopya
+        try { data = await ankFetch(R); ankCachePut(key, data); }
+        catch (e) { console.warn('ANK sunucu', e && e.message); const c = await ankCacheGet(key); if (c) { data = c.d; src = 'cache'; ct = c.t; } else { data = ankEmbedded(key); src = 'emb'; if (!data) throw e; } }
+        ANK.data[key] = data; ANK.src[key] = { s: src, t: ct }; }
       ankLoad(true, `🏗️ ${R.n}: ${adT('binalar kuruluyor')}…`); await new Promise(r => setTimeout(r, 60));
-      const n = ankBuild(data, R); ankGraph(data, R); ankLoad(false); showMsg(`🏙️ ${R.n}: ${n} ${adT('gerçek bina kuruldu')}`, 2.4);
+      const n = ankBuild(data, R); ankGraph(data, R); ankLoad(false); const so = ANK.src[key] || { s: 'srv' }; showMsg(`🏙️ ${R.n}: ${n} ${adT('gerçek bina kuruldu')} · ${so.s === 'srv' ? '🌐 ' + adT('OpenStreetMap sunucusundan indirildi (güncel)') : '⚠️ ' + adT('Sunucu 2 denemede cevap vermedi') + ' → ' + ankSrcTxt(key)}`, so.s === 'srv' ? 2.6 : 4.5);
       const A = AREAS.ankara; for (const p of ANK.ppl || []) { const nd = ANK.walkNodes[(Math.random() * ANK.walkNodes.length) | 0]; if (nd) { p.holder.position.set(A.cx + nd.x + (Math.random() - .5) * 2, 0, A.cz + nd.z + (Math.random() - .5) * 2); p.an = nd; p.state = 'idle'; } } for (const c of ANK.cars || []) { const nd = ANK.carNodes[(Math.random() * ANK.carNodes.length) | 0]; if (nd) { c.a = nd; c.b = nd.car[0].n; c.t = 0; c.wreck = false; } }
     }
     if (RIDE.on) { try { rideExit(); } catch (e) {} }
@@ -24621,11 +24632,11 @@ function ankUI() {
   let u = $('ankUI');
   if (!u) {
     document.head.insertAdjacentHTML('beforeend', '<style>#ankUI{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;display:none;gap:4px;flex-wrap:wrap;justify-content:center;max-width:70vw;background:rgba(14,20,34,.82);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:5px;font:11px system-ui,sans-serif}#ankUI button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:9px;padding:4px 8px;font:inherit}#ankUI small{color:#cfd8dc;align-self:center;padding:0 4px}</style>');
-    document.body.insertAdjacentHTML('beforeend', `<div id="ankUI"><small>🗺️ Ankara</small>${Object.entries(ANK_REG).map(([k, r]) => `<button data-ank="${k}">${r.n}</button>`).join('')}<button data-ank="srv">🌐 ${adT('Sunucudan güncelle')}</button><button data-ank="home">🏡 ${adT('Köye dön')}</button><small>© OpenStreetMap</small></div>`);
+    document.body.insertAdjacentHTML('beforeend', `<div id="ankUI"><small>🗺️ Ankara</small>${Object.entries(ANK_REG).map(([k, r]) => `<button data-ank="${k}">${r.n}</button>`).join('')}<button data-ank="srv">🌐 ${adT('Sunucudan güncelle')}</button><button data-ank="home">🏡 ${adT('Köye dön')}</button><small id="ankSrc"></small><small>© OpenStreetMap</small></div>`);
     u = $('ankUI'); for (const ev of ['pointerdown', 'mousedown', 'touchstart']) u.addEventListener(ev, e => e.stopPropagation(), { passive: true });
-    u.addEventListener('click', e => { const b = e.target.closest('[data-ank]'); if (!b) return; if (b.dataset.ank === 'home') { teleportTo('hub', 0, 8, Math.PI, adT('🏡 Köye döndün')); u.style.display = 'none'; } else if (b.dataset.ank === 'srv') { const k = ANK.key || 'kizilay'; ANK.srv = true; delete ANK.data[k]; ANK.reg = null; ankGo(k); } else ankGo(b.dataset.ank); });
+    u.addEventListener('click', e => { const b = e.target.closest('[data-ank]'); if (!b) return; if (b.dataset.ank === 'home') { teleportTo('hub', 0, 8, Math.PI, adT('🏡 Köye döndün')); u.style.display = 'none'; } else if (b.dataset.ank === 'srv') { const k = ANK.key || 'kizilay'; delete ANK.data[k]; ANK.reg = null; ankGo(k); } else ankGo(b.dataset.ank); });
   }
-  u.style.display = curKey === 'ankara' ? 'flex' : 'none';
+  u.style.display = curKey === 'ankara' ? 'flex' : 'none'; const sl = $('ankSrc'); if (sl) sl.textContent = ankSrcTxt(ANK.key || 'kizilay', true);
 }
 {
   $('pVR4').insertAdjacentHTML('afterend', `<button id="pAnk">🗺️ Ankara (${adT('gerçek harita — gez ve yık')})</button>`);
