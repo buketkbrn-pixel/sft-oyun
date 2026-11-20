@@ -148,7 +148,6 @@
   #admCode{width:120px;text-transform:uppercase;letter-spacing:.25em;font-weight:800;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font-size:15px}
   #admCode.bad{animation:admBad .4s}@keyframes admBad{25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}
   body.admLocked #btnAdmin,body.admLocked #pAdmin{display:none!important}
-  body.admLocked #sCitySec{display:none!important}
   .setRow span{flex:1;font-weight:600}
   .setRow input[type=color]{width:38px;height:28px;border:0;padding:0;background:none;cursor:pointer}
   .setRow input[type=text]{width:110px;background:#1b2535;color:#fff;border:1px solid #3a4658;border-radius:6px;padding:5px 7px;font-family:monospace}
@@ -347,7 +346,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.13-b</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.13-c</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -27190,7 +27189,7 @@ document.body.insertAdjacentHTML('beforeend', `<div id="csBox"><div class="csIn"
   <div class="csN">${adT('1 kat = şimdiki şehir, 20 kat = 20 kat büyük alan. Çevredeki yeşil arazi hep aynı kalır. Büyük şehir telefonu yorabilir.')}<br><span id="csMp"></span></div>
   <div class="csB"><button class="go" data-cs="ok">✓ ${adT('Uygula')}</button><button data-cs="x">✕ ${adT('Kapat')}</button></div></div></div>`);
 function csUI() { const k = $('csK'), b = null, r = $('sCityBtn'); if (k && document.activeElement !== k) { k.value = CITY_K; $('csV').textContent = CITY_K + ' ' + adT('kat'); } if (b) b.innerHTML = `🏙️ ${adT('Şehir boyutu')}: ${CITY_K} ${adT('kat')} <small>${adT('yeşil arazi aynı, şehir 1–20 kat')}</small>`; if (r) r.textContent = `${CITY_K} ${adT('kat')} · ${adT('değiştir')}`; }
-function csOpen() { if (!ADM_UNLOCK) { showMsg('🔒 ' + adT('Şehir boyutunu sadece admin değiştirir'), 1.8); return; } $('csBox').style.display = 'flex'; $('csK').value = CITY_K; $('csV').textContent = CITY_K + ' ' + adT('kat'); $('csMp').textContent = typeof MP !== 'undefined' && MP.on && MP.started ? '🗳️ ' + adT('Çok oyunculuda Uygula = oylama başlar; çoğunluk evet derse herkesin şehri değişir.') : ''; }
+function csOpen() { $('csBox').style.display = 'flex'; $('csK').value = CITY_K; $('csV').textContent = CITY_K + ' ' + adT('kat'); $('csMp').textContent = typeof MP !== 'undefined' && MP.on && MP.started ? '🗳️ ' + adT('Çok oyunculuda Uygula = oylama başlar; çoğunluk evet derse herkesin şehri değişir.') : ''; }
 {
   const box = $('csBox'); for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'keydown', 'wheel']) box.addEventListener(ev, e => e.stopPropagation(), { passive: true });
   $('csK').addEventListener('input', () => { $('csV').textContent = $('csK').value + ' ' + adT('kat'); });
@@ -27201,9 +27200,9 @@ function csOpen() { if (!ADM_UNLOCK) { showMsg('🔒 ' + adT('Şehir boyutunu sa
     }
     box.style.display = 'none'; });
   const ws = $('sWeather') && $('sWeather').closest('details');
-  if (ws) ws.insertAdjacentHTML('afterend', `<details class="sec" id="sCitySec"><summary>🏙️ ${adT('Şehir boyutu')} <small>👑 ${adT('admin')}</small></summary><div class="setRow"><span>🏙️ ${adT('Şehir')}</span><button class="btn" id="sCityBtn"></button></div><div class="hint">${adT('Şehir 1 ile 20 kat arasında büyür; çevresindeki kocaman yeşil arazi hep aynı kalır. Çok oyunculuda oylamayla değişir.')}</div></details>`);
+  if (ws) ws.insertAdjacentHTML('afterend', `<details class="sec" id="sCitySec"><summary>🏙️ ${adT('Şehir boyutu')}</summary><div class="setRow"><span>🏙️ ${adT('Şehir')}</span><button class="btn" id="sCityBtn"></button></div><div class="hint">${adT('Şehir 1 ile 20 kat arasında büyür; çevresindeki kocaman yeşil arazi hep aynı kalır. Çok oyunculuda oylamayla değişir.')}</div></details>`);
   if ($('sCityBtn')) $('sCityBtn').addEventListener('click', () => csOpen());
-  // 🏙️ şehir boyutu durdurma menüsünden kaldırıldı: sadece Ayarlar'da, sadece admin
+  // 🏙️ şehir boyutu durdurma menüsünden kaldırıldı: Ayarlar'da herkes için duruyor
   csUI();
 }
 
