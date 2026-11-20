@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.15</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.16</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -556,7 +556,8 @@ window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranı
     <div class="hint">Karakterin tüm vücudu birlikte büyür ya da küçülür. 1× normal boy · sağa çekince doğal büyüme (iri, uzun adımlı) · 1×'in altı doğaüstü küçülme: karınca kadar olup çimenlerin arasında gezebilirsin.</div>
   </details>
   <details class="sec"><summary>🖼️ Grafik</summary>
-    <div class="setRow"><span>Kalite</span><select id="sGfx"><option value="ultra">💎 Ultra (en keskin görüntü, en sık çimen, çiçek / taş / böcek ayrıntıları, uzak görüş)</option><option value="high">✨ Yüksek (parlama, güneş ışınları, sık çimen, kenar yumuşatma)</option><option value="mid">🙂 Orta (parlama)</option><option value="low">⚡ Düşük (en hızlı)</option></select></div>
+    <div class="setRow"><span>Kalite</span><select id="sGfx"><option value="ultra">💎 Ultra (en keskin görüntü, en sık çimen, çiçek / taş / böcek ayrıntıları, uzak görüş)</option><option value="high">✨ Yüksek (parlama, güneş ışınları, sık çimen, kenar yumuşatma)</option><option value="mid">🙂 Orta (parlama)</option><option value="low">⚡ Düşük (en hızlı: çimen, rüzgâr, gölge yok; arkası çizilmez)</option></select></div>
+    <div class="sl"><span>👁️ Görüş mesafesi</span><input type="range" id="sView" min="300" max="4000" step="100" aria-label="Görüş mesafesi"><b id="sViewV"></b></div>
     <div class="sl"><span>Keskinlik (çözünürlük)</span><input type="range" id="sRes" min="0.7" max="1.5" step="0.05" aria-label="Keskinlik"><b id="sResV"></b></div>
     <label class="ck"><input type="checkbox" id="sDyn"> Oyun takılırsa keskinliği biraz düşür</label>
     <div class="hint">Keskinlik %100'ün üstünde görüntü daha net olur ama telefonu daha çok yorar.</div>
@@ -1610,6 +1611,7 @@ const pivot = (parent, x, y, z = 0) => { const g = new THREE.Group(); g.position
 // Sabit modellerin parçalarını malzemeye göre tek ağa birleştirir (daha az çizim çağrısı = daha akıcı oyun)
 // Rüzgar: ağaç ve çalıların yüksekteki köşeleri zamanla hafifçe salınır (GPU'da, çok ucuz)
 const windUniforms = { uTime: { value: 0 }, uWind: { value: 1 } };
+var VW = { m: (() => { try { const v = +localStorage.getItem('sftGorus'); return v >= 300 && v <= 4000 ? v : 1200; } catch (e) { return 1200; } })() };   // 👁️ görüş mesafesi (m)
 function addWind(mat, strength, base) {
   mat.onBeforeCompile = sh => {
     sh.uniforms.uTime = windUniforms.uTime; sh.uniforms.uWind = windUniforms.uWind;
@@ -8575,6 +8577,7 @@ function keyAction(code) {
   if (HR.on && hrKey(code)) return;   // 🖐️ el ragdoll
   if (curKey === 'paint' && code === 'KeyE') { if (PAINT.draw) paintStand(); else paintSit(paintNearSeat()); return; }   // 🎨 otur / kalk
   if (curKey === 'uni' && code === 'KeyE') { uniSit(!UNI.seat); return; }
+  if (code === 'KeyE' && lifeOn() === 'city' && !HERO.on && !giant && !RIDE.on && miaInteract()) return;   // 🏙️ şehirde de: mekânlar, metro, bahşiş, dondurma
   if (curKey === 'miami' && !HERO.on && !giant && !RIDE.on) { if (code === 'KeyE' && miaInteract()) return; if (code === 'KeyU') { miaPhone(); return; } }   // 🌴 Miami: E etkileşim, U telefon
   if (code === 'KeyU' && INV.eq !== 'speaker') { if (CITY.menu) cyMenuClose(); else cyMenuOpen(giant ? 'giant' : 'phone'); return; }   // 📱 telefon / 🦖 dev güçleri
   if (giant && gpKey(code)) return;
@@ -10517,7 +10520,11 @@ function update(dt) {
   {
     const gf = Math.max(0, giantS - 1);
     const fk = (curArea === AREAS.hub ? DYN.fogK || 1 : curArea === AREAS.blank ? 4 : 1) * (ADM.nofog ? 3 : 1); scene.fog.near = (curArea.fog[0] + gf * 32) * fk; scene.fog.far = (curArea.fog[1] + gf * 60) * fk;
-    const cf = giantS < .13 ? Math.max(3, Math.min(400, 3000 * giantS)) * fk : (400 + gf * 85) * fk * (curArea === AREAS.miami || curArea === AREAS.ankara ? 3 : 1);   // 🗺️ gerçek şehirlerde görüş 1,2 km (sis kenarı yumuşak biter) if (Math.abs(camera.far - cf) > Math.min(1, cf * .01)) { camera.far = cf; camera.updateProjectionMatrix(); }   // 🐜 minikken yakın düzlem de küçülür, görüş kısalır (titreşmez)
+    const vk = !curArea.box && typeof VW !== 'undefined' && VW ? VW.m / 400 : 1;   // 👁️ Ayarlar → Görüş mesafesi (iç mekânlarda değişmez)
+    scene.fog.near *= vk; scene.fog.far *= vk;
+    const cf = giantS < .13 ? Math.max(3, Math.min(400, 3000 * giantS)) * fk : (400 + gf * 85) * fk * vk;
+    if (giantS >= .13 && scene.fog.far > cf * .97) { scene.fog.far = cf * .97; scene.fog.near = Math.min(scene.fog.near, cf * .55); }   // sis görüşün sonundan önce biter: kesik kenar olmaz
+    if (Math.abs(camera.far - cf) > Math.min(1, cf * .01)) { camera.far = cf; camera.updateProjectionMatrix(); }   // 🐜 minikken yakın düzlem de küçülür, görüş kısalır (titreşmez)
     if (giantS < .13) { scene.fog.far = Math.min(scene.fog.far, cf * .95); scene.fog.near = Math.min(scene.fog.near, cf * .3); }
     SH_K = giantS < .5 ? Math.max(.004, giantS * 1.3) : 1 + gf * .2; sun.shadow.normalBias = .025 * Math.min(1, SH_K);
     const se = SHADOW_EXT * SH_K; if (Math.abs(sc.right - se) > .05) { sc.left = sc.bottom = -se; sc.right = sc.top = se; sc.far = 140 * SH_K * 1.25; sc.updateProjectionMatrix(); }
@@ -11379,7 +11386,8 @@ function gfxBuild() {
   if (GFX.composer) { GFX.composer.renderTarget1.dispose(); GFX.composer.renderTarget2.dispose(); GFX.bloom.dispose(); GFX.composer = GFX.bloom = GFX.grade = GFX.rays = GFX.fxaa = null; }
   const pr = gfxPR(), q = GFX.q;
   renderer.setPixelRatio(pr); renderer.setSize(innerWidth, innerHeight);
-  grassGeo.instanceCount = Math.round(GRASS_N * (IS_COARSE ? { low: .34, mid: .46, high: .75, ultra: 1 } : { low: .3, mid: .45, high: .667, ultra: 1 })[q]);   // Ultra: en sık çimen
+  grassGeo.instanceCount = q === 'low' ? 0 : Math.round(GRASS_N * (IS_COARSE ? { low: .34, mid: .46, high: .75, ultra: 1 } : { low: .3, mid: .45, high: .667, ultra: 1 })[q]);   // Ultra: en sık çimen · ⚡ Düşük: çimen yok
+  sun.castShadow = q !== 'low';   // ⚡ Düşük: gölge yok (kameranın arkasındakiler de gölge için çizilmez)
   detailQuality(q); DYN.fogK = q === 'ultra' ? 1.3 : 1;   // Ultra: sis daha uzakta, görüş daha uzun
   { const sr = q === 'ultra' ? 4096 : SHADOW_RES; if (sun.shadow.mapSize.x !== sr) { sun.shadow.mapSize.set(sr, sr); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } } }
   { const an = q === 'ultra' ? renderer.capabilities.getMaxAnisotropy() : q === 'high' ? Math.min(4, renderer.capabilities.getMaxAnisotropy()) : 1;   // eğik bakınca zemin dokuları bulanıklaşmasın
@@ -12960,7 +12968,7 @@ function animeAnimate(dt) {
     AJ(hips, 'y', (boy ? .03 : .05) * W, k); AJ(hips, 'z', (boy ? .025 : .055) * W, k);
     AJ(torso, 'z', (boy ? -.02 : -.045) * W, k); AJ(torso, 'y', -.04 * W, k); AJ(torso, 'x', .012 * br, k);
     // ara sıra: saç düzeltme, gerinme, etrafa bakma, eller arkada, el sallama
-    if (!A.gest && arms && A.idle > 4 && Math.random() < dt * .22) { const ids = boy ? ['cross', 'hips', 'look', 'stretch', 'wave', 'scratch'] : ['hair', 'stretch', 'look', 'behind', 'wave']; A.gest = { id: ids[Math.random() * ids.length | 0], t: 0 }; }
+    if (!A.gest && arms && A.idle > 4 && Math.random() < dt * .22) { const ids = boy ? ['cross', 'hips', 'look', 'stretch', 'wave', 'scratch'] : ['stretch', 'look', 'behind', 'wave']; A.gest = { id: ids[Math.random() * ids.length | 0], t: 0 }; }
     if (A.gest && !arms) A.gest = null;
     let g = A.gest, gw = 0;
     if (g) { g.t += dt; const L = { hair: 2.4, stretch: 2.8, look: 3.4, behind: 4.5, wave: 2.4, cross: 5.5, hips: 4.2, scratch: 2.6 }[g.id] || 3; gw = Math.min(1, g.t / .4, (L - g.t) / .4); if (g.t > L) { A.gest = null; g = null; gw = 0; } }
@@ -15648,12 +15656,14 @@ function updateCull(dt) {
   const C = camera.position, hub = curArea === AREAS.hub, low = GFX.q === 'low', far = scene.fog.far;
   const rb = (low ? far * .8 : far + 12) ** 2, rs = (low ? Math.min(far, 95) : Math.min(far, 125)) ** 2;
   const P = player.position, pr = (16 + 8 * Math.max(1, giantS)) ** 2;   // karakterin yakınındakiler hep görünür (kamera uzaktayken görünmez kaya duvarı olmasın)
-  const pass = (h, r2) => { const dx = h.position.x - C.x, dz = h.position.z - C.z, px = h.position.x - P.x, pz = h.position.z - P.z; return h.userData.flying || SQ.has(h) || (carried && carried.ref === h) || dx * dx + dz * dz < r2 * h.scale.x ** .5 || px * px + pz * pz < pr; };
+  const fw = camera.getWorldDirection(CULL.fw || (CULL.fw = new THREE.Vector3())), fl = Math.hypot(fw.x, fw.z) || 1, fx = fw.x / fl, fz = fw.z / fl;
+  const pass = (h, r2) => { const dx = h.position.x - C.x, dz = h.position.z - C.z, px = h.position.x - P.x, pz = h.position.z - P.z; return h.userData.flying || SQ.has(h) || (carried && carried.ref === h) || (dx * dx + dz * dz < r2 * h.scale.x ** .5 && (!low || dx * fx + dz * fz > -8)) || px * px + pz * pz < pr; };   // ⚡ Düşük: kameranın arkası çizilmez
   for (const h of CULL.big) h.visible = hub && pass(h, rb);
   for (const h of CULL.small) h.visible = hub && pass(h, rs);
 }
 function applyPR() { renderer.setPixelRatio(gfxPR()); renderer.setSize(innerWidth, innerHeight); if (GFX.composer) { GFX.composer.setPixelRatio(renderer.getPixelRatio()); gfxResize(); } }
 {
+  { const sv = $('sView'), vv = $('sViewV'), sh = () => { vv.textContent = VW.m >= 1000 ? (VW.m / 1000).toFixed(1).replace('.0', '') + ' km' : VW.m + ' m'; }; sv.value = VW.m; sh(); sv.addEventListener('input', () => { VW.m = +sv.value; sh(); try { localStorage.setItem('sftGorus', VW.m); } catch (e) {} }); }
   const r = $('sRes'), v = $('sResV'), ck = $('sDyn'), show = () => { v.textContent = Math.round(DYN.user * 100) + '%'; };
   SETSYNC.push(() => { r.value = DYN.user; ck.checked = DYN.auto; show(); });
   r.addEventListener('input', () => { DYN.user = +r.value; show(); try { localStorage.setItem('sftKeskinlik', String(DYN.user)); } catch (e) {} applyPR(); });
@@ -16762,7 +16772,7 @@ function admAfterWeather2() {
 
 function admAfterWeather() {
   if (ADM.wind) { windUniforms.uWind.value = Math.max(windUniforms.uWind.value, 3.4); if (grassMat.uniforms.uWind) grassMat.uniforms.uWind.value = windUniforms.uWind.value; }
-  if (ADM.noWind) { windUniforms.uWind.value = 0; if (grassMat.uniforms.uWind) grassMat.uniforms.uWind.value = 0; }
+  if (ADM.noWind || GFX.q === 'low') { windUniforms.uWind.value = 0; if (grassMat.uniforms.uWind) grassMat.uniforms.uWind.value = 0; }
   admAfterWeather2();
   try { admAfterWeather3(); } catch (e) { sftErr(e); }
 }
@@ -21631,6 +21641,7 @@ function cityPeople() {
   }
 }
 function cityPick(n) {   // pickTarget yerine: kaldırım köşeleri arasında yürür, mesai saatinde iş yerine gider
+  if (n.miaCtl) return n.miaCtl(n);   // 🎭 olaylarda (kavga, flaş mob, sihirbaz…)
   const A = AREAS.city, P = n.holder.position;
   if (n.stuck || n.sick) return false;
   if (n.beach) return cyBeachPick(n);
@@ -24450,8 +24461,8 @@ function v4Gestures(P, dt) {   // P: karakter uzayında yumuşatılmış noktala
    Binalar gerçek yerlerinde, gerçek şekil ve yükseklikte kurulur; gez, dev ol ve yık (çarpınca, tepinince, yumrukla, ayakla).
    Harita verisi oyun açıkken internetten indirilir (© OpenStreetMap katkıcıları). claude.ai bağlantısında internet kapalıdır — GitHub sitesinde çalışır.
    ===================================================================== */
-AREAS.ankara = { cx: 20000, cz: -20000, r: 2600, bg: 0xbfd6ea, fog: [260, 1150], sky: 0xdfeaf6, gnd: 0x8c8a80, sunC: 0xfff2dd, sunI: 2.5, sunVis: 0xfff3d6 };
-AREAS.miami = { cx: 27000, cz: -20000, r: 2600, bg: 0x86c5f2, fog: [300, 1150], sky: 0xcbe7ff, gnd: 0xd9c8a0, sunC: 0xfff0d4, sunI: 3.0, sunVis: 0xfff6dc };   // 🌴 Miami: parlak güneş, açık gökyüzü
+AREAS.ankara = { cx: 20000, cz: -20000, r: 2600, bg: 0xbfd6ea, fog: [260, 2400], sky: 0xdfeaf6, gnd: 0x8c8a80, sunC: 0xfff2dd, sunI: 2.5, sunVis: 0xfff3d6 };
+AREAS.miami = { cx: 27000, cz: -20000, r: 2600, bg: 0x86c5f2, fog: [320, 2700], sky: 0xcbe7ff, gnd: 0xd9c8a0, sunC: 0xfff0d4, sunI: 3.0, sunVis: 0xfff6dc };   // 🌴 Miami: parlak güneş, açık gökyüzü
 const ANK = { ldT: 0, g: null, reg: null, bld: [], chunks: [], obs: [], obsIn: false, busy: false, dead: 0, data: {}, src: {}, spawn: null };
 function ankSrcTxt(k, short) {   // haritanın nereden geldiği
   const o = ANK.src[k] || {}; if (o.s === 'srv') return short ? '🌐 ' + adT('güncel') : '🌐 ' + adT('OpenStreetMap sunucusundan (güncel)');
@@ -24646,7 +24657,7 @@ function ankBlast(wx, wz, r) {
   return n;
 }
 function ankTick(dt) {
-  if (curKey !== 'miami') { const h = $('miaHud'); if (h && h.style.display !== 'none') { h.style.display = 'none'; $('miaAct').style.display = 'none'; miaPhone(false); } }
+  if (!lifeOn()) { const h = $('miaHud'); if (h && h.style.display !== 'none') { h.style.display = 'none'; $('miaAct').style.display = 'none'; miaPhone(false); } }
   if (!ankIn()) { if (ANK.obsIn) ankObs(false); const u = $('ankUI'); if (u && u.style.display !== 'none') u.style.display = 'none'; return; }
   if (!ANK.obsIn && ANK.g) ankObs(true);
   try { ankLifeTick(dt); ankDebrisTick(dt); if (curKey === 'miami') { miaTick(dt); miaGlbTick(); } } catch (e) { sftErr(e); }
@@ -29346,7 +29357,7 @@ function miaDispatch(kind, inc) {   // olay yerine araç gönder (hastaneden / k
   const v = miaVehicle(kind); v.path = path; v.i = 0; v.t = 0; v.inc = inc; v.kind = kind; v.st = 'go'; v.sp = 15; MIA2.veh.push(v); return v;
 }
 function miaVehTick(v, dt) {
-  const A = ankA(), fl = Math.sin(elapsed * 14) > 0; v.lr.emissiveIntensity = fl ? 3.5 : .2; v.lb.emissiveIntensity = fl ? .2 : 3.5;
+  const A = v.A || ankA(), fl = Math.sin(elapsed * 14) > 0; v.lr.emissiveIntensity = fl ? 3.5 : .2; v.lb.emissiveIntensity = fl ? .2 : 3.5;
   if (v.st === 'go' || v.st === 'back') {
     const a = v.path[v.i], b = v.path[v.i + 1]; if (!b) { v.st = v.st === 'go' ? 'here' : 'gone'; v.wait = 0; return; }
     const dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L; v.t += v.sp * dt / L; if (v.t >= 1) { v.t = 0; v.i++; return; }
@@ -29428,7 +29439,7 @@ function miaIncTick(inc, dt) {
 function miaCatch(inc, byMe) { const th = inc.thief; if (!th || th.caught) return; th.caught = true; th.state = 'down'; th.downT = .5; th.hurt = 'cuffed'; try { hrEmo(th.holder, '🚔', 1.5, 3); } catch (e) {} setTimeout(() => miaKill(th), 9000); if (inc.vic) try { hrEmo(inc.vic.holder, '😊', 1.5, 2); } catch (e) {}
   if (byMe) { progAdd(40, player.position, adT('Hırsızı yakaladın')); MIA2.task = null; miaHud(); } }
 // ---------- etkileşim (E), meslekler, takip ----------
-function miaNearInter() { const P = player.position, M = ANK.mia; if (!M || !M.inter) return null; let b = null, bd = 1e9; for (const it of M.inter) { const x = it.o ? it.o.position.x : it.x, z = it.o ? it.o.position.z : it.z, d = Math.hypot(x - P.x, z - P.z); if (d < it.r && d < bd) { bd = d; b = it; } } return b; }
+function miaNearInter() { const P = player.position, L = lifeOn() ? lifeInter() : null; if (!L) return null; let b = null, bd = 1e9; for (const it of L) { const x = it.o ? it.o.position.x : it.x, z = it.o ? it.o.position.z : it.z, d = Math.hypot(x - P.x, z - P.z); if (d < it.r && d < bd) { bd = d; b = it; } } return b; }
 function miaInteract() {
   const T = MIA2.task, P = player.position;
   if (T && T.k === 'heal' && T.inc.vic && T.inc.vic.hurt && Math.hypot(T.inc.vic.holder.position.x - P.x, T.inc.vic.holder.position.z - P.z) < 3) {
@@ -29476,11 +29487,11 @@ function miaJob2(k) { MIA2.job = null; miaJob(k); }
 function miaTarget() { const T = MIA2.task; if (!T) return null; if (T.k === 'heal') return T.inc.vic && T.inc.vic.holder.position; if (T.k === 'catch') return T.inc.thief && T.inc.thief.holder.position; if (T.k === 'taxi') return T.st === 'wait' ? T.n.holder.position : T.dst; if (T.k === 'deliver') return T.st === 'pick' ? T.from : T.to; return null; }
 function miaHud() {
   let h = $('miaHud'); if (!h) { document.body.insertAdjacentHTML('beforeend', '<div id="miaHud"></div><button id="miaAct"></button>'); h = $('miaHud'); $('miaAct').addEventListener('click', e => { e.stopPropagation(); if (!miaInteract()) play('ui'); }); for (const ev of ['pointerdown', 'touchstart', 'mousedown']) { h.addEventListener(ev, e => e.stopPropagation(), { passive: true }); $('miaAct').addEventListener(ev, e => e.stopPropagation(), { passive: true }); } h.addEventListener('click', e => { const b = e.target.closest('[data-mh]'); if (!b) return; e.stopPropagation(); if (b.dataset.mh === 'unf') { MIA2.follow = null; miaHud(); } else if (b.dataset.mh === 'ph') miaPhone(true); }); }
-  if (curKey !== 'miami') { h.style.display = 'none'; $('miaAct').style.display = 'none'; return; }
+  const W = lifeOn(); if (!W) { h.style.display = 'none'; $('miaAct').style.display = 'none'; return; }
   const P = player.position, T = MIA2.task, tg = miaTarget(), F = MIA2.follow, parts = [];
-  parts.push(`<button data-mh="ph">📱 ${adT('Telefon')} <small>U</small></button>`);
-  if (MIA3.wanted > 0) parts.push(`<span class="mt">🚨 ${'⭐'.repeat(MIA3.wanted)}</span>`);
-  if (MIA2.job) parts.push(`<span class="mj">${{ medic: '🚑', police: '👮', taxi: '🚕', courier: '🍔' }[MIA2.job]} ${{ medic: adT('Paramedik'), police: adT('Polis'), taxi: adT('Taksi'), courier: adT('Kurye') }[MIA2.job]}</span>`);
+  parts.push(W === 'city' ? `<button data-mh="ph">📱 ${adT('Hayat')}</button>` : `<button data-mh="ph">📱 ${adT('Telefon')} <small>U</small></button>`);
+  if (MIA3.wanted > 0 && W === 'miami') parts.push(`<span class="mt">🚨 ${'⭐'.repeat(MIA3.wanted)}</span>`);
+  if (MIA2.job && W === 'miami') parts.push(`<span class="mj">${{ medic: '🚑', police: '👮', taxi: '🚕', courier: '🍔' }[MIA2.job]} ${{ medic: adT('Paramedik'), police: adT('Polis'), taxi: adT('Taksi'), courier: adT('Kurye') }[MIA2.job]}</span>`);
   if (T && tg) { const d = Math.round(Math.hypot(tg.x - P.x, tg.z - P.z)), a = Math.atan2(tg.x - P.x, tg.z - P.z) - facing, ar = ['⬆️', '↗️', '➡️', '↘️', '⬇️', '↙️', '⬅️', '↖️'][((Math.round(-a / (Math.PI / 4)) % 8) + 8) % 8];
     const tx = { heal: '🩺 ' + adT('Yaralıya ulaş'), catch: '🏃 ' + adT('Hırsızı yakala'), taxi: T.st === 'wait' ? '🙋 ' + adT('Yolcuyu al') : '📍 ' + T.dst.n, deliver: T.st === 'pick' ? '📦 ' + T.from.n : '🏠 ' + T.to.n }[T.k]; parts.push(`<span class="mt">${tx} · ${ar} ${d} m</span>`); }
   if (F && F.holder.parent) { const st = F.hurt ? adT('yerde, yardım bekliyor') : F.state === 'idle' ? adT('duruyor') : F.state === 'flee' ? adT('kaçıyor') : adT('yürüyor'); parts.push(`<span class="mf">👣 ${F.name} · ${st} <button data-mh="unf">✕</button></span>`); }
@@ -29502,6 +29513,7 @@ function miaResident(bi, fl, un) {   // her daireye sabit bir hayat (bina, kat, 
   return { nm, age, job: adT(J[0]), act, pets, door: `${fl}${'ABCDEFGH'[un]}` };
 }
 function miaLookBld() {   // baktığın / en yakın bina
+  if (curKey === 'city' && CITY.bld) { const A = AREAS.city, P = player.position, fx = Math.sin(facing), fz = Math.cos(facing); let b = null, bd = 1e9; CITY.bld.forEach((q, i) => { if (q[5]) return; const [x, z, w, d, h] = q, dx = A.cx + x - P.x, dz = A.cz + z - P.z, dd = Math.hypot(dx, dz), dot = (dx * fx + dz * fz) / (dd || 1), sc = dd * (1.6 - dot); if (dd < 140 && sc < bd) { bd = sc; b = { nm: '', h: h || 12, minx: x - w / 2, maxx: x + w / 2, minz: z - d / 2, maxz: z + d / 2, bi: 9000 + i }; } }); return b; }
   const A = ankA(), P = player.position, fx = Math.sin(facing), fz = Math.cos(facing); let b = null, bd = 1e9;
   for (const q of ANK.bld) { if (!q.alive) continue; const cx = A.cx + (q.minx + q.maxx) / 2, cz = A.cz + (q.minz + q.maxz) / 2, dx = cx - P.x, dz = cz - P.z, d = Math.hypot(dx, dz), dot = (dx * fx + dz * fz) / (d || 1), sc = d * (1.6 - dot); if (d < 120 && sc < bd) { bd = sc; b = q; } } return b;
 }
@@ -29509,25 +29521,26 @@ function miaPhone(on = !MIA2.phone, page) {
   MIA2.phone = on; let p = $('miaPhone'); if (on && document.pointerLockElement) document.exitPointerLock();
   if (!p) { document.body.insertAdjacentHTML('beforeend', '<div id="miaPhone"></div>'); p = $('miaPhone'); for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'wheel', 'keydown']) p.addEventListener(ev, e => e.stopPropagation(), { passive: true });
     p.addEventListener('click', e => { const b = e.target.closest('[data-mp]'); if (!b) return; e.stopPropagation(); play('ui'); const a = b.dataset.mp;
-      if (a === 'x') miaPhone(false); else if (a.startsWith('job:')) { miaJob(a.slice(4)); miaPhone(true, 'job'); } else if (a === 'follow') { miaFollowNearest(); miaPhone(false); } else if (a === 'ev') { miaEvent(); miaPhone(true, 'inc'); }
+      if (a === 'x') miaPhone(false); else if (a.startsWith('job:')) { miaJob(a.slice(4)); miaPhone(true, 'job'); } else if (a === 'follow') { miaFollowNearest(); miaPhone(false); } else if (a === 'ev') { miaEventAny(); miaPhone(curKey === 'city' ? false : true, 'inc'); }
       else if (a.startsWith('go:')) { const f = ANK.mia.fac[+a.slice(3)]; if (f) { teleportTo('miami', f.x, f.z, f.ang + Math.PI, f.ic + ' ' + f.nm); miaPhone(false); } }
       else if (a.startsWith('ride:')) miaMetroRide(a.slice(5)); else if (a.startsWith('do:')) miaFacDo(a.slice(3)); else miaPhone(true, a); }); }
   p.classList.toggle('on', on); if (!on) return; MIA2.page = page || MIA2.page || 'home'; const pg = MIA2.page, A = s => adT(s);
   const hh = typeof DAY !== 'undefined' ? `${String(Math.floor(DAY.t)).padStart(2, '0')}:${String(Math.floor((DAY.t % 1) * 60)).padStart(2, '0')}` : '12:00';
   let body = '';
-  if (pg === 'home') body = `<div class="pg">${[['job', '💼', A('Meslek')], ['inc', '🚨', A('Olaylar')], ['follow', '👣', A('Takip et')], ['apt', '🏢', A('Daireler')], ['fac', '🏥', A('Tesisler')], ['metro', '🚇', A('Metro')], ['uni', '🎓', A('Okul')], ['myst', '🕵️', A('Gizemler')], ['park', '🌳', A('Yaşam Parkı')], ['bank', '💰', A('Cüzdan')], ['ev', '🎲', A('Olay çıkar')]].map(([k, i, t]) => `<button data-mp="${k}"><b>${i}</b><span>${t}</span></button>`).join('')}</div>`;
+  if (pg === 'home' && curKey === 'city') body = `<div class="pg">${[['follow', '👣', A('Takip et')], ['apt', '🏢', A('Daireler')], ['metro', '🚇', A('Metro')], ['uni', '🎓', A('Okul')], ['myst', '🕵️', A('Gizemler')], ['bank', '💰', A('Cüzdan')], ['ev', '🎲', A('Olay çıkar')]].map(([k, i, t]) => `<button data-mp="${k}"><b>${i}</b><span>${t}</span></button>`).join('')}</div>`;
+  else if (pg === 'home') body = `<div class="pg">${[['job', '💼', A('Meslek')], ['inc', '🚨', A('Olaylar')], ['follow', '👣', A('Takip et')], ['apt', '🏢', A('Daireler')], ['fac', '🏥', A('Tesisler')], ['metro', '🚇', A('Metro')], ['uni', '🎓', A('Okul')], ['myst', '🕵️', A('Gizemler')], ['park', '🌳', A('Yaşam Parkı')], ['bank', '💰', A('Cüzdan')], ['ev', '🎲', A('Olay çıkar')]].map(([k, i, t]) => `<button data-mp="${k}"><b>${i}</b><span>${t}</span></button>`).join('')}</div>`;
   else if (pg === 'job') body = `<h4>💼 ${A('Meslek seç')}</h4>` + [['medic', '🚑', A('Paramedik'), A('Kaza ve bayılmalarda yaralıya ilk sen ulaş · +30 🪙')], ['police', '👮', A('Polis'), A('Kapkaççıyı kovala, yakala · +40 🪙')], ['taxi', '🚕', A('Taksi'), A('Yolcuyu al, gideceği yere götür · mesafeye göre')], ['courier', '🍔', A('Kurye'), A('Mağazadan paketi al, adrese teslim et · +18 🪙')]].map(([k, i, t, d]) => `<button class="li${MIA2.job === k ? ' on' : ''}" data-mp="job:${k}"><b>${i}</b><span>${t}<small>${d}</small></span>${MIA2.job === k ? '✓' : ''}</button>`).join('');
   else if (pg === 'inc') body = `<h4>🚨 ${A('Olaylar')}</h4>` + (MIA2.inc.length ? MIA2.inc.map(i => `<div class="li"><b>${{ crash: '🚗💥', faint: '😵', snatch: '👜' }[i.k]}</b><span>${{ crash: A('Trafik kazası'), faint: A('Bayılma'), snatch: A('Kapkaç') }[i.k]}<small>${Math.round(Math.hypot(i.x - player.position.x, i.z - player.position.z))} m · ${(i.veh || []).map(v => v.kind === 'amb' ? '🚑' : '🚓').join(' ') || A('ekip bekleniyor')}</small></span></div>`).join('') : `<p>${A('Şu an sakin. Bir yayayı takip et ya da biraz bekle.')}</p>`) + `<button class="li" data-mp="ev"><b>🎲</b><span>${A('Şimdi bir olay çıkar')}</span></button>`;
-  else if (pg === 'apt') { const b = miaLookBld(); if (!b) body = `<p>${A('Yakında bina yok')}</p>`; else { const bi = ANK.bld.indexOf(b), fl = Math.max(1, Math.min(12, Math.round(b.h / 3.2))), per = Math.max(1, Math.min(4, Math.round(((b.maxx - b.minx) + (b.maxz - b.minz)) / 22))), L = [];
+  else if (pg === 'apt') { const b = miaLookBld(); if (!b) body = `<p>${A('Yakında bina yok')}</p>`; else { const bi = b.bi ?? ANK.bld.indexOf(b), fl = Math.max(1, Math.min(12, Math.round(b.h / 3.2))), per = Math.max(1, Math.min(4, Math.round(((b.maxx - b.minx) + (b.maxz - b.minz)) / 22))), L = [];
       for (let f = 1; f <= fl; f++) for (let u = 0; u < per; u++) { const r = miaResident(bi, f, u); L.push(`<div class="li"><b>🚪</b><span>${r.door} · ${r.nm}, ${r.age} · ${r.job}${r.pets}<small>${r.act}</small></span></div>`); }
       body = `<h4>🏢 ${b.nm || A('Apartman')} · ${fl * per} ${A('daire')}</h4>` + L.slice(0, 40).join(''); } }
   else if (pg === 'fac') body = `<h4>🏥 ${A('Tesisler')}</h4>` + (ANK.mia.fac || []).map((f, i) => `<button class="li" data-mp="go:${i}"><b>${f.ic}</b><span>${f.nm}<small>${Math.round(Math.hypot(f.x - player.position.x, f.z - player.position.z))} m · ${A('dokun: git')}</small></span></button>`).join('');
   else if (pg.startsWith('fac:')) { const k = pg.slice(4), f = (ANK.mia.fac || []).find(q => q.k === k), acts = { hosp: [['heal', '❤️', A('Tedavi ol (10 🪙)')], ['job:medic', '🚑', A('Paramedik ol')]], police: [['job:police', '👮', A('Polis ol')], ['report', '📝', A('Olay bildir')]], fire: [['hose', '🚒', A('Hortumla oyna')]], gas: [['drink', '🥤', A('Soğuk içecek (3 🪙)')], ['job:taxi', '🚕', A('Taksi kirala, taksici ol')]], bank: [['bal', '💰', A('Bakiyeni gör')]], market: [['snack', '🥪', A('Atıştırmalık (4 🪙)')], ['job:courier', '🍔', A('Kurye ol')]], gym: [['work', '💪', A('Antrenman yap')]], uni: [['uni', '🎓', A('Okul işleri (yazıl, derse git)')]] }[k] || [];
     body = `<h4>${f ? f.ic + ' ' + f.nm : ''}</h4>` + acts.map(([a, i, t]) => `<button class="li" data-mp="${a.startsWith('job:') ? a : 'do:' + a}"><b>${i}</b><span>${t}</span></button>`).join(''); }
   else if (pg === 'park') { const P2 = ANK.mia.park; body = `<h4>🌳 ${A('Yaşam Parkı')}</h4><p>${A('Koşu pisti, basketbol sahası, barfiks aletleri, piknik masaları, taco kamyonu, çeşme, köpek parkı.')}</p>` + (P2 ? `<button class="li" data-mp="do:park"><b>🧭</b><span>${A('Parka git')}</span></button>` : ''); }
-  else if (pg === 'metro') body = `<h4>🚇 ${A('Miami Metro')}</h4><p>${A('Bilet 2 🪙 · bir istasyon seç')}</p>` + MIA_STATIONS.map(([k, n]) => `<button class="li${ANK.key === k ? ' on' : ''}" data-mp="ride:${k}"><b>Ⓜ</b><span>${n}<small>${ANK.key === k ? A('buradasın') : A('dokun: bin')}</small></span></button>`).join('');
+  else if (pg === 'metro') body = `<h4>🚇 ${A('Miami Metro')}</h4><p>${A('Bilet 2 🪙 · bir istasyon seç')}</p>` + MIA_STATIONS.map(([k, n]) => { const here = (k === 'city' && curKey === 'city') || (k === ANK.key && curKey === 'miami'); return `<button class="li${here ? ' on' : ''}" data-mp="ride:${k}"><b>${k === 'city' ? '🏙️' : 'Ⓜ'}</b><span>${n}<small>${here ? A('buradasın') : A('dokun: bin')}</small></span></button>`; }).join('');
   else if (pg === 'uni') body = `<h4>🎓 ${A('Miami Üniversitesi')}</h4>` + (UNI.en ? `<p>${A('Öğrencisin')} · 📚 ${UNI.done}/6 ${A('ders')} · ⭐ ${A('ortalama')} ${uniGPA()}${UNI.dip ? ' · 🎓 ' + A('mezun') : ''}</p><button class="li" data-mp="do:class"><b>📚</b><span>${A('Derse git')}<small>${UNI_TOP[UNI.topic % UNI_TOP.length][0]}</small></span></button>` : `<p>${A('Kayıt ücretsiz. Derslere gir, sürpriz sınavlardan not al, 6 dersten sonra mezun ol.')}</p><button class="li" data-mp="do:enroll"><b>✍️</b><span>${A('Okula yazıl')}</span></button>`);
-  else if (pg === 'myst') body = `<h4>🕵️ ${A('Gizemler')}</h4><div class="li"><b>🦩</b><span>${A('Altın flamingolar')}: ${MIA3.fl.size}/12<small>${A('Her bölgede 3 tane saklı. Hepsini bul.')}</small></span></div><div class="li"><b>👽</b><span>${A('Uzaylı parçası')}: ${MIA3.alien}<small>${A('Geceleri gökyüzüne bak.')}</small></span></div><div class="li"><b>👻</b><span>${A('Ara sokaklar')}<small>${A('Gece hayalet görenler var. Yaklaşırsan bir şey fısıldar.')}</small></span></div><div class="li"><b>🐈‍⬛</b><span>${A('Kara kedi')}<small>${A('Peşinden gidersen bir yere götürür.')}</small></span></div>`;
+  else if (pg === 'myst') body = `<h4>🕵️ ${A('Gizemler')}</h4><div class="li"><b>🦩</b><span>${A('Altın flamingolar')}: ${MIA3.fl.size}/${FL_TOTAL}<small>${A('Miami\'nin her bölgesinde ve Şehir\'de 3\'er tane saklı. Hepsini bul.')}</small></span></div><div class="li"><b>👽</b><span>${A('Uzaylı parçası')}: ${MIA3.alien}<small>${A('Geceleri gökyüzüne bak.')}</small></span></div><div class="li"><b>👻</b><span>${A('Ara sokaklar')}<small>${A('Gece hayalet görenler var. Yaklaşırsan bir şey fısıldar.')}</small></span></div><div class="li"><b>🐈‍⬛</b><span>${A('Kara kedi')}<small>${A('Peşinden gidersen bir yere götürür.')}</small></span></div>`;
   else if (pg === 'bank') body = `<h4>💰 ${A('Cüzdan')}</h4><p style="font-size:28px;font-weight:800">${typeof progFmt === 'function' ? progFmt(PROG.coins) : PROG.coins} 🪙</p><p>${A('Meslek yaparak, alışverişte harcayarak RP oyna.')}</p>`;
   p.innerHTML = `<div class="sb"><span>${hh}</span><span>📶 🔋</span></div>${pg !== 'home' ? '<button class="bk" data-mp="home">‹</button>' : ''}<div class="ct">${body}</div><div class="nav"><button data-mp="home">◯</button><button data-mp="x">✕</button></div>`;
 }
@@ -29563,6 +29576,7 @@ function miaLifeTick(dt) {
 }
 function miaLifeClear() {   // şehirden çıkınca / yeniden kurulunca
   for (const sh of MIA3.shows) { try { sh.end && sh.end(); } catch (e) {} for (const a of sh.actors || []) miaKill(a); } MIA3.shows = []; for (const o of MIA3.pick || []) scene.remove(o.s); MIA3.pick = [];
+  for (const o of CLIFE.objs) scene.remove(o); CLIFE.objs = []; CLIFE.inter.length = 0; CLIFE.built = false;
   for (const v of MIA2.veh) { scene.remove(v.g); for (const c of v.crew || []) miaKill(c); } MIA2.veh = [];
   for (const i of MIA2.inc) { if (i.tape) scene.remove(i.tape); if (i.thief) miaKill(i.thief); if (i.vic && i.vic.miaHelper) miaKill(i.vic); else if (i.vic) i.vic.hurt = null; } MIA2.inc = []; MIA2.task = null; MIA2.follow = null;
   const L = slotHolders.miaprop || []; for (const o of L) scene.remove(o); L.length = 0; if (MIA2.siren) { try { MIA2.siren.o.stop(); } catch (e) {} MIA2.siren = null; }
@@ -29832,7 +29846,23 @@ function tpUI() {
    havai ray, gelip giden tren), 🎓 Miami Üniversitesi (yazıl, derse gir, sürekli bir şeyler olur, sınav, mezuniyet).
    ===================================================================== */
 const MIA3 = { wanted: 0, wantT: 0, chaseT: 0, shows: [], fl: (() => { try { return new Set(JSON.parse(localStorage.getItem('sftFlamingo') || '[]')); } catch (e) { return new Set(); } })(), metroTo: null, alien: 0 };
-const MIA_STATIONS = [['southbeach', 'South Beach'], ['downtown', 'Downtown'], ['littlehavana', 'Little Havana'], ['starisland', 'Star Island']];
+const MIA_STATIONS = [['city', 'Şehir Merkezi'], ['southbeach', 'South Beach'], ['downtown', 'Downtown'], ['littlehavana', 'Little Havana'], ['starisland', 'Star Island']];
+const CLIFE = { built: false, inter: [], objs: [], evT: 25, hudT: 0, metro: null, cg: null }, FL_TOTAL = 15;   // 🏙️ Şehir'de de aynı hayat
+function lifeOn() { return curKey === 'miami' && ANK.mia ? 'miami' : (typeof inCity !== 'undefined' && inCity && CITY.built) ? 'city' : null; }
+function lifePpl() { return lifeOn() === 'city' ? CITY.peds.filter(n => n.holder.visible && !n.beach && !n.sick && !n.stuck) : (ANK.ppl || []); }
+function lifeCars() { return lifeOn() === 'city' ? CITY.cars.filter(c => c.g && c.g.visible) : (ANK.cars || []); }
+function lifeInter() { return lifeOn() === 'miami' ? ANK.mia.inter : CLIFE.inter; }
+function lifeNodeNear(rmin, rmax) {   // odağa uzak-yakın bir kaldırım noktası (dünya koordinatı)
+  const f = miaFocus(); if (lifeOn() === 'city') { const A = AREAS.city, L = CITY.nodes.filter(n => { const d = Math.hypot(A.cx + n.x - f.x, A.cz + n.z - f.z); return d > rmin && d < rmax; }), n = L[(Math.random() * L.length) | 0]; return n ? { x: A.cx + n.x, z: A.cz + n.z } : null; }
+  const n = miaNodeNear(rmin, rmax); return n ? { x: ankA().cx + n.x, z: ankA().cz + n.z } : null;
+}
+function lifeWalkPath(len) {   // ara sokaklarda yürüyüş yolu (dünya koordinatı)
+  const f = miaFocus(), pts = [];
+  if (lifeOn() === 'city') { const A = AREAS.city, N = CITY.nodes, c0 = N.map((n, i) => i).filter(i => { const d = Math.hypot(A.cx + N[i].x - f.x, A.cz + N[i].z - f.z); return d > 30 && d < 90; }); if (!c0.length) return null; let cur = c0[(Math.random() * c0.length) | 0], prev = -1; pts.push([A.cx + N[cur].x, A.cz + N[cur].z]);
+    for (let k = 0; k < len; k++) { const o = (N[cur].nb || []).filter(j => j !== prev); if (!o.length) break; const nx = o[(Math.random() * o.length) | 0]; prev = cur; cur = nx; pts.push([A.cx + N[cur].x, A.cz + N[cur].z]); } return pts; }
+  const nd = miaNodeNear(30, 90, true); if (!nd) return null; const A = ankA(); let cur = nd, prev = null; pts.push([A.cx + nd.x, A.cz + nd.z]);
+  for (let k = 0; k < len; k++) { const e = cur.walk.filter(q => q.n !== prev); if (!e.length) break; const nx = e[(Math.random() * e.length) | 0].n; prev = cur; cur = nx; pts.push([A.cx + cur.x, A.cz + cur.z]); } return pts;
+}
 function miaSay(h, text, dur = 2.6, y = 2.3) {   // konuşma balonu (yaya, eşya, ne olursa)
   if (!h) return; const c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d'); g.font = 'bold 30px system-ui,sans-serif'; const w = Math.min(500, g.measureText(text).width + 36);
   g.fillStyle = 'rgba(255,255,255,.95)'; g.beginPath(); g.roundRect((512 - w) / 2, 6, w, 60, 22); g.fill(); g.beginPath(); g.moveTo(244, 64); g.lineTo(256, 88); g.lineTo(268, 64); g.fill();
@@ -29841,7 +29871,7 @@ function miaSay(h, text, dur = 2.6, y = 2.3) {   // konuşma balonu (yaya, eşya
   fx6({ t: 0, u(dt) { this.t += dt; s.position.copy(h.position); s.position.y += y; s.material.opacity = Math.min(1, (dur - this.t) * 3, this.t * 6); if (this.t > dur || !h.parent) { scene.remove(s); t.dispose(); return false; } return true; } });
   if (/[!?]/.test(text)) try { play('talk', { at: h.position, gap: .15 }); } catch (e) {}
 }
-function miaPeds(r = 60, n = 99) { const f = MIA2.follow && MIA2.follow.holder.parent ? MIA2.follow.holder.position : player.position; return (ANK.ppl || []).filter(q => npcSolid(q) && !q.hurt && !q.miaHelper && !q.parkLoop && !q.miaCtl && Math.hypot(q.holder.position.x - f.x, q.holder.position.z - f.z) < r).slice(0, n); }
+function miaPeds(r = 60, n = 99) { const f = MIA2.follow && MIA2.follow.holder.parent ? MIA2.follow.holder.position : player.position; return lifePpl().filter(q => npcSolid(q) && !q.hurt && !q.miaHelper && !q.parkLoop && !q.miaCtl && Math.hypot(q.holder.position.x - f.x, q.holder.position.z - f.z) < r).slice(0, n); }
 function miaHold(n, face) { n.miaCtl = () => false; n.state = 'idle'; n.timer = 99; n.vel.set(0, 0, 0); if (face) { n.facing = Math.atan2(face.x - n.holder.position.x, face.z - n.holder.position.z); n.holder.rotation.y = n.facing; } }
 function miaFree(n) { if (n) { n.miaCtl = null; n.timer = 0; n.body.position.y = 0; } }
 function miaHelper(x, z, shirt, pants, name, job) { spawnNPC(x + .31, z + .27, x, z, shirt); const n = npcs[npcs.length - 1]; n.ank = true; n.miaHelper = true; n.state = 'idle'; n.timer = 0; n.spd = 1; n.name = name; n.job = job; try { humanize(n.rig, { shirt, pants, longSleeve: true }); } catch (e) {} return n; }
@@ -29859,13 +29889,12 @@ const MIA_EVS = {
       end() { miaFree(a); watch.forEach(miaFree); } });
   },
   keko() {   // ara sokaktan geçen kekolar: eşofman, kasket, hoparlör, müzik
-    const nd = miaNodeNear(30, 90, true); if (!nd) return null; const A = ankA(), sx = A.cx + nd.x, sz = A.cz + nd.z, crew = [];
+    const path = lifeWalkPath(9); if (!path || path.length < 2) return null; const sx = path[0][0], sz = path[0][1], crew = [];
     for (let i = 0; i < 4; i++) { const n = miaHelper(sx - i * 1.4, sz - i * .8, i % 2 ? 0x111111 : 0xfafafa, 0x111111, cyPick(['Kenan', 'Berkay', 'Emrah', 'Volkan', 'Serkan', 'Tuna']), adT('Keko')); n.spd = 1.15;
       const cap = new THREE.Mesh(new THREE.SphereGeometry(.17, 10, 6, 0, 6.3, 0, 1.6), M(i % 2 ? 0xfafafa : 0x111111)); cap.position.y = .06; n.rig.head.add(cap); const vz = new THREE.Mesh(new THREE.BoxGeometry(.2, .02, .16), M(i % 2 ? 0xfafafa : 0x111111)); vz.position.set(0, .07, .16); n.rig.head.add(vz);
       if (i === 1) { const sp = new THREE.Mesh(new THREE.BoxGeometry(.32, .18, .14), M(0x222222)); sp.position.set(.12, .02, 0); n.rig.armR.el.add(sp); }
       crew.push(n); }
-    let cur = nd, prev = null; const path = [nd]; for (let k = 0; k < 9; k++) { const e = cur.walk.filter(q => q.n !== prev); if (!e.length) break; const nx = e[(Math.random() * e.length) | 0].n; prev = cur; cur = nx; path.push(cur); }
-    crew[0].pi = 1; crew[0].miaCtl = n => { const q = path[n.pi]; if (!q) return false; n.target.set(A.cx + q.x, 0, A.cz + q.z); if (Math.hypot(n.holder.position.x - n.target.x, n.holder.position.z - n.target.z) < 2.5) n.pi++; return true; };
+    crew[0].pi = 1; crew[0].miaCtl = n => { const q = path[n.pi]; if (!q) return false; n.target.set(q[0], 0, q[1]); if (Math.hypot(n.holder.position.x - n.target.x, n.holder.position.z - n.target.z) < 2.5) n.pi++; return true; };
     for (let i = 1; i < 4; i++) { const ld = crew[i - 1]; crew[i].miaCtl = n => { n.target.set(ld.holder.position.x - Math.sin(ld.facing) * 1.3, 0, ld.holder.position.z - Math.cos(ld.facing) * 1.3); return true; }; }
     const L = ['Bas bas bas! 🎵', 'Kanka naber?', 'Oha şu palmiyeye bak!', 'Akşam halısaha var mı?', 'Kral nereye böyle?', 'Bu şarkı efsane 🔊', 'Ooo kim gelmiş!', 'Abi bi selfie çekelim mi?'];
     return miaShow({ k: 'keko', dur: 75, actors: crew, msg: '🧢 ' + adT('Ara sokaktan kekolar geçiyor'), u(dt) { this.n = (this.n || 0) - dt; if (this.n < 0) { this.n = 2.6 + Math.random() * 2; const w = crew[(Math.random() * 4) | 0]; miaSay(w.holder, cyPick(L)); if (Math.random() < .5) try { play('drumroll', { at: w.holder.position, gain: .3 }); } catch (e) {} } } });
@@ -29880,11 +29909,11 @@ const MIA_EVS = {
     const f = miaFocus(), n = miaHelper(f.x + 6, f.z + 6, 0x311b92, 0x111111, 'Gran Mago', adT('Sokak sihirbazı')); miaHold(n, f);
     const hat = new THREE.Mesh(new THREE.CylinderGeometry(.13, .13, .26, 14), M(0x111111)); hat.position.y = .26; n.rig.head.add(hat); const br = new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, .02, 14), M(0x111111)); br.position.y = .13; n.rig.head.add(br);
     const crowd = miaPeds(45, 5); crowd.forEach((c, i) => { const a = i / 5 * 3 + 2; c.miaCtl = q => { q.target.set(n.holder.position.x + Math.cos(a) * 2.6, 0, n.holder.position.z + Math.sin(a) * 2.6); return Math.hypot(q.holder.position.x - q.target.x, q.holder.position.z - q.target.z) > 1; }; });
-    const it = { k: 'tip', o: n.holder, r: 2.4, n: '🪙 ' + adT('Sihirbaza bahşiş ver') }; ANK.mia.inter.push(it);
+    const it = { k: 'tip', o: n.holder, r: 2.4, n: '🪙 ' + adT('Sihirbaza bahşiş ver') }; lifeInter().push(it);
     const L = ['Bayanlar baylar!', 'Bu şapka... bomboş!', 'Abrakadabra! 🎩', 'TA-DAAA! 🐇'];
     return miaShow({ k: 'magician', dur: 32, actors: [n], msg: '🎩 ' + adT('Bir sokak sihirbazı gösteri yapıyor'), u(dt) { const i = Math.floor(this.t / 2.6); if (i < L.length && i !== this.i) { this.i = i; miaSay(n.holder, L[i]); if (i === 3) { const rb = new THREE.Group(), bm = M(0xffffff); const b0 = new THREE.Mesh(new THREE.SphereGeometry(.14, 10, 8), bm); b0.scale.set(1, .8, 1.3); rb.add(b0); for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.CapsuleGeometry(.025, .16, 3, 6), bm); e.position.set(s * .05, .18, .08); rb.add(e); } rb.position.copy(n.holder.position).add(new THREE.Vector3(0, 2.2, 0)); scene.add(rb); this.rb = rb; play('magic'); setTimeout(() => play('clap', { gain: .7 }), 400); crowd.forEach(c => { try { hrEmo(c.holder, '👏', 1.4, 2); } catch (e) {} }); } }
         if (this.rb) { this.rb.position.y = Math.max(.15, this.rb.position.y - dt * 1.5); this.rb.position.x += Math.sin(this.t * 3) * dt; } },
-      end() { crowd.forEach(miaFree); if (this.rb) scene.remove(this.rb); const k = ANK.mia.inter.indexOf(it); if (k >= 0) ANK.mia.inter.splice(k, 1); } });
+      end() { crowd.forEach(miaFree); if (this.rb) scene.remove(this.rb); const L2 = lifeInter(), k = L2.indexOf(it); if (k >= 0) L2.splice(k, 1); } });
   },
   flashmob() {   // flaş mob: yayalar birden dans eder
     const P = miaPeds(50, 7); if (P.length < 4) return null; const f = miaFocus(); P.forEach((n, i) => { const a = i / P.length * 6.283; n.holder.position.set(f.x + 8 + Math.cos(a) * 3, 0, f.z + Math.sin(a) * 3); miaHold(n, f); });
@@ -29898,7 +29927,7 @@ const MIA_EVS = {
       end() { a.body.position.y = 0; miaFree(a); miaFree(b); crowd.forEach(miaFree); } });
   },
   alarm() {   // araba alarmı
-    const f = miaFocus(), c = (ANK.cars || []).filter(q => q.g.visible && !q.wreck && q.g.position.distanceTo(f) < 50)[0]; if (!c) return null; c.sp0 = c.sp; c.sp = 0;
+    const f = miaFocus(), c = lifeCars().filter(q => q.g.visible && !q.wreck && q.g.position.distanceTo(f) < 50)[0]; if (!c) return null; c.sp0 = c.sp; c.sp = 0;
     return miaShow({ k: 'alarm', dur: 7, msg: '🚨 ' + adT('Bir araba alarmı çalıyor'), u(dt) { this.n = (this.n || 0) - dt; if (this.n < 0) { this.n = .55; try { play('horn', { at: c.g.position, gain: .6 }); } catch (e) {} } }, end() { c.sp = c.sp0 || 8; } });
   },
   pigeons() {   // güvercinler havalanır
@@ -29907,21 +29936,22 @@ const MIA_EVS = {
     return miaShow({ k: 'pigeons', dur: 6, u(dt) { for (const b of birds) { b.position.addScaledVector(b.userData.v, dt); b.userData.v.y += dt * .8; const fl = Math.sin(this.t * 30 + b.position.x) * .8; b.userData['w-1'].rotation.z = fl; b.userData.w1.rotation.z = -fl; } }, end() { birds.forEach(b => scene.remove(b)); } });
   },
   icecream() {   // dondurma arabası: gelir, müziğini çalar, dondurma alabilirsin
-    const f = miaFocus(), to = miaNearNode(f.x, f.z); if (!to) return null; const A = ankA(), far = ANK.carNodes.filter(n => { const d = Math.hypot(A.cx + n.x - f.x, A.cz + n.z - f.z); return d > 90 && d < 200; }), from = far[(Math.random() * far.length) | 0], path = from && miaPath(from, to); if (!path) return null;
+    const f = miaFocus(), city = lifeOn() === 'city', to = city ? null : miaNearNode(f.x, f.z); if (!city && !to) return null; const A = city ? AREAS.city : ankA(), far = city ? [] : ANK.carNodes.filter(n => { const d = Math.hypot(A.cx + n.x - f.x, A.cz + n.z - f.z); return d > 90 && d < 200; }), from = far[(Math.random() * far.length) | 0];
+    let path = city ? null : from && miaPath(from, to); if (city) { const ax = Math.random() < .5, sg = Math.random() < .5 ? -1 : 1, ex = f.x + (ax ? 7 : 3), ez = f.z + (ax ? 3 : 7); path = [{ x: ex + (ax ? 70 * sg : 0) - A.cx, z: ez + (ax ? 0 : 70 * sg) - A.cz, car: [] }, { x: ex - A.cx, z: ez - A.cz, car: [] }]; } if (!path) return null;
     const c = { col: 0xffb3d9, kind: 'van' }, g = cyCarMesh(c); scene.add(g); const sg = new THREE.Mesh(new THREE.PlaneGeometry(1.8, .45), new THREE.MeshBasicMaterial({ map: miaTxtTex('🍦 DONDURMA', '#ffffff', '#e91e63', 512, 128, '900 70px system-ui'), toneMapped: false, side: THREE.DoubleSide })); sg.position.y = 2.5; g.add(sg);
-    const v = { g, path, i: 0, t: 0, st: 'go', sp: 9, lr: new THREE.MeshStandardMaterial(), lb: new THREE.MeshStandardMaterial(), kind: 'ice' }; const it = { k: 'ice', o: g, r: 3.4, n: '🍦 ' + adT('Dondurma al (3 🪙)') };
-    return miaShow({ k: 'icecream', dur: 60, msg: '🍦 ' + adT('Dondurma arabası geliyor! 🎵'), u(dt) { if (v.st === 'go') miaVehTick(v, dt); else if (v.st === 'here' && !this.on) { this.on = 1; ANK.mia.inter.push(it); miaPeds(40, 4).forEach(n => { n.miaCtl = q => { q.target.set(g.position.x + (Math.random() - .5) * 3, 0, g.position.z + 2); return false; }; }); }
+    const v = { g, path, i: 0, t: 0, st: 'go', sp: 9, lr: new THREE.MeshStandardMaterial(), lb: new THREE.MeshStandardMaterial(), kind: 'ice', A }; const it = { k: 'ice', o: g, r: 3.4, n: '🍦 ' + adT('Dondurma al (3 🪙)') };
+    return miaShow({ k: 'icecream', dur: 60, msg: '🍦 ' + adT('Dondurma arabası geliyor! 🎵'), u(dt) { if (v.st === 'go') miaVehTick(v, dt); else if (v.st === 'here' && !this.on) { this.on = 1; lifeInter().push(it); miaPeds(40, 4).forEach(n => { n.miaCtl = q => { q.target.set(g.position.x + (Math.random() - .5) * 3, 0, g.position.z + 2); return false; }; }); }
         this.n = (this.n || 0) - dt; if (this.n < 0) { this.n = .5; try { play('note', { at: g.position, gain: .45 }); } catch (e) {} } },
-      end() { scene.remove(g); const k = ANK.mia.inter.indexOf(it); if (k >= 0) ANK.mia.inter.splice(k, 1); (ANK.ppl || []).forEach(n => { if (n.miaCtl && !n.miaHelper) miaFree(n); }); } });
+      end() { scene.remove(g); const L2 = lifeInter(), k = L2.indexOf(it); if (k >= 0) L2.splice(k, 1); (ANK.ppl || []).forEach(n => { if (n.miaCtl && !n.miaHelper) miaFree(n); }); } });
   },
   lost() {   // yolunu kaybeden turist: onu gideceği yere götür
-    if (MIA2.task) return null; const f = miaFocus(), n = miaPeds(40, 1)[0]; if (!n) return null; const dsts = (ANK.mia.fac || []).map(q => ({ n: q.ic + ' ' + q.nm, x: q.x, z: q.z })).filter(d => Math.hypot(d.x - f.x, d.z - f.z) > 80); const dst = dsts[(Math.random() * dsts.length) | 0]; if (!dst) return null;
+    if (MIA2.task) return null; const f = miaFocus(), n = miaPeds(40, 1)[0]; if (!n) return null; const dsts = (lifeOn() === 'city' ? Object.entries(CITY.lots).filter(([k, L]) => L && L.spot && CY_INFO[k]).map(([k, L]) => ({ n: CY_INFO[k][0], x: AREAS.city.cx + L.spot.x, z: AREAS.city.cz + L.spot.z })) : (ANK.mia.fac || []).map(q => ({ n: q.ic + ' ' + q.nm, x: q.x, z: q.z }))).filter(d => Math.hypot(d.x - f.x, d.z - f.z) > 60); const dst = dsts[(Math.random() * dsts.length) | 0]; if (!dst) return null;
     n.holder.position.set(player.position.x + 2, 0, player.position.z + 1.5); miaHold(n, player.position); miaSay(n.holder, `Pardon! ${dst.n} nerede? 🗺️`, 3.5);
     n.miaCtl = q => { q.spd = 1.6; q.target.set(player.position.x - Math.sin(facing) * 1.6, 0, player.position.z - Math.cos(facing) * 1.6); return Math.hypot(q.holder.position.x - player.position.x, q.holder.position.z - player.position.z) > 2; };
     MIA2.task = { k: 'taxi', st: 'ride', n, dst, d0: Math.hypot(dst.x - f.x, dst.z - f.z) }; miaHud(); return miaShow({ k: 'lost', dur: 1, msg: '🗺️ ' + adT('Bir turist yol soruyor — onu götür!') });
   },
   race() {   // gece sokak yarışı
-    const f = miaFocus(), cs = (ANK.cars || []).filter(q => q.g.visible && !q.wreck && q.g.position.distanceTo(f) < 120).slice(0, 2); if (cs.length < 2) return null; cs.forEach(c => { c.sp0 = c.sp; c.sp = 30; });
+    const f = miaFocus(), cs = lifeCars().filter(q => q.g.visible && !q.wreck && q.g.position.distanceTo(f) < 120).slice(0, 2); if (cs.length < 2) return null; cs.forEach(c => { c.sp0 = c.sp; c.sp = 30; });
     return miaShow({ k: 'race', dur: 9, msg: '🏎️ ' + adT('İki araba yarışıyor!'), u(dt) { cs.forEach(c => { if (Math.random() < .3) spawnDust(c.g.position.x, .2, c.g.position.z, .8, 1, 0, 0, 0x777777); }); this.n = (this.n || 0) - dt; if (this.n < 0) { this.n = 1.2; try { play('zoom', { at: cs[0].g.position }); } catch (e) {} } }, end() { cs.forEach(c => c.sp = c.sp0 || 8); } });
   },
   ufo() {   // 🛸 gece: UFO bir sokak eşyasını alıp gider; ışının düştüğü yerde uzaylı parçası kalır
@@ -29929,7 +29959,7 @@ const MIA_EVS = {
     const disc = new THREE.Mesh(new THREE.SphereGeometry(4, 24, 8), new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: .9, roughness: .25 })); disc.scale.y = .22; g.add(disc); const dome = new THREE.Mesh(new THREE.SphereGeometry(1.6, 16, 8, 0, 6.3, 0, 1.5), new THREE.MeshStandardMaterial({ color: 0x88ffcc, emissive: 0x33ff99, emissiveIntensity: 1.5, transparent: true, opacity: .8 })); dome.position.y = .5; g.add(dome);
     for (let i = 0; i < 10; i++) { const l = new THREE.Mesh(new THREE.SphereGeometry(.22, 6, 5), new THREE.MeshBasicMaterial({ color: [0xff3355, 0x33ffaa, 0xffee33][i % 3], toneMapped: false })); l.position.set(Math.cos(i / 10 * 6.283) * 3.8, -.1, Math.sin(i / 10 * 6.283) * 3.8); l.material.color.multiplyScalar(3); g.add(l); }
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 3, 18, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0x88ffcc, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })); beam.position.y = -9; g.add(beam);
-    g.position.set(x, 70, z); scene.add(g); const prop = (slotHolders.miaprop || []).filter(o => o.position.distanceTo(g.position) < 90).sort((p, q) => Math.hypot(p.position.x - x, p.position.z - z) - Math.hypot(q.position.x - x, q.position.z - z))[0];
+    g.position.set(x, 70, z); scene.add(g); const prop = (slotHolders.miaprop || []).concat(lifeOn() === 'city' ? lifeCars().map(c => c.g) : []).filter(o => o.position.distanceTo(g.position) < 90).sort((p, q) => Math.hypot(p.position.x - x, p.position.z - z) - Math.hypot(q.position.x - x, q.position.z - z))[0];
     miaPeds(60, 4).forEach(n => { try { hrEmo(n.holder, '😱', 1.5, 3); miaSay(n.holder, cyPick(['UFO!!', 'Bu ne ya?!', 'Kayda al kayda!', 'Uzaylılar!']), 2.5); } catch (e) {} }); play('magic', { gain: 1 });
     return miaShow({ k: 'ufo', dur: 15, msg: '🛸 ' + adT('Gökyüzünde garip bir ışık...'), u(dt) { g.rotation.y += dt * 2; const T = this.t; g.position.y = T < 3 ? 70 - T * 17.5 : T < 11 ? 18 + Math.sin(T * 2) * .5 : 18 + (T - 11) * (T - 11) * 14;
         beam.material.opacity = T > 4 && T < 10 ? .35 + Math.sin(T * 9) * .1 : 0; if (prop && T > 5 && T < 10) { prop.position.lerp(new THREE.Vector3(g.position.x, g.position.y - 1, g.position.z), dt * .5); prop.rotation.y += dt * 3; }
@@ -29937,7 +29967,7 @@ const MIA_EVS = {
       end() { scene.remove(g); } });
   },
   ghost() {   // 👻 gece ara sokakta hayalet: yaklaşınca fısıldar ve kaybolur
-    const nd = miaNodeNear(25, 70, true); if (!nd) return null; const A = ankA(), r = createStickman(0xffffff, 0xffffff); r.stick.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshBasicMaterial({ color: 0xdff6ff, transparent: true, opacity: .45, depthWrite: false }); } }); const g = new THREE.Group(); g.add(r.stick); g.position.set(A.cx + nd.x, .3, A.cz + nd.z); scene.add(g);
+    const nd = lifeNodeNear(25, 70); if (!nd) return null; const r = createStickman(0xffffff, 0xffffff); r.stick.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshBasicMaterial({ color: 0xdff6ff, transparent: true, opacity: .45, depthWrite: false }); } }); const g = new THREE.Group(); g.add(r.stick); g.position.set(nd.x, .3, nd.z); scene.add(g);
     return miaShow({ k: 'ghost', dur: 50, u(dt) { g.position.y = .3 + Math.sin(this.t * 2) * .2; g.rotation.y = Math.atan2(player.position.x - g.position.x, player.position.z - g.position.z); const d = g.position.distanceTo(player.position);
         if (d < 9 && !this.said) { this.said = 1; this.fade = 1; miaSay(g, cyPick(['...altın flamingoları bul...', '...gece 3\'te deniz feneri...', '...kedi yolu bilir...', '...12 tane... hepsi...']), 3.5, 2.4); play('wind', { gain: .6 }); }
         if (this.fade) { g.traverse(o => { if (o.material) o.material.opacity = Math.max(0, o.material.opacity - dt * .15); }); } }, end() { scene.remove(g); } });
@@ -29946,7 +29976,7 @@ const MIA_EVS = {
     const f = miaFocus(), g = new THREE.Group(), m = M(0x111111), b = new THREE.Mesh(new THREE.CapsuleGeometry(.12, .3, 4, 8), m); b.rotation.x = Math.PI / 2; b.position.y = .25; g.add(b); const h = new THREE.Mesh(new THREE.SphereGeometry(.1, 10, 8), m); h.position.set(0, .34, .24); g.add(h);
     for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.ConeGeometry(.04, .08, 4), m); e.position.set(s * .05, .45, .24); g.add(e); const ey = new THREE.Mesh(new THREE.SphereGeometry(.018, 6, 5), new THREE.MeshBasicMaterial({ color: 0xffee58, toneMapped: false })); ey.position.set(s * .04, .36, .33); g.add(ey); }
     const tl = new THREE.Mesh(new THREE.CylinderGeometry(.015, .02, .35, 6), m); tl.position.set(0, .4, -.28); tl.rotation.x = -.6; g.add(tl); g.position.set(f.x + 3, 0, f.z + 2); scene.add(g); play('meow');
-    const nd = miaNodeNear(70, 130); if (!nd) { scene.remove(g); return null; } const A = ankA(), goal = new THREE.Vector3(A.cx + nd.x + 3, 0, A.cz + nd.z + 3);
+    const nd = lifeNodeNear(70, 130); if (!nd) { scene.remove(g); return null; } const goal = new THREE.Vector3(nd.x + 3, 0, nd.z + 3);
     return miaShow({ k: 'cat', dur: 120, msg: '🐈‍⬛ ' + adT('Bir kara kedi sana bakıyor... peşinden git'), u(dt) { const d = g.position.distanceTo(player.position), tg = goal.clone().sub(g.position); const L = tg.length();
         if (L > 1.2 && d < 14) { tg.setLength(Math.min(L, dt * 3.2)); g.position.add(tg); g.rotation.y = Math.atan2(tg.x, tg.z); g.position.y = Math.abs(Math.sin(this.t * 10)) * .04; } else if (L > 1.2 && d > 14) { g.rotation.y = Math.atan2(player.position.x - g.position.x, player.position.z - g.position.z); this.m = (this.m || 0) - dt; if (this.m < 0) { this.m = 4; play('meow', { at: g.position }); } }
         if (L <= 1.2 && !this.ch) { this.ch = 1; miaPickup(goal.x + .8, goal.z, '🧰', adT('Kedinin hazinesi'), () => progAdd(30, player.position, adT('Kara kedi seni hazineye götürdü'))); play('meow'); } }, end() { scene.remove(g); } });
@@ -29955,7 +29985,7 @@ const MIA_EVS = {
 const MIA_EV_W = [['crash', 2], ['faint', 2], ['snatch', 2], ['quarrel', 3], ['keko', 3], ['chicken', 1.5], ['magician', 2], ['flashmob', 1.5], ['propose', 1.5], ['alarm', 2], ['pigeons', 2], ['icecream', 1.5], ['lost', 1.5], ['race', 1, 'n'], ['ufo', 1.2, 'n'], ['ghost', 1.5, 'n'], ['cat', 1.5]];
 function miaEventAny(kind) {
   const night = typeof DAY !== 'undefined' && DAY.N > .5; if (kind) return MIA_EVS[kind] ? MIA_EVS[kind]() : miaEvent(kind);
-  const L = MIA_EV_W.filter(e => !e[2] || night), tot = L.reduce((s, e) => s + e[1], 0); let r = Math.random() * tot;
+  const city = lifeOn() === 'city', L = MIA_EV_W.filter(e => (!e[2] || night) && !(city && /^(crash|faint|snatch|race)$/.test(e[0]))), tot = L.reduce((s, e) => s + e[1], 0); let r = Math.random() * tot;
   for (const e of L) { r -= e[1]; if (r <= 0) { const k = e[0]; return MIA_EVS[k] ? (MIA_EVS[k]() || miaEvent()) : miaEvent(k); } } return null;
 }
 function miaShowsTick(dt) { for (let i = MIA3.shows.length - 1; i >= 0; i--) { const s = MIA3.shows[i]; s.t += dt; try { if (s.u) s.u(dt); } catch (e) { sftErr(e); s.t = 1e9; } if (s.t >= s.dur) { try { if (s.end) s.end(); } catch (e) {} for (const a of s.actors || []) miaKill(a); MIA3.shows.splice(i, 1); } } }
@@ -29971,9 +30001,10 @@ function miaPickTick(dt) {
 function miaFlamingos() {   // her bölgede 3 altın flamingo (bulunanlar kaydedilir) → 12'si = gizem çözüldü
   const key = ANK.key, A = ankA(), nodes = ANK.walkNodes || []; if (!nodes.length) return;
   for (let i = 0; i < 3; i++) { const id = key + i; if (MIA3.fl.has(id)) continue; const nd = nodes[Math.floor(ankHash(i * 977 + key.length * 31) * nodes.length)]; if (!nd) continue;
-    const x = A.cx + nd.x + 6 * (i - 1), z = A.cz + nd.z + 5; miaPickup(x, z, '🦩', '', () => { MIA3.fl.add(id); try { localStorage.setItem('sftFlamingo', JSON.stringify([...MIA3.fl])); } catch (e) {} const n = MIA3.fl.size; showMsg(`🦩 ${adT('Altın flamingo')} ${n}/12`, 2.4); progAdd(10, player.position, adT('Altın flamingo'));
-      if (n >= 12) { setTimeout(() => { showMsg('🏆 ' + adT('Gizem çözüldü! 12 altın flamingonun hepsini buldun'), 4); progAdd(100, player.position, adT('Gizem çözüldü')); try { fw7('heart'); } catch (e) {} }, 1500); } }, true); }
+    const x = A.cx + nd.x + 6 * (i - 1), z = A.cz + nd.z + 5; miaPickup(x, z, '🦩', '', miaFlCb(id), true); }
 }
+function miaFlCb(id) { return () => { MIA3.fl.add(id); try { localStorage.setItem('sftFlamingo', JSON.stringify([...MIA3.fl])); } catch (e) {} const n = MIA3.fl.size; showMsg(`🦩 ${adT('Altın flamingo')} ${n}/${FL_TOTAL}`, 2.4); progAdd(10, player.position, adT('Altın flamingo'));
+  if (n >= FL_TOTAL) setTimeout(() => { showMsg('🏆 ' + adT('Gizem çözüldü! Bütün altın flamingoları buldun'), 4); progAdd(100, player.position, adT('Gizem çözüldü')); try { fw7('heart'); } catch (e) {} }, 1500); }; }
 // ---------- 🚗 araba çal, ⭐ aranma, polis kovalar ----------
 function miaNearCar() { const P = player.position; let b = null, bd = 3.4; for (const c of ANK.cars || []) { if (!c.g.visible || c.wreck || c.g.userData.flying) continue; const d = c.g.position.distanceTo(P); if (d < bd) { bd = d; b = c; } } return b; }
 function miaSteal(c) {
@@ -30040,10 +30071,10 @@ function miaTrainTick(dt) {
   const [x, z, a] = miaMetroAt(M2, T.s); T.g.position.set(x, M2.H + 2.2, z); T.g.rotation.y = a;
 }
 function miaMetroRide(k) {
-  const st = MIA_STATIONS.find(q => q[0] === k); if (!st) return; if (k === ANK.key) { showMsg('📍 ' + adT('Zaten bu istasyondasın'), 1.4); return; }
+  const st = MIA_STATIONS.find(q => q[0] === k); if (!st) return; if ((k === 'city' && curKey === 'city') || (k === ANK.key && curKey === 'miami')) { showMsg('📍 ' + adT('Zaten bu istasyondasın'), 1.4); return; }
   if (PROG.coins < 2) { showMsg('💸 ' + adT('Metro bileti 2 🪙'), 1.6); return; } PROG.coins -= 2; progSave(); progHud(true); miaPhone(false);
   $('fade').style.opacity = 1; play('elevator'); showMsg(`🚇 ${adT('Sonraki durak')}: ${st[1]} · ${adT('kapılara dikkat')}`, 2.6); MIA3.metroTo = k;
-  setTimeout(() => { $('fade').style.opacity = 0; ankGo(k); }, 1800);
+  setTimeout(() => { $('fade').style.opacity = 0; if (k === 'city') cityGo(); else ankGo(k); }, 1800);
 }
 // ---------- 🎓 MIAMI ÜNİVERSİTESİ ----------
 AREAS.uni = { cx: 33000, cz: 15000, r: 13, box: { hx: 9.4, hz: 7.4 }, bg: 0x2a2620, fog: [50, 140], sky: 0xfff6e8, gnd: 0x8d6e63, sunC: 0xfff4e6, sunI: 1.15 };
@@ -30077,7 +30108,7 @@ function uniBuild() {
   uniBoard();
 }
 function uniBoard(extra) { const B = UNI.board; if (!B) return; const T = UNI_TOP[UNI.topic % UNI_TOP.length], c = B.cx; c.fillStyle = '#1f3d2b'; c.fillRect(0, 0, 1024, 400); c.strokeStyle = '#8d6e63'; c.lineWidth = 14; c.strokeRect(0, 0, 1024, 400); c.fillStyle = '#f1f8e9'; c.font = 'bold 54px "Comic Sans MS","Segoe Print",cursive'; c.fillText(T[0], 40, 80); c.font = '40px "Comic Sans MS","Segoe Print",cursive'; T[1].forEach((l, i) => c.fillText('• ' + l, 60, 160 + i * 70)); if (extra) { c.fillStyle = '#ffeb3b'; c.font = 'bold 44px system-ui'; c.fillText(extra, 520, 380); } B.tx.needsUpdate = true; }
-function uniGo(force) { if (!UNI.en && !force) { showMsg('🎓 ' + adT('Önce okula yazıl (telefon → 🎓 Okul)'), 2.4); miaPhone(true, 'uni'); return; } uniBuild(); const A = AREAS.uni; teleportTo('uni', A.cx, A.cz + 6, Math.PI, '🎓 ' + adT('Miami Üniversitesi — yerine otur (E), ders başlıyor'), () => { UNI.clsT = 0; UNI.evT = 5; uniUI(); }); }
+function uniGo(force) { if (curKey !== 'uni') UNI.back = { k: curKey, x: player.position.x, z: player.position.z, f: facing }; if (!UNI.en && !force) { showMsg('🎓 ' + adT('Önce okula yazıl (telefon → 🎓 Okul)'), 2.4); miaPhone(true, 'uni'); return; } uniBuild(); const A = AREAS.uni; teleportTo('uni', A.cx, A.cz + 6, Math.PI, '🎓 ' + adT('Miami Üniversitesi — yerine otur (E), ders başlıyor'), () => { UNI.clsT = 0; UNI.evT = 5; uniUI(); }); }
 function uniSit(on) { UNI.seat = on; const A = AREAS.uni, [x, z] = UNI.seats[2]; if (on) { player.position.set(A.cx + x, 0, A.cz + z); facing = Math.PI; yaw = 0; if (document.pointerLockElement) document.exitPointerLock(); showMsg('📚 ' + adT('Derstesin. Sürpriz sınava hazır ol!'), 2); } else { player.position.set(A.cx + x + 1.2, 0, A.cz + z); } uniUI(); }
 const UNI_EVS = [
   s => { const st = cyPick(UNI.studs); st.sleep = 8; miaSay(st.h, 'Zzz… 😴', 3, 1.9); },
@@ -30113,8 +30144,8 @@ function uniTick(dt) {
   const b = $('pntAct'); if (b && !UNI.seat) { const [x, z] = UNI.seats[2], d = Math.hypot(A.cx + x - player.position.x, A.cz + z - player.position.z); b.style.display = d < 2.2 ? 'block' : 'none'; b.dataset.s = -1; if (d < 2.2) { b.innerHTML = `📚 ${adT('Yerine otur')} <small>E</small>`; b.onclick = e => { e.stopPropagation(); uniSit(true); }; } } else if (b && UNI.seat) b.style.display = 'none';
 }
 function uniUI() {
-  let u = $('uniUI'); if (!u) { document.body.insertAdjacentHTML('beforeend', '<div id="uniUI"></div>'); u = $('uniUI'); for (const ev of ['pointerdown', 'mousedown', 'touchstart']) u.addEventListener(ev, e => e.stopPropagation(), { passive: true }); u.addEventListener('click', e => { const b = e.target.closest('[data-un]'); if (!b) return; e.stopPropagation(); if (b.dataset.un === 'up') uniSit(false); else if (b.dataset.un === 'out') { uniSit(false); ankGo('downtown'); } }); }
-  u.style.display = curKey === 'uni' ? 'flex' : 'none'; u.innerHTML = `<span>🎓 ${UNI_TOP[UNI.topic % UNI_TOP.length][0]}</span><span>📚 ${UNI.done}/6</span><span>⭐ ${adT('Ortalama')} ${uniGPA()}</span>${UNI.seat ? `<button data-un="up">🚶 ${adT('Kalk')}</button>` : ''}<button data-un="out">🌴 ${adT('Kampüsten çık')}</button>`;
+  let u = $('uniUI'); if (!u) { document.body.insertAdjacentHTML('beforeend', '<div id="uniUI"></div>'); u = $('uniUI'); for (const ev of ['pointerdown', 'mousedown', 'touchstart']) u.addEventListener(ev, e => e.stopPropagation(), { passive: true }); u.addEventListener('click', e => { const b = e.target.closest('[data-un]'); if (!b) return; e.stopPropagation(); if (b.dataset.un === 'up') uniSit(false); else if (b.dataset.un === 'out') { uniSit(false); const B = UNI.back; if (!B || B.k === 'miami' || B.k === 'ankara') ankGo(B && B.k === 'ankara' ? 'kizilay' : (ANK.key && ANK_REG[ANK.key] && ANK_REG[ANK.key].city === 'miami' ? ANK.key : 'downtown')); else if (B.k === 'city') cityGo(); else teleportTo(B.k, B.x, B.z, B.f, null); } }); }
+  u.style.display = curKey === 'uni' ? 'flex' : 'none'; u.innerHTML = `<span>🎓 ${UNI_TOP[UNI.topic % UNI_TOP.length][0]}</span><span>📚 ${UNI.done}/6</span><span>⭐ ${adT('Ortalama')} ${uniGPA()}</span>${UNI.seat ? `<button data-un="up">🚶 ${adT('Kalk')}</button>` : ''}<button data-un="out">🚪 ${adT('Kampüsten çık')}</button>`;
 }
 document.head.insertAdjacentHTML('beforeend', `<style>
 #uniUI{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);z-index:32;display:none;gap:6px;align-items:center;font:600 12px 'Roboto',system-ui,sans-serif}
@@ -30122,6 +30153,40 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 #uniQ{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:46;display:none;flex-direction:column;gap:8px;width:min(360px,90vw);background:#1c1b1f;color:#e6e1e5;border-radius:28px;padding:18px;box-shadow:0 16px 50px rgba(0,0,0,.5);font:14px 'Roboto',system-ui,sans-serif;animation:a12up2 .35s cubic-bezier(.2,.9,.3,1.15)}
 #uniQ p{margin:2px 0 6px;font-size:16px}#uniQ button{background:#2b2930;color:inherit;border:0;border-radius:16px;padding:11px 14px;text-align:left;font:inherit;cursor:pointer}#uniQ button:active{transform:scale(.97)}#uniQ small{opacity:.7;text-align:right}
 </style>`);
+
+/* ---------- 🏙️ ŞEHİR'DE DE AYNI HAYAT: olaylar, gizemler, mekân kulübeleri (arcade, falcı, karaoke, gizem müzesi), yeraltı metrosu (Miami'ye bağlanır), 3 altın flamingo, takip, daireler ---------- */
+function lifeBooth(txt, col) {
+  const g = new THREE.Group(), c = new THREE.Color(col).getHex(), b = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.4, 2), M(0xf5f5f5)); b.position.y = 1.2; g.add(b);
+  const r = new THREE.Mesh(new THREE.BoxGeometry(3, .2, 2.4), M(c)); r.position.y = 2.5; g.add(r); const w = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.1), M(0x1b1033, { emissive: c, emissiveIntensity: .5 })); w.position.set(0, 1.4, 1.01); g.add(w);
+  const sm = new THREE.MeshBasicMaterial({ map: miaTxtTex(txt, col, '#ffffff', 640, 128, '900 60px system-ui,sans-serif'), toneMapped: false, side: THREE.DoubleSide }); sm.color.setScalar(1.5); const s = new THREE.Mesh(new THREE.PlaneGeometry(3, .6), sm); s.position.set(0, 3, 1.2); g.add(s);
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); return g;
+}
+function lifeMetroEnt() {
+  const g = new THREE.Group(), fr = new THREE.Mesh(new THREE.BoxGeometry(3.2, .9, 4.4), M(0x37474f)); fr.position.y = .45; g.add(fr); const hole = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 3.6).rotateX(-Math.PI / 2), M(0x050505)); hole.position.y = .92; g.add(hole);
+  for (let i = 0; i < 6; i++) { const st = new THREE.Mesh(new THREE.BoxGeometry(2.3, .05, .5), M(0x9e9e9e)); st.position.set(0, .85 - i * .14, -1.4 + i * .55); g.add(st); }
+  const tp = new THREE.Mesh(new THREE.CylinderGeometry(.1, .1, 3.4), M(0x263238)); tp.position.set(1.9, 1.7, 1.8); g.add(tp);
+  const ts = new THREE.Mesh(new THREE.PlaneGeometry(1.8, .9), new THREE.MeshBasicMaterial({ map: miaTxtTex(['Ⓜ METRO', adT('Şehir Merkezi')], '#1565c0', '#ffffff', 512, 256, '900 92px system-ui,sans-serif'), toneMapped: false, side: THREE.DoubleSide })); ts.position.set(1.9, 3.6, 1.8); g.add(ts);
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; }); return g;
+}
+function lifeCityBuild() {
+  CLIFE.built = true; CLIFE.cg = CITY.g; for (const o of CLIFE.objs) scene.remove(o); CLIFE.objs = []; CLIFE.inter.length = 0;
+  const A = AREAS.city, L = CITY.lots.plaza, cx = A.cx + (L && L.spot ? L.spot.x : 0), cz = A.cz + (L && L.spot ? L.spot.z : 0), spots = [];
+  const free = (x, z) => !CITY.obs.some(o => !o.pass && obsHit(o, x, z, 2.4));
+  for (let i = 0; i < 160 && spots.length < 5; i++) { const a = i * 2.39996, r = 12 + i * .35, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r; if (free(x, z) && spots.every(q => Math.hypot(q[0] - x, q[1] - z) > 9)) spots.push([x, z]); }
+  MIA_VENUES.forEach(([k, ic, nm, col], i) => { const sp = spots[i]; if (!sp) return; const g = lifeBooth(ic + ' ' + nm, col); g.position.set(sp[0], 0, sp[1]); g.rotation.y = Math.atan2(cx - sp[0], cz - sp[1]); scene.add(g); CLIFE.objs.push(g);
+    const fx = Math.sin(g.rotation.y) * 2.2, fz = Math.cos(g.rotation.y) * 2.2; CLIFE.inter.push({ k: 'venue', vk: k, x: sp[0] + fx, z: sp[1] + fz, r: 2.2, n: ic + ' ' + nm }); });
+  const ms = spots[4]; if (ms) { const g = lifeMetroEnt(); g.position.set(ms[0], 0, ms[1]); g.rotation.y = Math.atan2(cx - ms[0], cz - ms[1]); scene.add(g); CLIFE.objs.push(g); CLIFE.metro = { x: ms[0] + Math.sin(g.rotation.y) * 3, z: ms[1] + Math.cos(g.rotation.y) * 3 }; CLIFE.inter.push({ k: 'metro', x: CLIFE.metro.x, z: CLIFE.metro.z, r: 2.6, n: '🚇 ' + adT('Metroya bin') }); }
+  for (const o of (MIA3.pick || []).filter(q => q.city)) scene.remove(o.s); MIA3.pick = (MIA3.pick || []).filter(q => !q.city);
+  for (let i = 0; i < 3; i++) { const id = 'city' + i; if (MIA3.fl.has(id)) continue; const nd = CITY.nodes[Math.floor(ankHash(i * 131 + 7) * CITY.nodes.length)]; if (!nd) continue; const o = miaPickup(A.cx + nd.x + 1, A.cz + nd.z + 1, '🦩', '', miaFlCb(id), true); o.city = true; }
+}
+function lifeCityTick(dt) {
+  if (!CLIFE.built || CLIFE.cg !== CITY.g) lifeCityBuild();
+  CLIFE.evT -= dt; if (CLIFE.evT < 0) { CLIFE.evT = MIA2.follow ? 14 + Math.random() * 12 : 24 + Math.random() * 22; if (MIA3.shows.length < 3) try { miaEventAny(); } catch (e) { sftErr(e); } }
+  try { miaShowsTick(dt); miaPickTick(dt); miaTaskTick(dt); } catch (e) { sftErr(e); }
+  if (MIA2.follow && (!MIA2.follow.holder.parent || !MIA2.follow.holder.visible)) MIA2.follow = null;
+  if (MIA3.metroTo === 'city' && CLIFE.metro && !teleporting) { MIA3.metroTo = null; player.position.set(CLIFE.metro.x, 0, CLIFE.metro.z); }
+  CLIFE.hudT -= dt; if (CLIFE.hudT < 0) { CLIFE.hudT = .35; miaHud(); }
+}
 
 /* ---------- 🏷️ herkesin etiketi: bir kişiye sol tıkla / dokun → adı, yaşı, işi (köy, şehir, Ankara; okulda da) ---------- */
 const NPCL = { list: [] };
@@ -30281,7 +30346,7 @@ renderer.setAnimationLoop(() => {
   try { lockLate(paused || photoMode ? 0 : dt); } catch (e) {}
   try { npcMgrTick(paused || photoMode ? 0 : dt); possLate(); } catch (e) { sftErr(e); }
   try { deskTick(paused ? 0 : dt); deskLate(dt); } catch (e) { sftErr(e); }
-  try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); try { paintLate(paused || photoMode ? 0 : dt); galLate(); uniTick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); } if (window.__mp) window.__mp.tick(dt); try { rcTick(dt); } catch (e) { console.warn('rc', e); } npcLblTick(paused ? 0 : dt); if (!ankIn()) ankDebrisTick(paused || photoMode ? 0 : dt); cyUltraTick(); gvDualLate(); if (inCity && CITY.built) { cyVariety(); cyVarietySync(); } } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
+  try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); try { paintLate(paused || photoMode ? 0 : dt); galLate(); uniTick(paused || photoMode ? 0 : dt); if (lifeOn() === 'city' && !paused && !photoMode) lifeCityTick(dt); } catch (e) { sftErr(e); } if (window.__mp) window.__mp.tick(dt); try { rcTick(dt); } catch (e) { console.warn('rc', e); } npcLblTick(paused ? 0 : dt); if (!ankIn()) ankDebrisTick(paused || photoMode ? 0 : dt); cyUltraTick(); gvDualLate(); if (inCity && CITY.built) { cyVariety(); cyVarietySync(); } } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
   try { buddyUpdate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🤝 arkadaş: senin pozunu kopyalar
   updateDay(paused || photoMode || ADM.freeze ? 0 : dt * (ADM.daySpeed ? 40 : 1));
   updateWeather(paused || photoMode || ADM.freeze ? 0 : dt);
