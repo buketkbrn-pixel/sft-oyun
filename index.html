@@ -8500,8 +8500,177 @@ $('sAll1').addEventListener('click', () => { for (const [id] of SFX_DEFS) AU.vol
   });
 }
 // Hava durumu
-SETSYNC.push(() => { $('sWeather').value = WX.mode; $('sGfx').value = GFX.q; for (const b of document.querySelectorAll('.charPick button')) b.classList.toggle('on', b.dataset.char === (HERO.on ? (HERO.kind === 'roach' ? 'roach' : 'pati') : ANIME.on ? (ANIME.kind === 'girl' ? 'anime' : ANIME.kind) : 'stick')); });
+SETSYNC.push(() => { $('sWeather').value = WX.mode; $('sGfx').value = GFX.q; for (const b of document.querySelectorAll('.charPick button')) b.classList.toggle('on', b.dataset.char === (HERO.on ? (HERO.kind === 'roach' ? 'roach' : 'pati') : ANIME.on ? (ANIME.kind === 'girl' ? 'anime' : ANIME.kind) : SIGMA.on ? 'sigma' : 'stick')); });
 document.querySelector('.charPick').addEventListener('click', e => { const b = e.target.closest('button[data-char]'); if (b) pickChar(b.dataset.char); });   // sonradan eklenen 'Anime kız' düğmesi de çalışsın
+/* ---------- 🗿 Sigma: çöp adamın kaslı hâli — belirgin kas hatları (kontur), sert bakış (çatık kaş, yarı kapalı göz kapakları, köşeli çene),
+   kasılmış yürüyüş (göğüs önde, kollar yana açık, sert dizler) ve durunca sinematik poz (kollar kavuşuk, sinema şeritleri, bass).
+   Hâlâ çöp adam: tüm yetenekler aynen çalışır, vücut ve kafa rengi 🎨 Karakter renkleri'nden değişir. ---------- */
+const SIGMA = { on: false, built: false, vis: false, idle: 0, walkW: 0, standW: 0, cineW: 0, cineOn: false, shY: false,
+                cine: true, delay: 4, line: 'auto', mus: 1, groups: [], hulls: [], mus0: [], brows: [], G: null };
+try { const s = JSON.parse(localStorage.getItem('sftSigma') || '{}'); if (typeof s.cine === 'boolean') SIGMA.cine = s.cine; if (s.delay >= 1 && s.delay <= 30) SIGMA.delay = s.delay; if (typeof s.line === 'string') SIGMA.line = s.line; if (s.mus >= .5 && s.mus <= 1.6) SIGMA.mus = s.mus; } catch (e) {}
+try { if (localStorage.getItem('copAdamKarakter') === 'sigma') SIGMA.on = true; } catch (e) {}
+const sigSave = () => { try { localStorage.setItem('sftSigma', JSON.stringify({ cine: SIGMA.cine, delay: SIGMA.delay, line: SIGMA.line, mus: SIGMA.mus })); } catch (e) {} };
+const SIG_LINE = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide });
+const SIG_BROW = new THREE.MeshStandardMaterial({ color: 0x121212, roughness: .7 });
+const SIG_BALL = new THREE.SphereGeometry(1, 14, 10), SIG_LID = new THREE.SphereGeometry(.03, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+function sigLineColor() {   // otomatik: koyu vücutta açık gri hat, açık vücutta vücut renginin koyusu
+  if (SIGMA.line !== 'auto') return SIG_LINE.color.set(SIGMA.line);
+  const c = playerRig.bodyMat.color, l = .2126 * c.r + .7152 * c.g + .0722 * c.b;
+  if (l < .06) SIG_LINE.color.set(0xb9c0cc); else SIG_LINE.color.copy(c).multiplyScalar(.22);
+}
+function sigmaBuild() {
+  SIGMA.built = true;
+  const r = playerRig, bm = r.bodyMat, hm = r.headMat;
+  const grp = p => { const g = new THREE.Group(); g.visible = false; p.add(g); SIGMA.groups.push(g); return g; };
+  const mus = (g, x, y, z, a, b, c, rz = 0, mat = bm, line = true) => {
+    const m = mesh(SIG_BALL, mat, x, y, z); m.scale.set(a, b, c); m.rotation.set(0, 0, rz);
+    if (line) { const h = new THREE.Mesh(SIG_BALL, SIG_LINE), t = .0105; h.scale.set(1 + t / a, 1 + t / b, 1 + t / c); m.add(h); }
+    g.add(m); SIGMA.mus0.push([m, a, b, c]); return m;
+  };
+  const hull = (m, sx, sy, sz) => { if (!m) return; const h = new THREE.Mesh(m.geometry, SIG_LINE); h.scale.set(sx, sy, sz); h.visible = false; m.add(h); SIGMA.hulls.push(h); };
+  // tüm çöp adamın dış hattı (kontur)
+  hull(BL.torso, 1.17, 1.03, 1.17); hull(BL.neck, 1.2, 1.05, 1.2); hull(r.head, 1.07, 1.07, 1.07);
+  for (const S of ['L', 'R']) { const b = BL[S]; hull(b.ua, 1.22, 1.03, 1.22); hull(b.fa, 1.22, 1.03, 1.22); hull(b.th, 1.2, 1.02, 1.2); hull(b.sn, 1.2, 1.02, 1.2);
+    for (const k in BJ[S]) hull(BJ[S][k], 1.2, 1.2, 1.2); }
+  const T = grp(r.torso), N = grp(r.look), H = grp(r.head), G = SIGMA.G = { T, N, H, L: {}, R: {} };
+  for (const sd of [1, -1]) {
+    mus(T, sd * .052, .44, .05, .062, .05, .046, sd * -.12);           // göğüs
+    for (const y of [.335, .266, .197]) mus(T, sd * .029, y, .057, .027, .029, .022);   // karın (six-pack)
+    mus(T, sd * .074, .35, 0, .036, .12, .05, -sd * .2);               // kanat kası (V kesim)
+    mus(T, sd * .055, .55, -.012, .058, .03, .04, -sd * .42);          // trapez
+    mus(T, sd * .042, .4, -.05, .05, .105, .03);                      // sırt
+    const S = sd > 0 ? 'L' : 'R', arm = sd > 0 ? r.armL : r.armR, leg = sd > 0 ? r.legL : r.legR, A = G[S];
+    A.sh = grp(arm.sh); A.el = grp(arm.el); A.hip = grp(leg.hip); A.kn = grp(leg.kn);
+    mus(A.sh, sd * .014, -.025, 0, .074, .082, .072);                  // omuz (deltoid)
+    mus(A.sh, 0, -.165, .032, .056, .095, .058);                       // pazu
+    mus(A.sh, sd * .006, -.15, -.028, .05, .1, .046);                  // arka kol
+    mus(A.el, 0, -.09, .008, .052, .09, .05);                          // ön kol
+    mus(A.hip, 0, -.17, .03, .068, .15, .06);                          // ön bacak (quadriceps)
+    mus(A.hip, -sd * .026, -.34, .035, .042, .06, .04);                // diz üstü damla kas
+    mus(A.hip, 0, -.2, -.03, .055, .13, .05);                          // arka bacak
+    mus(A.kn, 0, -.12, -.035, .05, .095, .05);                         // baldır
+    // yüz: çatık kaş + yarı kapalı göz kapağı
+    const bw = mesh(new THREE.BoxGeometry(.075, .017, .02), SIG_BROW, sd * .062, .078, .143); bw.rotation.set(-.25, sd * .38, sd * .3); H.add(bw); SIGMA.brows.push(bw);
+    const lid = mesh(SIG_LID, hm, sd * .06, .032, .15); lid.rotation.x = .55; H.add(lid);
+  }
+  mus(N, 0, .04, 0, .07, .07, .062);                                   // kalın boyun
+  mus(H, 0, -.095, .015, .128, .078, .112, 0, hm, false);              // köşeli çene (yüzde çizgi yok)
+  mus(H, 0, -.142, .07, .046, .034, .04, 0, hm, false);                // çene ucu
+  sigMusApply();
+}
+function sigMusApply() { const k = SIGMA.mus; for (const [m, a, b, c] of SIGMA.mus0) m.scale.set(a * k, b * (.6 + .4 * k), c * k); }
+function sigmaActive() { return SIGMA.on && !HERO.on && !ANIME.on && !charHolder.userData.glb; }
+const SIG_X = { R: [.533, .898, -.914, -2.319], L: [.518, -.915, .925, -2.451] };   // kollar kavuşuk (omuz x, y, z, dirsek)
+function sigSetBars(on) {
+  if (on === SIGMA.cineOn) return; SIGMA.cineOn = on;
+  const el = $('sigBars'); if (el) el.classList.toggle('on', on);
+  if (on) { play('sigma'); if (!photoMode) renderer.domElement.style.filter = 'contrast(1.14) saturate(.82)'; }
+  else if (!photoMode && renderer.domElement.style.filter.startsWith('contrast(1.14)')) renderer.domElement.style.filter = '';
+}
+// animateStick'ten sonra her kare: animasyonun üstüne sigma katmanı karıştırılır (animasyonun kendi yumuşatma değerleri bozulmaz)
+function sigmaPost(dt) {
+  const act = sigmaActive();
+  if (act && !SIGMA.built) sigmaBuild();
+  if (!SIGMA.built) return;
+  if (act !== SIGMA.vis) {
+    SIGMA.vis = act; for (const g of SIGMA.groups) g.visible = act; for (const h of SIGMA.hulls) h.visible = act;
+    if (!act) { applyBodyShape(); sigSetBars(false); SIGMA.walkW = SIGMA.standW = SIGMA.cineW = 0; SIGMA.idle = 0; if (SIGMA.shY) { playerRig.armL.sh.rotation.y = playerRig.armR.sh.rotation.y = 0; SIGMA.shY = false; } }
+  }
+  if (!act) return;
+  sigLineColor();
+  const r = playerRig, o = r.lastO || {}, B = BODY, G = SIGMA.G, L = THREE.MathUtils.lerp;
+  G.T.scale.set(B.torsoW, 1, B.torsoD); G.N.scale.set(B.neck, 1, B.neck);
+  for (const [S, sd, arm, leg] of [['L', 1, r.armL, r.legL], ['R', -1, r.armR, r.legR]]) {
+    const ua = B['ua' + S], A = G[S];
+    A.sh.scale.set(ua, 1, ua); A.el.scale.set(B['fa' + S], 1, B['fa' + S]); A.hip.scale.set(B['th' + S], 1, B['th' + S]); A.kn.scale.set(B['sn' + S], 1, B['sn' + S]);
+    arm.sh.position.x = sd * (.04 + .07 * (B.torsoW - 1) + .05 * (Math.max(ua, B['shJ' + S]) - 1) + .058 * SIGMA.mus);   // geniş omuzlar
+    arm.sh.position.y += .018;                                                                                   // kasılmış, kalkık omuzlar
+  }
+  const free = !o.sliding && !o.down && !o.airborne && !o.fly && !o.sit && !o.gsit && o.slamT == null && o.stompT == null && !o.carry && !o.reach && !CLIMB.on;
+  const armsFree = free && !r.armsOn, sp = o.speed || 0;
+  const walking = free && sp > .2, still = free && sp <= .2;
+  if (armsFree && still && !paused && !BODYPREV.on && !DRESS.open) SIGMA.idle += dt; else SIGMA.idle = 0;
+  const wantCine = SIGMA.cine && SIGMA.idle > SIGMA.delay;
+  const kq = d => 1 - Math.exp(-d * dt);
+  SIGMA.walkW = L(SIGMA.walkW, walking ? 1 : 0, kq(8));
+  SIGMA.standW = L(SIGMA.standW, still ? 1 : 0, kq(5));
+  SIGMA.cineW = L(SIGMA.cineW, wantCine ? 1 : 0, kq(wantCine ? 3.2 : 10));
+  sigSetBars(wantCine && SIGMA.cineW > .25);
+  const J = (obj, ax, tgt, w) => { if (w > .002) obj.rotation[ax] = L(obj.rotation[ax], tgt, Math.min(1, w)); };
+  const s = Math.sin(r.phase), c = Math.cos(r.phase), run = !!o.running;
+  // 1) kasılmış yürüyüş: sert dizler, geniş adım, kollar yana açık ve az sallanır, göğüs önde, çene yukarıda, kalça yaylanır
+  const w = SIGMA.walkW;
+  if (w > .002) {
+    if (!run) {
+      J(r.legL.hip, 'x', -s * .44, w); J(r.legR.hip, 'x', s * .44, w);
+      J(r.legL.kn, 'x', Math.max(0, c) * .32 + .04, w); J(r.legR.kn, 'x', Math.max(0, -c) * .32 + .04, w);
+      J(r.legL.hip, 'z', .085, w); J(r.legR.hip, 'z', -.085, w);
+      J(r.torso, 'x', -.07, w); J(r.torso, 'y', -s * .1, w); J(r.hips, 'y', s * .17, w); J(r.neck, 'x', -.1, w);
+    }
+    if (armsFree) {
+      const wa = run ? w * .6 : w;
+      J(r.armL.sh, 'x', run ? r.armL.sh.rotation.x : s * .22, wa); J(r.armR.sh, 'x', run ? r.armR.sh.rotation.x : -s * .22, wa);
+      J(r.armL.sh, 'z', .5 + Math.abs(s) * .04, wa); J(r.armR.sh, 'z', -.5 - Math.abs(s) * .04, wa);
+      if (!run) { J(r.armL.el, 'x', -.6, wa); J(r.armR.el, 'x', -.6, wa); }
+    }
+  }
+  // 2) duruş: geniş basış, kanat kasları yüzünden kollar hafif açık, göğüs önde
+  const ws = SIGMA.standW * (1 - SIGMA.cineW);
+  if (ws > .002) {
+    J(r.legL.hip, 'z', .1, ws); J(r.legR.hip, 'z', -.1, ws); J(r.torso, 'x', -.05, ws); J(r.neck, 'x', -.08, ws);
+    if (armsFree) { J(r.armL.sh, 'z', .32, ws); J(r.armR.sh, 'z', -.32, ws); J(r.armL.el, 'x', -.28, ws); J(r.armR.el, 'x', -.28, ws); }
+  }
+  // 3) 🎬 sinematik poz: kollar kavuşuk, ayaklar açık, çene havada, bir kaş kalkık
+  const wc = SIGMA.cineW;
+  if (wc > .002 && armsFree) {
+    for (const [S, arm] of [['L', r.armL], ['R', r.armR]]) { const X = SIG_X[S]; J(arm.sh, 'x', X[0], wc); J(arm.sh, 'y', X[1], wc); J(arm.sh, 'z', X[2], wc); J(arm.el, 'x', X[3], wc); }
+    SIGMA.shY = true;
+    J(r.legL.hip, 'z', .14, wc); J(r.legR.hip, 'z', -.14, wc); J(r.legL.kn, 'x', .03, wc); J(r.legR.kn, 'x', .03, wc);
+    J(r.torso, 'x', -.1, wc); J(r.neck, 'x', -.06, wc); J(r.hips, 'y', .12, wc); J(r.torso, 'y', -.12, wc);
+  } else if (SIGMA.shY && wc <= .002) { r.armL.sh.rotation.y = r.armR.sh.rotation.y = 0; SIGMA.shY = false; }
+  if (SIGMA.brows[0]) { const b = SIGMA.brows[0]; b.rotation.z = .3 - .38 * wc; b.position.y = .078 + .014 * wc; }   // sol kaş kalkar
+}
+function sigmaLook() {   // baş bakışı (updateHeadLook) sonrası: çene yukarı, hafif yan bakış
+  if (!SIGMA.vis) return;
+  const r = playerRig, w = SIGMA.cineW, ws = Math.max(SIGMA.walkW, SIGMA.standW);
+  r.look.rotation.x -= .08 * ws + .14 * w;
+  r.look.rotation.y += .32 * w * Math.min(1, Math.max(0, (SIGMA.idle - SIGMA.delay) * .6));
+}
+function sigmaPhotoPose(r) {   // foto modu: 🗿 Sigma pozu (her çöp adamda çalışır)
+  for (const [S, arm] of [['L', r.armL], ['R', r.armR]]) { const X = SIG_X[S]; arm.sh.rotation.set(X[0], X[1], X[2]); arm.el.rotation.set(X[3], 0, 0); }
+  r.legL.hip.rotation.z = .14; r.legR.hip.rotation.z = -.14; r.legL.kn.rotation.x = r.legR.kn.rotation.x = .03; r.legL.hip.rotation.x = r.legR.hip.rotation.x = 0;
+  r.torso.rotation.set(-.1, -.12, 0); r.hips.rotation.y = .12; r.look.rotation.set(-.2, .3, 0);
+  if (r === playerRig && SIGMA.brows[0]) { SIGMA.brows[0].rotation.z = -.08; SIGMA.brows[0].position.y = .092; }
+}
+SFX.sigma = (d, t) => { tone(d, 'sine', 120, 38, t, 1.3, 1); tone(d, 'triangle', 240, 70, t, .45, .35); noiseB(d, 'lowpass', 900, 60, .5, t, .6, .5); };   // "vine boom" bass
+SFX_DEFS.push(['sigma', 'Sigma sinematik bass', 'Oyun ve arayüz']);
+Object.assign(L_EN, { 'Sigma': 'Sigma', 'Kaslı çöp adam · keskin hatlar, sert bakış · tüm yetenekler': 'Muscular stickman · sharp outlines, stern stare · all abilities',
+  '🗿 Sigma': '🗿 Sigma', 'Durunca sinematik poz ver': 'Strike a cinematic pose when standing still', 'Kaç saniye durunca': 'After how many seconds', '2 sn': '2 s', '4 sn': '4 s',
+  '💪 Kas belirginliği': '💪 Muscle definition', '✏️ Hat rengi': '✏️ Outline colour', 'Otomatik': 'Auto', 'Sigma sinematik bass': 'Sigma cinematic bass',
+  'Sigma, çöp adamın kaslı hâli: kas hatları belirgin, kaşlar çatık, göz kapakları yarı kapalı, yürürken göğsünü şişirip kollarını açarak kasılarak yürür. Bir süre durunca kollarını kavuşturup sinematik poz verir (sinema şeritleri + bass). Vücut ve kafa rengi yukarıdaki 🎨 Karakter renkleri\'nden değişir; foto modunda 🗿 Sigma pozu da var.':
+  'Sigma is the muscular stickman: defined muscle lines, furrowed brows, half-closed eyelids, and a tense walk with chest out and arms spread. Stand still for a while and he crosses his arms for a cinematic pose (film bars + bass). Body and head colours change in 🎨 Character colours above; photo mode has a 🗿 Sigma pose too.' });
+{
+  document.head.insertAdjacentHTML('beforeend', '<style>#sigBars{position:fixed;inset:0;pointer-events:none;z-index:6}#sigBars::before,#sigBars::after{content:"";position:absolute;left:0;right:0;height:11vh;background:#000;transition:transform .7s cubic-bezier(.2,.8,.2,1)}#sigBars::before{top:0;transform:translateY(-100%)}#sigBars::after{bottom:0;transform:translateY(100%)}#sigBars.on::before,#sigBars.on::after{transform:none}body.photo #sigBars{display:none}#sigLineSw button.on{outline:2px solid #ffd166}</style>');
+  document.body.insertAdjacentHTML('beforeend', '<div id="sigBars"></div>');
+  const pick = document.querySelector('.charPick'), first = pick && pick.querySelector('[data-char="stick"]');
+  if (first) first.insertAdjacentHTML('afterend', '<button data-char="sigma"><span class="ci">🗿</span><b>Sigma</b><small>Kaslı çöp adam · keskin hatlar, sert bakış · tüm yetenekler</small></button>');
+  const sw = ['auto', '#000000', '#ffffff', '#ffd166', '#e63946', '#3a86ff', '#06d6a0', '#8338ec'];
+  if (pick) pick.insertAdjacentHTML('afterend', `<div class="grpT">🗿 Sigma</div>
+    <label class="ck"><input type="checkbox" id="sSigCine"> Durunca sinematik poz ver</label>
+    <div class="setRow"><span>Kaç saniye durunca</span><select id="sSigDelay"><option value="2">2 sn</option><option value="4">4 sn</option><option value="8">8 sn</option><option value="12">12 sn</option></select></div>
+    <div class="sl"><span>💪 Kas belirginliği</span><input type="range" id="sSigMus" min="0.5" max="1.6" step="0.05" aria-label="Kas belirginliği"><b id="sSigMusV"></b></div>
+    <div class="setRow"><span>✏️ Hat rengi</span><input type="color" id="sSigLine"></div>
+    <div class="swatches" id="sigLineSw">${sw.map(c => c === 'auto' ? '<button data-sl="auto" title="Otomatik" style="background:linear-gradient(135deg,#000 50%,#fff 50%)"></button>' : `<button data-sl="${c}" title="${c}" style="background:${c}"></button>`).join('')}</div>
+    <div class="hint">Sigma, çöp adamın kaslı hâli: kas hatları belirgin, kaşlar çatık, göz kapakları yarı kapalı, yürürken göğsünü şişirip kollarını açarak kasılarak yürür. Bir süre durunca kollarını kavuşturup sinematik poz verir (sinema şeritleri + bass). Vücut ve kafa rengi yukarıdaki 🎨 Karakter renkleri'nden değişir; foto modunda 🗿 Sigma pozu da var.</div>`);
+  const ui = () => { $('sSigCine').checked = SIGMA.cine; $('sSigDelay').value = String(SIGMA.delay); $('sSigLine').value = SIGMA.line === 'auto' ? '#000000' : SIGMA.line;
+    for (const b of document.querySelectorAll('#sigLineSw [data-sl]')) b.classList.toggle('on', b.dataset.sl === SIGMA.line); };
+  SETSYNC.push(ui, bindRange('sSigMus', () => SIGMA.mus, v => { SIGMA.mus = v; sigMusApply(); sigSave(); }, v => v.toFixed(2).replace(/0$/, '') + 'x'));
+  $('sSigCine').addEventListener('change', e => { SIGMA.cine = e.target.checked; sigSave(); });
+  $('sSigDelay').addEventListener('change', e => { SIGMA.delay = +e.target.value; sigSave(); });
+  $('sSigLine').addEventListener('input', e => { SIGMA.line = e.target.value; sigSave(); ui(); });
+  $('sigLineSw').addEventListener('click', e => { const b = e.target.closest('[data-sl]'); if (!b) return; play('ui'); SIGMA.line = b.dataset.sl; sigSave(); ui(); });
+  ui();
+}
 $('sGfx').addEventListener('change', e => setGfx(e.target.value));
 $('sWeather').addEventListener('change', e => setWeather(e.target.value));
 // Koşu ve depar
@@ -8796,7 +8965,7 @@ const lookDirOf = (out) => out.set(-Math.sin(yaw) * Math.cos(pitch), -Math.sin(p
 const PH = { dsp: (() => { try { const v = +localStorage.getItem('sftDronHiz'); return v >= 1 && v <= 500 ? v : 6; } catch (e) { return 6; } })(), mode: 'drone', pos: new THREE.Vector3(), saved: null, fov: 60, filter: 'none', pose: 'natural', hideChar: false, snap: null, hintT: 0 };
 const FILTERS = { none: ['Normal', ''], vivid: ['Canlı', 'saturate(1.45) contrast(1.08)'], bw: ['Siyah-Beyaz', 'grayscale(1) contrast(1.1)'],
                   sepia: ['Sepya', 'sepia(.85) contrast(1.05)'], film: ['Sinema', 'contrast(1.18) saturate(.78) brightness(.96)'], warm: ['Gün batımı', 'sepia(.3) saturate(1.45) hue-rotate(-12deg) brightness(1.03)'] };
-const POSES = { natural: 'Doğal', wave: '👋 El salla', win: '✌️ Zafer', flex: '💪 Kaslı', think: '🤔 Düşünür' };
+const POSES = { natural: 'Doğal', wave: '👋 El salla', win: '✌️ Zafer', flex: '💪 Kaslı', think: '🤔 Düşünür', sigma: '🗿 Sigma' };
 const RIG_JOINTS = r => [r.hips, r.torso, r.neck, r.look, r.armL.sh, r.armL.el, r.armR.sh, r.armR.el, r.legL.hip, r.legL.kn, r.legR.hip, r.legR.kn];
 {
   const fEl = $('pFilters'), pEl = $('pPoses');
@@ -8841,6 +9010,7 @@ function setPose(k) {
   if (k === 'win') { set(r.armR.sh, 0, 0, -2.6); set(r.armL.sh, 0, 0, 2.6); set(r.armR.el, 0, 0, 0); set(r.armL.el, 0, 0, 0); set(r.look, -.3, 0, 0); }
   if (k === 'flex') { set(r.armR.sh, 0, 0, -1.45); set(r.armR.el, 0, 0, -1.75); set(r.armL.sh, 0, 0, 1.45); set(r.armL.el, 0, 0, 1.75); set(r.torso, -.08, 0, 0); }
   if (k === 'think') { set(r.armR.sh, -1.0, 0, .35); set(r.armR.el, -2.35, 0, 0); set(r.armL.sh, -.45, 0, -.55); set(r.armL.el, -1.55, 0, 0); set(r.look, .2, .3, 0); }
+  if (k === 'sigma') sigmaPhotoPose(r);
   refreshPhotoUI();
 }
 function setPhotoMode(m) {
@@ -10800,6 +10970,7 @@ function update(dt) {
                                                   : COMP.cheerMe > 0 ? CHEER_ARMS : COMP.sadMe > 0 ? SAD_ARMS : CHAT.laughMe > 0 && COMP.active ? laughArms(elapsed)
                                                   : !shielding && !slide && !sitting && !gSit && !carried && !dead && !giant && !reachK ? itemArms(THREE.MathUtils.clamp(pitch * .8 - .05, -1, 1)) : null });
   }
+  if (!charRig) sigmaPost(dt);   // 🗿 Sigma katmanı (kasılmış yürüyüş, sinematik poz)
   if (CLIMB.on && !charRig) climbPose();
   if (!charRig) animeAnimate(dt);
   animeUpdate(dt, speed / giantS);
@@ -11074,7 +11245,7 @@ function update(dt) {
   const fovA = fovB + (ADM.fov ? 24 : ADM.narrow ? -24 : 0);   // admin: geniş / dar açı
   if (Math.abs(camera.fov - fovA) > .01) { camera.fov = fovA; camera.updateProjectionMatrix(); }
 
-  if (!charRig && !dead) updateHeadLook(dt);
+  if (!charRig && !dead) { updateHeadLook(dt); sigmaLook(); }
   updateBubbles();
   updateCompArrow();
 
@@ -12684,9 +12855,11 @@ function animeHairUI() {
 function pickChar(c) {
   if (c === 'custom') { crigPick(); return; }
   play('ui');
+  SIGMA.on = c === 'sigma';   // 🗿 Sigma: kaslı çöp adam
   if (c === 'pati' || c === 'roach') { if (ANIME.on) setAnime(false, true); setHero(true, false, c); }
   else if (c === 'anime' || c === 'boy' || c === 'girlA' || c === 'girlB' || c === 'girlC') { if (HERO.on) setHero(false, true); setAnime(true, false, c === 'anime' ? 'girl' : c); }
-  else { if (ANIME.on) setAnime(false, true); setHero(false); }
+  else { if (ANIME.on) setAnime(false, true); setHero(false); if (SIGMA.on) { try { localStorage.setItem('copAdamKarakter', 'sigma'); } catch (e) {} showMsg('🗿 Sigma'); } }
+  try { syncSettings(); } catch (e) {}
 }
 {
   const pick = document.querySelector('.charPick');
