@@ -6785,6 +6785,7 @@ function fallIntoCloset() {
 }
 function exitCloset() {
   if (DRESS.open) closeDress();
+  if (CLOSET.returnTo === 'maker' && window.__mk) { CLOSET.returnTo = null; __mk.fromCloset(); return; }   // 🗺️ haritadaki iris çukurundan geldiysek
   if (CLOSET.returnTo === 'home') {   // evdeki dolaptan geldiysek dolabın önüne dön
     CLOSET.returnTo = null; const A = AREAS.home;
     teleportTo('home', A.cx - 6.2, A.cz + .8, Math.PI / 2, '🏠 Evine döndün', () => { player.position.y = HM.FH; onGround = true; });
@@ -8852,12 +8853,12 @@ function showResume() {
 }
 document.addEventListener('pointerlockchange', () => {
   if (isLocked()) { lockWorked = true; lockFailed = false; overlay.style.display = 'none'; canvas.style.cursor = ''; }
-  else { mouseHeld = false; if (DRESS.open || TET.open || HOME.picking || ADM.open || CITY.menu || CITY.talk || FB.on || (window.__mp && window.__mp.ui()) || (typeof DESK !== 'undefined' && DESK.on) || (typeof PAINT !== 'undefined' && PAINT.draw) || (typeof MIA2 !== 'undefined' && MIA2.phone) || (typeof UNI !== 'undefined' && (UNI.seat || UNI.quiz))) return; if (started && !paused && !touchMode) openPause(); else showResume(); }   // Esc: oyun durur, menü açılır
+  else { mouseHeld = false; if (DRESS.open || TET.open || HOME.picking || ADM.open || CITY.menu || CITY.talk || FB.on || (window.__mp && window.__mp.ui()) || (typeof DESK !== 'undefined' && DESK.on) || (typeof PAINT !== 'undefined' && PAINT.draw) || (typeof MIA2 !== 'undefined' && MIA2.phone) || (typeof UNI !== 'undefined' && (UNI.seat || UNI.quiz)) || (window.__mk && __mk.uiOpen())) return; if (started && !paused && !touchMode) openPause(); else showResume(); }   // Esc: oyun durur, menü açılır
 });
 document.addEventListener('pointerlockerror', () => { if (!lockWorked) lockFailedNow(); else showResume(); });
 overlay.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') enableTouch(); });
 overlay.addEventListener('click', e => { if (!started && !e.target.closest('#mmPlay')) return; started = true; overlay.classList.add('st'); paused = false; overlay.style.display = 'none'; if (!touchMode) tryLock(); });
-canvas.addEventListener('click', () => { if (started && !paused && !touchMode && !isLocked() && !lockFailed && !DRESS.open && !TET.open && !ADM.open && !FB.on && !CITY.menu && !CITY.talk && !(typeof PAINT !== 'undefined' && PAINT.draw) && !(typeof MIA2 !== 'undefined' && MIA2.phone) && !(typeof UNI !== 'undefined' && (UNI.seat || UNI.quiz))) tryLock(); });
+canvas.addEventListener('click', () => { if (started && !paused && !touchMode && !isLocked() && !lockFailed && !DRESS.open && !TET.open && !ADM.open && !FB.on && !CITY.menu && !CITY.talk && !(typeof PAINT !== 'undefined' && PAINT.draw) && !(typeof MIA2 !== 'undefined' && MIA2.phone) && !(typeof UNI !== 'undefined' && (UNI.seat || UNI.quiz)) && !(window.__mk && __mk.uiOpen())) tryLock(); });
 let dragging = false;
 canvas.addEventListener('mousedown', e => {
   dragging = true;
@@ -9521,6 +9522,7 @@ function groundAt(x, z, y) {   // her eşyanın üstünde durulabilir (ağaçlar
   if (OBG.on) obgEach(x, z, 1, one);
   if (inRoyale && BR.builds.length) g = brRampAt(x, z, y, g);
   if (ADM.brb && ADM.brb.length) g = admRampAt(x, z, y, g);
+  if (inMaker && window.__mk) g = __mk.ramp(x, z, y, g);   // 🗺️ harita rampaları / merdivenleri
   return g;
 }
 // Engellerden itme (çalı ve portalın içinden geçilir, kayanın tepesindeysek itme yok) + bölge sınırı
@@ -9939,7 +9941,7 @@ function teleportTo(key, x, z, face, msg, onArrive) {
     if (PARTS[curKey] && curKey !== key) scene.remove(PARTS[curKey]);   // çıktığımız iç mekân sahneden ayrılır
     if (PARTS[key]) scene.add(PARTS[key]);                                // girdiğimiz iç mekân yüklenir
     curKey = key;
-    curArea = AREAS[key]; inArena = key === 'arena'; inHouse = key === 'house'; inMall = key === 'mall'; inCloset = key === 'closet'; inHome = key === 'home'; inParkour = key === 'parkour'; inRoyale = key === 'royale'; inIce = key === 'ice'; inDesert = key === 'desert'; inQuest = key === 'quest'; inBlank = key === 'blank'; inCity = key === 'city'; applyArea(curArea);
+    curArea = AREAS[key]; inArena = key === 'arena'; inHouse = key === 'house'; inMall = key === 'mall'; inCloset = key === 'closet'; inHome = key === 'home'; inParkour = key === 'parkour'; inRoyale = key === 'royale'; inIce = key === 'ice'; inDesert = key === 'desert'; inQuest = key === 'quest'; inBlank = key === 'blank'; inCity = key === 'city'; inMaker = key === 'maker'; applyArea(curArea);
     if (!inMall && !inCloset && !inHome && !inParkour) objEl.style.display = 'none';
     for (const l of HOME.lights) l.visible = inHome;
     if (!inHome) { if (HOME.video && !HOME.video.paused) HOME.video.pause(); if (TET.open) closeTetris(); HOME.act = null; HOME.sleep = null; $('sleepFx').classList.remove('on', 'day'); HOME.broom.visible = HOME.pan.visible = false; }
@@ -9952,7 +9954,7 @@ function teleportTo(key, x, z, face, msg, onArrive) {
     camBase.copy(player.position).y += 1.5;
     if (inArena) { kills = 0; $('kills').textContent = `Yenilen ${killNoun()}: 0`; }
     if (inParkour || inRoyale) { giant = false; ROBO.open = false; }
-    brArea(); iceArea(); desertArea(); questArea(); blankArea(); cityArea(); try { deskArea(); } catch (e) { sftErr(e); }
+    brArea(); iceArea(); desertArea(); questArea(); blankArea(); cityArea(); try { deskArea(); } catch (e) { sftErr(e); } try { if (window.__mk) __mk.area(); } catch (e) { sftErr(e); }
     $('hpWrap').style.display = $('kills').style.display = inArena ? 'block' : 'none';
     if (onArrive) onArrive();
     if (!inHouse && !inMall && !inCloset && !inHome && !inParkour) for (let i = 0; i < 20; i++) spawnDust(x, 0, z, 1.5, 2, 0, 0, 0xc9a2ff);
@@ -9982,6 +9984,7 @@ function exitHouse() {
 }
 
 function doPunchHit(dir) {
+  if (inMaker && window.__mk) __mk.punch(dir);   // 🗺️ haritadaki canavarlar / NPC'ler
   if (inRoyale) { brMelee(dir, { reach: 1.7, arc: 60, dmg: 10 }); return; }
   if (BOSS.on) bossMelee(dir, 2.4 * Math.max(1, giantS), 30 * (ADM.superPunch ? 4 : 1) * (INV.eq === 'superfight' ? 1.6 : 1));
   const P = player.position;
@@ -10949,7 +10952,7 @@ function update(dt) {
     deadT += dt;
     charHolder.rotation.x = THREE.MathUtils.lerp(charHolder.rotation.x, -1.45, 1 - Math.exp(-8 * dt));
     charHolder.position.set(0, .1, 0);
-    if (deadT > 2 && !teleporting && !inRoyale) { const rv = () => { dead = false; hp = HPMAX; charHolder.rotation.x = 0; charHolder.position.y = 0; }; if (inArena && ARENA.theme === 'all') questReturn(rv); else if (inCity) cityRespawn(rv); else teleport(false, rv); }
+    if (deadT > 2 && !teleporting && !inRoyale) { const rv = () => { dead = false; hp = HPMAX; charHolder.rotation.x = 0; charHolder.position.y = 0; }; if (inArena && ARENA.theme === 'all') questReturn(rv); else if (inCity) cityRespawn(rv); else if (inMaker && window.__mk) __mk.respawn(rv); else teleport(false, rv); }
   }
 
   if (charRig) {
@@ -11013,13 +11016,13 @@ function update(dt) {
 
   // Dünya: köyde NPC'ler, çocuklar ve çalılar; arenada canavarlar; evde içerideki NPC
   if (!inHouse && !inMall && !inHome && !COMP.active) chatAnsEl.style.display = 'none';
-  if (COMP.active && !inHouse && !inArena && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity) updateCompanion(dt);
+  if (COMP.active && !inHouse && !inArena && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !inMaker) updateCompanion(dt);
   if (inMall) updateMall(dt);
   if (inCloset) updateCloset(dt);
   if (inHome) updateHome(dt);
   if (TET.open) tetrisTick(dt);
   if (tvReq) { tvReq = false; if (inHome) tvMain(); }
-  if (!inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'desk' && curKey !== 'school' && curKey !== 'uni') updatePit(dt);
+  if (!inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'desk' && curKey !== 'school' && curKey !== 'uni' && !inMaker) updatePit(dt);
   if (DRESS.poseT > 0) DRESS.poseT -= dt;
   if (inHouse) { updateHouseNpc(wdt); placeTeaProps(wdt); }
   else if (!inArena) {
@@ -11064,7 +11067,7 @@ function update(dt) {
   }
   // Stadyum 7/24: maç her zaman sürer; yakındaysak oyuncular, seyirciler ve teknik direktörler görünür ve canlanır
   {
-    const inHub = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity, sd = Math.hypot(pos.x - STADIUM.x, pos.z - STADIUM.z), near = inHub && sd < 115;   // stadyum: oyuncular, taraftarlar, hocalar yaklaşınca yüklenir
+    const inHub = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !inMaker, sd = Math.hypot(pos.x - STADIUM.x, pos.z - STADIUM.z), near = inHub && sd < 115;   // stadyum: oyuncular, taraftarlar, hocalar yaklaşınca yüklenir
     for (const k of STADIUM_FIELD.kids) k.holder.visible = near;
     STADIUM_FIELD.ball.holder.visible = near;
     if (near) updateField(STADIUM_FIELD, ADM.npcStop ? 0 : wdt);   // maç yakındayken oynanır
@@ -11081,13 +11084,13 @@ function update(dt) {
   updateCyclists(ADM.npcStop ? 0 : wdt);
   updateSquash(wdt);
   {
-    const hubNow = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni';
+    const hubNow = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni' && !inMaker;
     for (const fl of flocks) for (const b of fl.birds) b.obj.visible = hubNow && !DAY.night && Math.abs(b.pos.x - pos.x) + Math.abs(b.pos.z - pos.z) < 115;
     if (!hubNow) for (const k of birdKids) k.holder.visible = false;
     updateHoods(ADM.npcStop ? 0 : wdt, hubNow); updateAmbience(wdt, hubNow); updateAdventurer(wdt, hubNow); updateLife(wdt, hubNow); updateLuna(wdt, hubNow); updateRoyale(dt); updateFlight(dt); updateIce(wdt); updateDesert(wdt); questUpdate(wdt); cityUpdate(wdt); updateDetail(wdt, hubNow);
     for (const g of SIGNS) g.visible = hubNow && Math.abs(g.position.x - pos.x) + Math.abs(g.position.z - pos.z) < 140;
   }
-  grass.visible = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni';
+  grass.visible = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni' && !inMaker;
   grassMat.uniforms.uWalk.value = onGround && !flying ? 1 : 0;
   {   // çimen alanı kameranın baktığı yöne kaydırılır: arkada boşa çimen çizilmez, önde daha uzağa kadar çimen olur
     const U = grassMat.uniforms, fx = -Math.sin(yaw), fz = -Math.cos(yaw), sh = GRASS_S * .19;
@@ -11946,7 +11949,7 @@ function updateDay(dt) {
   DK.moonV.copy(DK.sunV).negate();
   const N = DAY.N = THREE.MathUtils.clamp((.05 - DK.sunV.y) / .26, 0, 1);
   if (!DAY.night && N > .6) DAY.night = true; else if (DAY.night && N < .45) DAY.night = false;
-  const hub = curArea === AREAS.hub || (typeof inCity !== 'undefined' && inCity) || curArea === AREAS.miami;
+  const hub = curArea === AREAS.hub || (typeof inCity !== 'undefined' && inCity) || curArea === AREAS.miami || inMaker;
   // Ana ışık (gölge yapan): gündüz güneş, gece ay; çok alçaktayken gölgeler sonsuz uzamasın diye en az 12°
   const L = DK.sunV.y > 0 ? DK.sunV : DK.moonV, hz = Math.hypot(L.x, L.z), ly = Math.max(L.y, .21), kk = Math.sqrt(1 - ly * ly) / hz;
   if (hub) DK.LD.set(L.x * kk, ly, L.z * kk); else DK.LD.copy(DEFAULT_SUN);
@@ -12135,7 +12138,7 @@ function pickWeather() {
 }
 const WXC = new THREE.Color(), WX_GRAY = new THREE.Color(0x8a94a0), WX_FOG = new THREE.Color(0xa7b1bc);
 function updateWeather(dt) {
-  const hub = curArea === AREAS.hub;
+  const hub = curArea === AREAS.hub || inMaker;
   if (WX.mode === 'auto' && dt > 0) { WX.next -= dt; if (WX.next <= 0) pickWeather(); }
   const wet = WX.cur === 'rain' || WX.cur === 'storm', snow = WX.cur === 'snow', fog = WX.cur === 'fog';
   WX.k = THREE.MathUtils.lerp(WX.k, hub && WX.cur !== 'clear' ? 1 : 0, 1 - Math.exp(-.8 * Math.max(dt, .016)));
@@ -30504,6 +30507,32 @@ function updateRTree() {
   RTREE.shown = on;
 }
 
+/* 🗺️ Harita oluşturucu: maker.js ayrı dosyadır (sayfa boyutu sınırı). Oyunun içindeki değişkenlere bu G tablosuyla erişir. */
+var inMaker = false;
+window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G, k, st ? { get: g, set: st, enumerable: true } : { get: g, enumerable: true });
+  d('$', () => $); d('ADM', () => ADM); d('AREAS', () => AREAS); d('BAKED_BUSH', () => BAKED_BUSH);
+  d('BAKED_TREE', () => BAKED_TREE); d('BENCHES', () => BENCHES); d('CLOSET', () => CLOSET); d('DAY', () => DAY);
+  d('DEG', () => DEG); d('DT_LAST', () => DT_LAST, v => { DT_LAST = v; }); d('FLY', () => FLY); d('HOUSE_VARIANTS', () => HOUSE_VARIANTS);
+  d('HPMAX', () => HPMAX, v => { HPMAX = v; }); d('LOAD_NAMES', () => LOAD_NAMES); d('M', () => M); d('NV_DEF', () => NV_DEF, v => { NV_DEF = v; });
+  d('PLACEHOLDERS', () => PLACEHOLDERS); d('RIDE', () => RIDE); d('THREE', () => THREE); d('TREE_VARIANTS', () => TREE_VARIANTS);
+  d('WX', () => WX); d('adT', () => adT); d('admBusy', () => admBusy); d('animateStick', () => animateStick);
+  d('applyArea', () => applyArea); d('benchModel', () => benchModel); d('buildAcacia', () => buildAcacia); d('buildCar', () => buildCar);
+  d('buildHouse', () => buildHouse); d('buildPalm', () => buildPalm); d('buildPet', () => buildPet); d('buildPine', () => buildPine);
+  d('buildTree', () => buildTree); d('camera', () => camera); d('canvas', () => canvas); d('createStickman', () => createStickman);
+  d('curKey', () => curKey, v => { curKey = v; }); d('damagePlayer', () => damagePlayer); d('dead', () => dead, v => { dead = v; }); d('dist', () => dist, v => { dist = v; });
+  d('elapsed', () => elapsed, v => { elapsed = v; }); d('facing', () => facing, v => { facing = v; }); d('giant', () => giant, v => { giant = v; }); d('ground', () => ground);
+  d('hp', () => hp, v => { hp = v; }); d('hurtFlash', () => hurtFlash, v => { hurtFlash = v; }); d('inMaker', () => inMaker, v => { inMaker = v; }); d('isLocked', () => isLocked);
+  d('lockFailed', () => lockFailed, v => { lockFailed = v; }); d('makeBalloon', () => makeBalloon); d('makeThemeRig', () => makeThemeRig); d('mesh', () => mesh);
+  d('nvSpawn', () => nvSpawn); d('obstacles', () => obstacles); d('onGround', () => onGround, v => { onGround = v; }); d('paused', () => paused, v => { paused = v; });
+  d('photoMode', () => photoMode, v => { photoMode = v; }); d('pitch', () => pitch, v => { pitch = v; }); d('play', () => play); d('player', () => player);
+  d('progAdd', () => progAdd); d('resumeGame', () => resumeGame); d('rideExit', () => rideExit); d('scene', () => scene);
+  d('separate', () => separate); d('shake', () => shake, v => { shake = v; }); d('showMsg', () => showMsg); d('spawnDust', () => spawnDust);
+  d('speckleTexture', () => speckleTexture); d('started', () => started, v => { started = v; }); d('staticPH', () => staticPH); d('teleportTo', () => teleportTo);
+  d('teleporting', () => teleporting, v => { teleporting = v; }); d('touchMode', () => touchMode, v => { touchMode = v; }); d('tryLock', () => tryLock); d('vel', () => vel);
+  d('vy', () => vy, v => { vy = v; }); d('wrapAng', () => wrapAng); d('yaw', () => yaw, v => { yaw = v; });
+  return G; })();
+{ const s = document.createElement('script'); s.src = 'maker.js'; s.onerror = () => console.warn('🗺️ maker.js yüklenemedi'); document.head.appendChild(s); }
+
 renderer.setAnimationLoop(() => {
   try {   // bir alt sistem hata verse bile oyun donmasın: hata ekranda gösterilir, çizim sürer
   const dt = Math.min(clock.getDelta(), 1 / 20) * (ADM.slowmo ? .3 : ADM.slowmo2 ? .1 : 1);   // admin: ağır çekim
@@ -30521,6 +30550,7 @@ renderer.setAnimationLoop(() => {
   try { deskTick(paused ? 0 : dt); deskLate(dt); } catch (e) { sftErr(e); }
   try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); try { paintLate(paused || photoMode ? 0 : dt); galLate(); uniTick(paused || photoMode ? 0 : dt); if (lifeOn() === 'city' && !paused && !photoMode) lifeCityTick(dt); } catch (e) { sftErr(e); } if (window.__mp) window.__mp.tick(dt); try { rcTick(dt); } catch (e) { console.warn('rc', e); } npcLblTick(paused ? 0 : dt); if (!ankIn()) ankDebrisTick(paused || photoMode ? 0 : dt); cyUltraTick(); gvDualLate(); if (inCity && CITY.built) { cyVariety(); cyVarietySync(); } } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
   try { buddyUpdate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🤝 arkadaş: senin pozunu kopyalar
+  try { if (window.__mk) __mk.tick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🗺️ harita oluşturucu
   updateDay(paused || photoMode || ADM.freeze ? 0 : dt * (ADM.daySpeed ? 40 : 1));
   updateWeather(paused || photoMode || ADM.freeze ? 0 : dt);
   admAfterWeather();
