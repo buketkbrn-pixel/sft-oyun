@@ -19,6 +19,7 @@ const MK = { map: null, recs: [], root: new G.THREE.Group(), envG: new G.THREE.G
 MK.root.name = 'mkRoot'; MK.envG.name = 'mkEnv';
 const mkA = () => G.AREAS.maker;
 const mkSnapD = () => MK.map ? MK.map.env.snap : 1;
+const mkAdm = () => !!G.ADM_UNLOCK;   // 🔐 harita oluşturma / düzenleme sadece admin; herkes 🏪 mağazadan indirip oynar
 
 /* ---------- küçük yapı taşları ---------- */
 const mkMat = c => typeof c === 'number' ? G.M(c) : c;
@@ -213,7 +214,7 @@ mkItem('deadtree', 'doga', '🥀', 'Kuru ağaç', o => mkS('deadtree', g => { co
 mkItem('pumpkin', 'doga', '🎃', 'Balkabağı', o => mkS('pumpkin' + ((o.v || 0) % 2), g => { const p = mkSp(g, .45, 0xf77f00, 0, .38, 0, 14); p.scale.y = .8; mkCy(g, .05, .06, .2, 0x4f6a2a, 0, .78, 0, 5); if ((o.v || 0) % 2) { for (const x of [-.15, .15]) mkB(g, .1, .1, .05, MK_GLOW.warm, x, .45, .42); mkB(g, .24, .06, .05, MK_GLOW.warm, 0, .27, .42); } }), { hit: { s: [.45, .7] }, vary: 2 });
 mkItem('hay', 'doga', '🟨', 'Saman balyası', o => mkS('hay', g => { const m = mkCy(g, .7, .7, 1.4, 0xe9c46a, 0, .7, 0, 14); m.rotation.z = Math.PI / 2; for (const x of [-.71, .71]) { const e = mkCy(g, .68, .68, .02, 0xd4a843, x, .7, 0, 14); e.rotation.z = Math.PI / 2; } }), { hit: { b: [.7, .7, 1.4] } });
 
-// 🛣️ YOLLAR (6 m'lik karolar: ızgara açıkken 6 m'ye ve 90°'ye oturur)
+// 🛣️ YOLLAR: ızgarasız, serbest konur ve 15° adımla döner (6 m'lik karolar)
 mkItem('road', 'yol', '🛣️', 'Düz yol', mkRoad('straight'), { flat: true, road: true });
 mkItem('roadc', 'yol', '↪️', 'Viraj', mkRoad('corner'), { flat: true, road: true });
 mkItem('roadt', 'yol', '⊥', 'T kavşak', mkRoad('tee'), { flat: true, road: true });
@@ -222,6 +223,34 @@ mkItem('zebra', 'yol', '🚸', 'Yaya geçidi', mkRoad('zebra'), { flat: true, ro
 mkItem('parking', 'yol', '🅿️', 'Otopark', mkRoad('park'), { flat: true, road: true });
 mkItem('walk', 'yol', '⬜', 'Kaldırım', mkRoad('walk'), { flat: true, road: true });
 mkItem('dirtpath', 'yol', '🟫', 'Toprak yol', mkRoad('dirt'), { flat: true, road: true });
+// 〰️ SERBEST YOLLAR: ızgara yok — noktaları istediğin yere koy, kıvrımlı yol kendiliğinden çizilir
+function mkFreeTex(kind) { const k = 'froad_' + kind; if (MK_TEX[k]) return MK_TEX[k]; const t = mkRoadTex(kind).clone(); t.wrapS = t.wrapT = G.THREE.RepeatWrapping; t.needsUpdate = true; return MK_TEX[k] = t; }
+const MK_FREEMAT = {};
+function mkFreeMat(kind) { return MK_FREEMAT[kind] ||= new G.THREE.MeshStandardMaterial({ map: mkFreeTex(kind === 'asphalt' ? 'straight' : kind), roughness: .95, side: G.THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }); }
+function mkRibbon(pts, w, kind) {   // pts: [[x,z],...] (yerel) → yumuşak yol şeridi; doku yol boyunca akar
+  const T = G.THREE, V = pts.map(([x, z]) => new T.Vector3(x, 0, z)); let S = V;
+  if (V.length >= 3) { const c = new T.CatmullRomCurve3(V, false, 'centripetal', .5), L = c.getLength(); S = c.getSpacedPoints(Math.max(2, Math.min(900, Math.ceil(L / .6)))); }
+  const pos = [], uv = [], idx = []; let acc = 0;
+  for (let i = 0; i < S.length; i++) {
+    const p = S[i], a = S[Math.max(0, i - 1)], b = S[Math.min(S.length - 1, i + 1)]; let tx = b.x - a.x, tz = b.z - a.z; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
+    if (i) acc += p.distanceTo(S[i - 1]);
+    pos.push(p.x - tz * w / 2, .045, p.z + tx * w / 2, p.x + tz * w / 2, .045, p.z - tx * w / 2); uv.push(0, acc / w, 1, acc / w);
+    if (i) { const k = i * 2; idx.push(k - 2, k, k - 1, k - 1, k, k + 1); }
+  }
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  const m = new T.Mesh(g, mkFreeMat(kind)); m.receiveShadow = true; return m;
+}
+function mkFreeBuild(o) {
+  const F = MK_I[o.t].free, g = new G.THREE.Group();
+  if (Array.isArray(o.pts) && o.pts.length >= 2) g.add(mkRibbon(o.pts, F.w, F.k));
+  else g.add(G.mesh(new G.THREE.CylinderGeometry(F.w / 2, F.w / 2, .04, 28), mkFreeMat(F.k), 0, .05, 0));   // çizmeden önce: yol genişliğini gösteren daire
+  return g;
+}
+const MK_FREEHINT = 'Noktaları sırayla koy (✅ Koy ya da dokun), ✅ Bitti ile yol oluşur. Izgara yok: istediğin yere, istediğin açıyla.';
+mkItem('froad', 'yol', '〰️', 'Serbest yol (çiz)', mkFreeBuild, { flat: true, road: true, free: { w: 6, k: 'asphalt' }, hint: MK_FREEHINT });
+mkItem('froadn', 'yol', '➰', 'Serbest dar yol', mkFreeBuild, { flat: true, road: true, free: { w: 4, k: 'asphalt' }, hint: MK_FREEHINT });
+mkItem('fdirt', 'yol', '🟤', 'Serbest toprak yol', mkFreeBuild, { flat: true, road: true, free: { w: 3.5, k: 'dirt' }, hint: MK_FREEHINT });
+mkItem('fwalk', 'yol', '◽', 'Serbest kaldırım', mkFreeBuild, { flat: true, road: true, free: { w: 2.4, k: 'walk' }, hint: MK_FREEHINT });
 mkItem('lamp', 'yol', '💡', 'Sokak lambası', o => G.PLACEHOLDERS.lamp(), { hit: { c: [.2, 3.3] } });
 mkItem('tlight', 'yol', '🚦', 'Trafik lambası', o => mkS('tlight', g => { mkCy(g, .08, .1, 3, 0x333a44, 0, 1.5, 0, 8); mkB(g, .4, 1.1, .3, 0x222222, 0, 3.3, 0); [[0xe63946, 3.65], [0xffd166, 3.3], [0x06d6a0, 2.95]].forEach(([c, y]) => mkSp(g, .11, mkNeonMat(c), 0, y, .16, 10)); }), { hit: { c: [.2, 3.8] } });
 mkItem('stop', 'yol', '🛑', 'Dur tabelası', o => { const g = mkS('stopp', gg => mkCy(gg, .04, .04, 2.2, 0x9aa0a6, 0, 1.1, 0, 6)); const s = new G.THREE.Mesh(new G.THREE.CircleGeometry(.4, 8), new G.THREE.MeshStandardMaterial({ map: mkTextTex('DUR', '#d62828', '#ffffff', 256, 256), side: G.THREE.DoubleSide })); s.position.set(0, 2.2, .05); s.rotation.z = Math.PI / 8; g.add(s); return g; }, { hit: { c: [.1, 2.6] } });
@@ -531,13 +560,14 @@ function mkSanitize(m) {
   if (!m || typeof m !== 'object' || !Array.isArray(m.objs)) return null;
   m.env = Object.assign({ ...MK_ENV0 }, m.env || {}); m.env.size = G.THREE.MathUtils.clamp(+m.env.size || 150, 40, 500);
   m.objs = m.objs.filter(o => o && MK_I[o.t] && isFinite(o.x) && isFinite(o.z)).slice(0, 4000);
-  for (const o of m.objs) { if (o.route && !Array.isArray(o.route)) delete o.route; if (o.txt != null) o.txt = String(o.txt).slice(0, 120); if (o.name != null) o.name = String(o.name).slice(0, 24); if (o.say != null) o.say = String(o.say).slice(0, 400); }
+  for (const o of m.objs) { if (o.route && !Array.isArray(o.route)) delete o.route; if (o.pts != null) { o.pts = Array.isArray(o.pts) ? o.pts.filter(q => Array.isArray(q) && isFinite(q[0]) && isFinite(q[1])).slice(0, 80).map(q => [+q[0], +q[1]]) : []; if (o.pts.length < 2) delete o.pts; } if (o.txt != null) o.txt = String(o.txt).slice(0, 120); if (o.name != null) o.name = String(o.name).slice(0, 24); if (o.say != null) o.say = String(o.say).slice(0, 400); }
   m.name = String(m.name || G.adT('Haritam')).slice(0, 40); if (!m.id) m.id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   return m;
 }
 function mkLoadMap(id) { try { return mkSanitize(JSON.parse(localStorage.getItem(mkKey(id)) || 'null')); } catch (e) { return null; } }
 function mkSaveMap(m) {
   m.t = Date.now();
+  if (m.dl) { const L = mksList(MKS_DL), d = L.find(x => x.id === m.dl); if (d && m.best) { d.best = m.best; mksSet(MKS_DL, L); } return mksSet(mksDlKey(m.dl), m); }   // 📥 mağazadan indirilen
   try { localStorage.setItem(mkKey(m.id), JSON.stringify(m)); } catch (e) { G.showMsg(G.adT('⚠️ Kayıt yeri doldu — eski haritaları dışa aktarıp sil'), 2.6); return false; }
   const L = mkIndex().filter(x => x.id !== m.id); L.unshift({ id: m.id, name: m.name, t: m.t, n: m.objs.length, best: m.best }); mkIndexSave(L); return true;
 }
@@ -570,6 +600,7 @@ function mkSpawnPt() {
 }
 function mkOpen(map, edit) {
   const busy = G.admBusy(); if (busy) { G.showMsg(busy, 1.8); return; }
+  if (edit && (!mkAdm() || map.dl)) { edit = false; G.showMsg(G.adT(map.dl ? '📥 İndirilen harita sadece oynanır' : '🔒 Harita düzenleme sadece admin'), 1.8); }
   if (typeof G.RIDE !== 'undefined' && G.RIDE.on) G.rideExit();
   if (MK.map && MK.dirty) mkSaveNow(true);
   if (!G.inMaker) MK.back = { k: G.curKey, x: G.player.position.x, z: G.player.position.z, f: G.facing };
@@ -690,6 +721,7 @@ function mkAimFrom(nx, ny) {
   return out;
 }
 function mkSnapXZ(x, z, it) {
+  if (it && it.road) return [x, z];   // 🛣️ yollar ızgarasız: tam istediğin yere
   const sn = MK.map.env.snap; if (!sn) return [x, z];
   const st = it && it.road ? 6 : it && it.snap ? Math.max(it.snap, sn) : sn, A = mkA();
   return [A.cx + Math.round((x - A.cx) / st) * st, A.cz + Math.round((z - A.cz) / st) * st];
@@ -717,13 +749,16 @@ const mkR2 = v => Math.round(v * 100) / 100;
 function mkPlace() {
   if (!MK.map || !MK.edit) return;
   if (MK.route) { mkRouteAdd(); return; }
+  if (MK.free) { mkFreeAdd(); return; }
   if (!MK.inB) { G.showMsg(G.adT('🚫 Harita sınırının dışı'), 1); G.play('ui'); return; }
   const A = mkA(), lx = mkR2(MK.aim.x - A.cx), lz = mkR2(MK.aim.z - A.cz), y = MK.aimY > .05 ? mkR2(MK.aimY) : 0;
   if (MK.moving) {   // taşımayı bitir
     mkPush(); const rec = MK.moving, o = rec.o; o.x = lx; o.z = lz; if (y) o.y = y; else delete o.y;
     MK.moving = null; rec.g.visible = true; mkGhostClear(); mkRetransform(rec); if (rec.it.act === 'npc') mkRouteDraw(); mkSelect(rec); mkChanged(); G.play('pop'); mkUI(); return;
   }
-  const it = MK_I[MK.item]; mkPush();
+  const it = MK_I[MK.item];
+  if (it.free) { MK.free = { id: it.id, pts: [] }; mkFreeAdd(); return; }
+  mkPush();
   if (it.one) for (const r of [...MK.recs]) if (r.it.id === it.id) { MK.map.objs.splice(MK.map.objs.indexOf(r.o), 1); mkRemove(r); }
   const o = mkProto(); o.x = lx; o.z = lz; if (y) o.y = y;
   MK.map.objs.push(o); const rec = mkAdd(o); if (it.vary) MK.v++;
@@ -747,6 +782,7 @@ function mkPickAt(nx, ny) {
 function mkCancel(quiet) {
   if (MK.moving) { MK.moving.g.visible = true; MK.moving = null; mkGhostClear(); }
   if (MK.route) { MK.route = null; }
+  if (MK.free) { MK.free = null; mkFreeDraw(); }
   if (MK.sel) mkSelect(null);
   if (!quiet) mkUI();
 }
@@ -765,7 +801,7 @@ function mkDup() {
 }
 function mkRotate(dir, step = Math.PI / 4) {
   const tg = MK.moving || MK.sel, it = tg ? tg.it : MK_I[MK.item];
-  const st = it.road && MK.map.env.snap ? Math.PI / 2 : step;
+  const st = it.road ? Math.min(step, Math.PI / 12) : step;   // yollar 15° adımla (Alt+R: daha ince)
   if (tg) { if (MK.sel && !MK.moving) mkPush(); tg.o.r = mkR2(((tg.o.r || 0) + dir * st) % (Math.PI * 2)); if (!MK.moving) { mkRetransform(tg); mkChanged(); } }
   else MK.rot = (MK.rot + dir * st) % (Math.PI * 2);
   G.play('ui', { gain: .4 });
@@ -808,6 +844,36 @@ function mkRouteDraw() {
   if (pts.length > 1) { const l = new G.THREE.Line(new G.THREE.BufferGeometry().setFromPoints(pts), new G.THREE.LineBasicMaterial({ color: 0x9fd0ff, depthTest: false, transparent: true })); l.renderOrder = 8; g.add(l); }
   G.scene.add(g); MK.routeG = g;
 }
+/* 〰️ serbest yol çizimi */
+function mkFreeAdd() {
+  const F = MK.free; if (!F) return; if (!MK.inB) { G.showMsg(G.adT('🚫 Harita sınırının dışı'), 1); return; }
+  const L = F.pts[F.pts.length - 1]; if (L && Math.hypot(L[0] - MK.aim.x, L[1] - MK.aim.z) < .5) return;
+  if (F.pts.length >= 80) { G.showMsg(G.adT('〰️ En fazla 80 nokta — ✅ Bitti’ye bas'), 1.4); return; }
+  F.pts.push([MK.aim.x, MK.aim.z]); G.play('pop', { gain: .4 }); mkFreeDraw(); mkUI();
+  if (F.pts.length === 1) G.showMsg(G.adT('〰️ Sonraki noktayı koy — yol kıvrılarak çizilir'), 1.6);
+}
+function mkFreeDone() {
+  const F = MK.free; if (!F) return; if (F.pts.length < 2) { G.showMsg(G.adT('〰️ En az 2 nokta koy'), 1.2); return; }
+  const A = mkA(), [x0, z0] = F.pts[0]; mkPush();
+  const o = { t: F.id, x: mkR2(x0 - A.cx), z: mkR2(z0 - A.cz), r: 0, pts: F.pts.map(([x, z]) => [mkR2(x - x0), mkR2(z - z0)]) };
+  MK.map.objs.push(o); mkAdd(o); MK.free = null; mkFreeDraw(); mkChanged(); G.play('pop'); G.showMsg('〰️ ' + G.adT('Yol hazır! Yeni yol için tekrar nokta koy'), 1.6); mkUI();
+}
+function mkFreeEdit() {   // koyulmuş serbest yolu tekrar noktalarına aç
+  const rec = MK.sel; if (!rec || !rec.it.free) return; mkPush();
+  const A = mkA(), c = Math.cos(rec.o.r || 0), s = Math.sin(rec.o.r || 0), k = rec.o.s || 1, X = A.cx + rec.o.x, Z = A.cz + rec.o.z;
+  const pts = (rec.o.pts || []).map(([x, z]) => [X + (x * c + z * s) * k, Z + (-x * s + z * c) * k]);
+  MK.map.objs.splice(MK.map.objs.indexOf(rec.o), 1); mkRemove(rec); mkSelect(null);
+  MK.item = rec.o.t; MK.tool = 'place'; MK.free = { id: rec.o.t, pts }; mkFreeDraw(); mkChanged(); mkUI(); G.showMsg(G.adT('〰️ Nokta ekle ya da ↩️ ile sil, sonra ✅ Bitti'), 1.8);
+}
+function mkFreeDraw() {
+  if (MK.freeG) { G.scene.remove(MK.freeG); MK.freeG = null; MK.freeLine = null; }
+  const F = MK.free; if (!F || !G.inMaker) return; const it = MK_I[F.id], g = new G.THREE.Group();
+  if (F.pts.length >= 2) { const [x0, z0] = F.pts[0], r = mkRibbon(F.pts.map(([x, z]) => [x - x0, z - z0]), it.free.w, it.free.k); r.material = mkGhostMat(r.material) || r.material; r.position.set(x0, .01, z0); g.add(r); }
+  for (const [x, z] of F.pts) { const f = G.mesh(new G.THREE.ConeGeometry(.28, .8, 8), G.M(0xffd166, { emissive: 0xffd166, emissiveIntensity: .5 }), x, .45, z); f.rotation.x = Math.PI; g.add(f); }
+  const ln = new G.THREE.Line(new G.THREE.BufferGeometry().setFromPoints([new G.THREE.Vector3(), new G.THREE.Vector3()]), new G.THREE.LineBasicMaterial({ color: 0xffd166, depthTest: false, transparent: true }));
+  ln.renderOrder = 8; ln.frustumCulled = false; ln.visible = F.pts.length > 0; g.add(ln); MK.freeLine = ln;
+  G.scene.add(g); MK.freeG = g;
+}
 function mkBird() {
   if (MK.bird) { G.dist = MK.bird.d; G.pitch = MK.bird.p; MK.bird = null; }
   else { MK.bird = { d: G.dist, p: G.pitch }; G.dist = 32; G.pitch = 1.32; }
@@ -829,6 +895,7 @@ function mkLightsTick(lit) {
 const MK_V3 = new G.THREE.Vector3();
 function mkTick(dt) {
   if (!G.inMaker || !MK.map) return;
+  if (MK.edit && (!mkAdm() || MK.map.dl)) mkStartPlay();
   const E = MK.map.env, P = G.player.position, t = G.elapsed;
   if (E.time !== 'auto') { G.DAY.t = +E.time; G.DAY.goto = null; }
   if (E.wx && E.wx !== 'auto') G.WX.cur = E.wx;
@@ -898,6 +965,7 @@ function mkEditTick(dt) {
     MK.ring.visible = true; MK.ring.position.set(MK.aim.x, MK.aimY + .06, MK.aim.z); MK.ring.scale.setScalar((MK.ghostR || 1) * (src.s || 1)); MK.ring.material.color.setHex(MK.inB ? 0x06d6a0 : 0xe63946);
   } else { if (MK.ghost) MK.ghost.visible = false; if (MK.ring) MK.ring.visible = !!MK.route; if (MK.route && MK.ring) { MK.ring.position.set(MK.aim.x, .06, MK.aim.z); MK.ring.scale.setScalar(.6); MK.ring.material.color.setHex(0x3a86ff); } }
   if (MK.sel && MK.box) MK.box.update();
+  if (MK.free && MK.freeLine && MK.free.pts.length) { const L = MK.free.pts[MK.free.pts.length - 1], pa = MK.freeLine.geometry.attributes.position; pa.setXYZ(0, L[0], .2, L[1]); pa.setXYZ(1, MK.aim.x, .2, MK.aim.z); pa.needsUpdate = true; }
 }
 function mkPlayHud() {
   const el = MK.hudEl; if (!el) return;
@@ -1071,7 +1139,7 @@ function mkUnlock() { if (!G.touchMode && G.isLocked()) try { document.exitPoint
 function mkRelock() { if (!G.touchMode && !G.lockFailed && !G.paused && G.inMaker) try { G.tryLock(); } catch (e) {} }
 function mkModeUI() {
   const on = G.inMaker && !!MK.map, ed = on && MK.edit;
-  document.body.classList.toggle('mk', on); document.body.classList.toggle('mkEdit', ed);
+  document.body.classList.toggle('mk', on); document.body.classList.toggle('mkEdit', ed); document.body.classList.toggle('mkAdm', on && mkAdm() && !MK.map.dl);
   if (!on) { mkCatShow(false); G.$('mkSel').classList.remove('on'); G.$('mkAct').style.display = 'none'; if (MK.hudEl) MK.hudEl.style.display = 'none'; if (MK.routeG) { G.scene.remove(MK.routeG); MK.routeG = null; } if (MK.box) { G.scene.remove(MK.box); MK.box = null; } return; }
   G.$('mkName').textContent = '🗺️ ' + MK.map.name;
   G.$('mkTop').querySelector('.mode').textContent = ed ? '▶️ ' + G.adT('Oyna') : '✏️ ' + G.adT('Düzenle');
@@ -1090,11 +1158,12 @@ function mkHudItem() {
 function mkUI() {
   if (!MK.map) return; mkHudItem();
   const T = G.$('mkTools'); T.querySelector('[data-a=pick]').classList.toggle('on', MK.tool === 'pick'); T.querySelector('[data-a=bird]').classList.toggle('on', !!MK.bird);
-  T.querySelector('[data-a=place] small').textContent = MK.route ? G.adT('Nokta') : MK.moving ? G.adT('Bırak') : MK.tool === 'pick' ? G.adT('Seç') : G.adT('Koy');
+  T.querySelector('[data-a=place] small').textContent = MK.route || MK.free || (MK_I[MK.item] && MK_I[MK.item].free && !MK.moving && MK.tool !== 'pick') ? G.adT('Nokta') : MK.moving ? G.adT('Bırak') : MK.tool === 'pick' ? G.adT('Seç') : G.adT('Koy');
   const S = G.$('mkSel'); let h = '';
-  if (MK.route) { const n = (MK.route.o.route || []).length; h = `<span class="lbl">🧭 ${G.adT('Rota')}: ${n} ${G.adT('nokta')}</span><button data-a="rUndo">↩️ ${G.adT('Son nokta')}</button><button data-a="rClear">🗑️ ${G.adT('Temizle')}</button><button class="ok" data-a="rDone">✅ ${G.adT('Bitti')}</button>`; }
+  if (MK.free) { const n = MK.free.pts.length; h = `<span class="lbl">〰️ ${G.adT('Serbest yol')}: ${n} ${G.adT('nokta')}</span><button data-a="frUndo">↩️ ${G.adT('Son nokta')}</button><button data-a="frX">✖ ${G.adT('Vazgeç')}</button><button class="ok" data-a="frDone">✅ ${G.adT('Bitti')}</button>`; }
+  else if (MK.route) { const n = (MK.route.o.route || []).length; h = `<span class="lbl">🧭 ${G.adT('Rota')}: ${n} ${G.adT('nokta')}</span><button data-a="rUndo">↩️ ${G.adT('Son nokta')}</button><button data-a="rClear">🗑️ ${G.adT('Temizle')}</button><button class="ok" data-a="rDone">✅ ${G.adT('Bitti')}</button>`; }
   else if (MK.moving) h = `<span class="lbl">✋ ${G.adT('Taşınıyor')}: ${MK.moving.it.ic} ${G.adT(MK.moving.it.n)}</span><button class="ok" data-a="place">✅ ${G.adT('Bırak')}</button><button data-a="cancel">✖ ${G.adT('Vazgeç')}</button>`;
-  else if (MK.sel && MK.edit) { const it = MK.sel.it; h = `<span class="lbl">${it.ic} ${G.adT(it.n)}</span><button data-a="move">✋ ${G.adT('Taşı')}</button><button data-a="up">⬆️</button><button data-a="down">⬇️</button>` + (it.col !== undefined ? `<button data-a="color">🎨</button>` : '') + `<button data-a="dup">📋 ${G.adT('Kopyala')}</button>` + (mkHasProps(it) ? `<button data-a="props">⚙️ ${G.adT('Özellikler')}</button>` : '') + (it.act === 'npc' ? `<button data-a="route">🧭 ${G.adT('Rota')}</button>` : '') + `<button class="del" data-a="del">🗑️</button><button data-a="cancel">✖</button>`; }
+  else if (MK.sel && MK.edit) { const it = MK.sel.it; h = `<span class="lbl">${it.ic} ${G.adT(it.n)}</span><button data-a="move">✋ ${G.adT('Taşı')}</button><button data-a="up">⬆️</button><button data-a="down">⬇️</button>` + (it.col !== undefined ? `<button data-a="color">🎨</button>` : '') + `<button data-a="dup">📋 ${G.adT('Kopyala')}</button>` + (mkHasProps(it) ? `<button data-a="props">⚙️ ${G.adT('Özellikler')}</button>` : '') + (it.act === 'npc' ? `<button data-a="route">🧭 ${G.adT('Rota')}</button>` : '') + (it.free ? `<button data-a="frEdit">〰️ ${G.adT('Noktaları düzenle')}</button>` : '') + `<button class="del" data-a="del">🗑️</button><button data-a="cancel">✖</button>`; }
   S.innerHTML = h; S.classList.toggle('on', !!h && MK.edit && G.inMaker);
 }
 const mkHasProps = it => !!(it.txt || it.npc || it.act === 'mon' || it.act === 'veh' || it.act === 'chest' || it.act === 'portal');
@@ -1107,7 +1176,7 @@ function mkCatRender() {
   G.$('mkTabs').innerHTML = MK_CATS.map(([k, ic, n]) => `<button data-c="${k}" class="${!q && MK.cat === k ? 'on' : ''}">${ic} ${G.adT(n)}</button>`).join('');
   const items = Object.values(MK_I).filter(it => q ? (G.adT(it.n) + ' ' + it.n).toLocaleLowerCase('tr').includes(q) : it.cat === MK.cat);
   G.$('mkGrid').innerHTML = items.map(it => `<button data-i="${it.id}" class="${MK.item === it.id ? 'on' : ''}"><span>${it.ic}</span><small>${G.adT(it.n)}</small></button>`).join('') || `<div class="tip">${G.adT('Bulunamadı')}</div>`;
-  G.$('mkFoot').textContent = { yol: G.adT('Yollar 6 m’lik karolardır; ızgara açıkken birbirine oturur. Virajı ⟲⟳ ile çevir.'), npc: G.adT('NPC’yi koyduktan sonra seç → ⚙️ Özellikler: isim, söz, renk, şapka, davranış · 🧭 Rota ile yol çiz.'), macera: G.adT('Canavarlar, para, lav, trambolin, portal ▶️ Oyna’da çalışır. Aynı renkteki iki portal birbirine bağlanır.'), sekil: G.adT('Şekillerin rengini 🎨 ile, boyutunu ➖➕ ile, yüksekliğini seçip ⬆️⬇️ ile değiştir.'), ozel: G.adT('İris çukuru giyinme odasına iner. Araç noktası: oyunda V ile araç çağırırsın.') }[MK.cat] || G.adT('Bir eşya seç, nişan al (ya da ekrana dokun) ve ✅ Koy. Seçmek için 👆.');
+  G.$('mkFoot').textContent = { yol: G.adT('Yollar ızgarasız: istediğin yere koy, ⟲⟳ ile 15° döndür (Alt+R daha ince). 〰️ Serbest yol ile noktaları sırayla koyup kıvrımlı yol çiz.'), npc: G.adT('NPC’yi koyduktan sonra seç → ⚙️ Özellikler: isim, söz, renk, şapka, davranış · 🧭 Rota ile yol çiz.'), macera: G.adT('Canavarlar, para, lav, trambolin, portal ▶️ Oyna’da çalışır. Aynı renkteki iki portal birbirine bağlanır.'), sekil: G.adT('Şekillerin rengini 🎨 ile, boyutunu ➖➕ ile, yüksekliğini seçip ⬆️⬇️ ile değiştir.'), ozel: G.adT('İris çukuru giyinme odasına iner. Araç noktası: oyunda V ile araç çağırırsın.') }[MK.cat] || G.adT('Bir eşya seç, nişan al (ya da ekrana dokun) ve ✅ Koy. Seçmek için 👆.');
 }
 G.$('mkTabs').addEventListener('click', e => { const b = e.target.closest('[data-c]'); if (!b) return; MK.cat = b.dataset.c; G.$('mkQ').value = ''; G.play('ui', { gain: .4 }); mkCatRender(); });
 G.$('mkGrid').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; G.play('ui', { gain: .5 }); mkPickItem(b.dataset.i); mkCatRender(); if (G.touchMode || matchMedia('(max-width: 900px)').matches) mkCatShow(false); });
@@ -1189,18 +1258,21 @@ function mkEnvOpen() {
 }
 /* 🗂️ haritalarım */
 function mkListOpen() {
+  if (!mkAdm()) { mksOpen('dl'); return; }
   const L = mkIndex(), fmt = t => { const d = new Date(t); return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }); };
   const rows = L.map(m => `<div class="mkMap" data-id="${m.id}"><div class="mi"><b>🗺️ ${mkEsc(m.name)}</b><small>${m.n || 0} ${G.adT('eşya')} · ${fmt(m.t)}${m.best ? ' · 🏆 ' + (+m.best).toFixed(1) + ' sn' : ''}</small></div>
     <div class="ma"><button class="mkB" data-a="edit">✏️ ${G.adT('Düzenle')}</button><button class="mkB pri" data-a="play">▶️</button><button class="mkB" data-a="more">⋯</button></div>
-    <div class="mm"><input type="text" class="rn" maxlength="40" value="${mkEsc(m.name)}" style="flex:1;width:auto;min-width:120px"><button class="mkB" data-a="ren">✔ ${G.adT('Adını değiştir')}</button><button class="mkB" data-a="copy">📋 ${G.adT('Kopyala')}</button><button class="mkB" data-a="exp">📤 ${G.adT('Dışa aktar')}</button><button class="mkB warn" data-a="del">🗑️ ${G.adT('Sil')}</button></div></div>`).join('');
+    <div class="mm"><input type="text" class="rn" maxlength="40" value="${mkEsc(m.name)}" style="flex:1;width:auto;min-width:120px"><button class="mkB" data-a="ren">✔ ${G.adT('Adını değiştir')}</button><button class="mkB" data-a="pub">🏪 ${G.adT('Mağazada yayınla')}</button><button class="mkB" data-a="copy">📋 ${G.adT('Kopyala')}</button><button class="mkB" data-a="exp">📤 ${G.adT('Dışa aktar')}</button><button class="mkB warn" data-a="del">🗑️ ${G.adT('Sil')}</button></div></div>`).join('');
   mkDlg(`<div class="mkH"><b>🗺️ ${G.adT('Haritalarım')}</b><button class="mkB" data-a="x">✖</button></div>
     <div class="tip">${G.adT('Sıfırdan kendi dünyanı kur: ev, bina, ağaç, yol, sandalye, masa, iris çukuru, sahil, Miami ve canavar macerası eşyaları, NPC’ler ve rotaları, saat, hava, deniz… Her harita bu tarayıcıda kaydedilir.')}</div>
-    <div class="mkRow"><button class="mkB pri" data-a="new">➕ ${G.adT('Yeni boş harita')}</button><button class="mkB" data-a="imp">📥 ${G.adT('Dosyadan yükle')}</button></div>
+    <div class="mkRow"><button class="mkB pri" data-a="new">➕ ${G.adT('Yeni boş harita')}</button><button class="mkB" data-a="imp">📥 ${G.adT('Dosyadan yükle')}</button><button class="mkB" data-a="store">🏪 ${G.adT('Mağaza')}</button></div>
     <div class="mkSub">${G.adT('Hazır şablonla başla')}</div><div class="mkRow">${MK_TPL.map((t, i) => `<button class="mkB" data-a="tpl" data-i="${i}">${t.ic} ${G.adT(t.n)}</button>`).join('')}</div>
     <div class="mkSub">${G.adT('Kayıtlı haritalar')} (${L.length})</div>${rows || `<div class="tip">${G.adT('Henüz harita yok — “Yeni boş harita” ile başla!')}</div>`}`, (a, b) => {
     const row = b.closest('.mkMap'), id = row && row.dataset.id;
     if (a === 'new') { const m = mkNewMap(); mkSaveMap(m); mkOpen(m, true); setTimeout(() => G.showMsg(G.adT('📦 Eşyalar’dan seç, nişan al ve ✅ Koy'), 2.4), 900); }
     else if (a === 'imp') G.$('mkFile').click();
+    else if (a === 'store') mksOpen();
+    else if (a === 'pub') mksPubOpen(id);
     else if (a === 'tpl') { const T = MK_TPL[+b.dataset.i], m = mkNewMap(G.adT(T.n)); Object.assign(m.env, T.env); m.objs = T.make(); mkSaveMap(m); mkOpen(m, true); }
     else if (a === 'edit' || a === 'play') { const m = mkLoadMap(id); if (!m) { G.showMsg(G.adT('⚠️ Harita açılamadı'), 1.6); mkDeleteMap(id); mkListOpen(); return; } mkOpen(m, a === 'edit'); }
     else if (a === 'more') row.classList.toggle('open');
@@ -1240,13 +1312,16 @@ function mkAction(a) {
     case 'rUndo': if (MK.route && MK.route.o.route.length) { mkPush(); MK.route.o.route.pop(); mkRouteDraw(); mkChanged(); mkUI(); } break;
     case 'rClear': if (MK.route) { mkPush(); MK.route.o.route = []; if (MK.route.o.mode === 'route') MK.route.o.mode = 'stand'; mkRouteDraw(); mkChanged(); mkUI(); } break;
     case 'rDone': { const r = MK.route; MK.route = null; if (r) { mkSelect(r); G.showMsg(`🧭 ${(r.o.route || []).length} ${G.adT('nokta')} — ${G.adT('▶️ Oyna’da yürür')}`, 1.6); } mkUI(); break; }
-    case 'mode': if (MK.edit) mkStartPlay(); else mkStartEdit(); break;
-    case 'env': mkEnvOpen(); break; case 'save': mkSaveNow(); break; case 'list': mkListOpen(); break; case 'help': mkHelpOpen(); break;
+    case 'mode': if (MK.edit) mkStartPlay(); else if (!mkAdm() || MK.map.dl) G.showMsg(G.adT(MK.map.dl ? '📥 İndirilen harita sadece oynanır' : '🔒 Harita düzenleme sadece admin'), 1.8); else mkStartEdit(); break;
+    case 'frUndo': if (MK.free && MK.free.pts.length) { MK.free.pts.pop(); mkFreeDraw(); mkUI(); } break;
+    case 'frX': if (MK.free) { MK.free = null; mkFreeDraw(); mkUI(); } break;
+    case 'frDone': mkFreeDone(); break; case 'frEdit': mkFreeEdit(); break;
+    case 'env': if (!mkAdm() || MK.map.dl) { G.showMsg(G.adT('🔒 Harita ayarları sadece admin'), 1.4); break; } mkEnvOpen(); break; case 'save': mkSaveNow(); break; case 'list': if (mkAdm()) mkListOpen(); else mksOpen('dl'); break; case 'help': mkHelpOpen(); break;
     case 'exit': mkLeave(); break;
   }
 }
 for (const id of ['mkTop', 'mkItemBtn', 'mkTools', 'mkSel']) G.$(id).addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b) mkAction(b.dataset.a); });
-G.$('mkName').addEventListener('click', () => mkEnvOpen());
+G.$('mkName').addEventListener('click', () => mkAction('env'));
 G.$('mkAct').addEventListener('click', () => mkDoNear());
 function mkActBtn() {
   const el = G.$('mkAct'), rec = !MK.edit && MK.near; let s = '';
@@ -1272,7 +1347,7 @@ addEventListener('keydown', e => {
     case 'KeyQ': mkPickAt(0, 0); MK.tool = 'pick'; mkUI(); break;
     case 'KeyZ': if (e.ctrlKey || e.metaKey) mkUndo(); else used = false; break;
     case 'KeyD': if (e.ctrlKey || e.metaKey) mkDup(); else used = false; break;
-    case 'Escape': if (MK.catOpen) { mkCatShow(false); } else if (MK.moving || MK.sel || MK.route) mkCancel(); else used = false; break;
+    case 'Escape': if (MK.catOpen) { mkCatShow(false); } else if (MK.moving || MK.sel || MK.route || MK.free) mkCancel(); else used = false; break;
     default: used = false;
   }
   if (used) { e.preventDefault(); e.stopImmediatePropagation(); }
@@ -1295,8 +1370,201 @@ function mkTapAt(x, y) {
   if (MK.tool === 'pick' && !MK.moving && !MK.route) { mkPickAt(nx, ny); return; }
   mkAimUpdate(nx, ny); mkPlace(); MK.rayT = .25;
 }
-// durdurma menüsü: 🗺️ Harita oluştur
-{ const pp = G.$('pPhoto'); if (pp) pp.insertAdjacentHTML('afterend', `<button id="pMaker">🗺️ ${G.adT('Harita oluştur')} <small>${G.adT('sıfırdan dünya yap, kaydet')}</small></button>`); const b = G.$('pMaker'); if (b) b.addEventListener('click', () => { mkListOpen(); }); }
+/* =====================================================================
+   🏪 HARİTA MAĞAZASI (durdurma menüsü → 🏪 Harita Mağazası): admin haritasını başlık, açıklama ve sahip adıyla yayınlar;
+   herkes mağazadan indirip oynar. Kaynaklar:
+   🌐 Mağaza: GitHub'daki "maps" dalı (herkese açık okunur; yayınlamak için admin bir kez GitHub anahtarı girer, anahtar sadece o cihazda kalır)
+   👥 Oda: aynı çok oyunculu odadaki arkadaşların yayınladıkları (anahtarsız, doğrudan)
+   📥 İndirdiklerim: bu cihaza indirilenler (internet olmadan da oynanır)
+   ===================================================================== */
+const MKS_GH = { owner: 'buketkbrn-pixel', repo: 'sft-oyun', br: 'maps' };
+const MKS = { tab: 'web', web: null, webErr: '', loading: false, room: {}, msg: '' };
+const MKS_PUB = 'sftMagazaBen', MKS_DL = 'sftIndirilen', mksPubKey = id => 'sftMagazaBen:' + id, mksDlKey = id => 'sftIndirilen:' + id;
+const mksGet = k => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v; } catch (e) { return null; } };
+const mksSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { G.showMsg(G.adT('⚠️ Kayıt yeri doldu — eski haritaları sil'), 2.4); return false; } };
+const mksList = k => { const L = mksGet(k); return Array.isArray(L) ? L : []; };
+const mksTok = () => { try { return localStorage.getItem('sftGhToken') || ''; } catch (e) { return ''; } };
+function mksEntry(e, src) {   // dışarıdan gelen kayıt: sadece bilinen alanlar, kısaltılmış
+  if (!e || typeof e !== 'object' || !/^[\w-]{3,40}$/.test(String(e.id || ''))) return null;
+  return { id: String(e.id), title: String(e.title || G.adT('Harita')).slice(0, 48), desc: String(e.desc || '').slice(0, 300), owner: String(e.owner || '?').slice(0, 24),
+    t: +e.t || 0, n: Math.max(0, +e.n || 0) | 0, v: Math.max(1, +e.v || 1) | 0, g: String(e.g || 'grass').slice(0, 12), sz: +e.sz || 0, src };
+}
+const mksDate = t => { if (!t) return ''; try { return new Date(t).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: '2-digit' }); } catch (e) { return ''; } };
+const mksGround = g => (MK_GROUNDS[g] || MK_GROUNDS.grass)[0].split(' ')[0];
+// 🌐 mağaza listesi (herkese açık okunur)
+async function mksWebLoad(force) {
+  if (MKS.loading || (MKS.web && !force)) return; MKS.loading = true; MKS.webErr = ''; mksRender();
+  const base = `https://raw.githubusercontent.com/${MKS_GH.owner}/${MKS_GH.repo}/${MKS_GH.br}/`;
+  try {
+    let L; try { const r = await fetch(base + 'index.json?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error(r.status); L = await r.json(); }
+    catch (e) { const r = await fetch(`https://api.github.com/repos/${MKS_GH.owner}/${MKS_GH.repo}/contents/index.json?ref=${MKS_GH.br}`, { headers: { Accept: 'application/vnd.github.raw+json' } }); if (!r.ok) throw new Error(r.status); L = await r.json(); }
+    MKS.web = (Array.isArray(L) ? L : []).map(e => mksEntry(e, 'web')).filter(Boolean).slice(0, 300);
+  } catch (e) { MKS.webErr = G.adT('Mağazaya bağlanılamadı (internet gerekli).') + ' ' + (e && e.message ? '(' + String(e.message).slice(0, 40) + ')' : ''); }
+  MKS.loading = false; mksRender();
+}
+async function mksWebMap(e) {
+  const base = `https://raw.githubusercontent.com/${MKS_GH.owner}/${MKS_GH.repo}/${MKS_GH.br}/`;
+  try { const r = await fetch(base + 'm/' + e.id + '.json?v=' + e.v + '&t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error(r.status); return await r.json(); }
+  catch (x) { const r = await fetch(`https://api.github.com/repos/${MKS_GH.owner}/${MKS_GH.repo}/contents/m/${e.id}.json?ref=${MKS_GH.br}`, { headers: { Accept: 'application/vnd.github.raw+json' } }); if (!r.ok) throw new Error(r.status); return await r.json(); }
+}
+// 📥 indir ve 🗑️ sil
+function mksSaveDl(e, raw) {
+  const m = mkSanitize(raw); if (!m) { G.showMsg(G.adT('⚠️ Bu harita bozuk'), 2); return null; }
+  m.id = 'dl_' + e.id; m.dl = e.id; m.name = e.title; m.owner = e.owner; m.desc = e.desc; m.pv = e.v;
+  const old = mksGet(mksDlKey(e.id)); if (old && old.best) m.best = old.best;
+  if (!mksSet(mksDlKey(e.id), m)) return null;
+  const L = mksList(MKS_DL).filter(x => x.id !== e.id); L.unshift(Object.assign({}, e, { n: m.objs.length, dt: Date.now(), best: m.best })); mksSet(MKS_DL, L);
+  G.play('coin', { gain: .5 }); G.showMsg('📥 ' + e.title + ' — ' + G.adT('indirildi'), 1.6); return m;
+}
+async function mksDownload(e, play) {
+  let raw = null;
+  try { if (e.src === 'room') raw = MKS.room[e.id] && MKS.room[e.id].m; else raw = await mksWebMap(e); }
+  catch (x) { G.showMsg(G.adT('⚠️ İndirilemedi — internetini kontrol et'), 2); return; }
+  const m = raw && mksSaveDl(e, raw); if (!m) return;
+  if (play) mkOpen(m, false); else mksRender();
+}
+function mksDelDl(id) { try { localStorage.removeItem(mksDlKey(id)); } catch (e) {} mksSet(MKS_DL, mksList(MKS_DL).filter(x => x.id !== id)); mksRender(); }
+function mksPlayDl(id) { const m = mkSanitize(mksGet(mksDlKey(id))); if (!m) { G.showMsg(G.adT('⚠️ Harita açılamadı'), 1.6); mksDelDl(id); return; } m.dl = id; mkOpen(m, false); }
+// 📤 yayınla (admin)
+const mksB64 = s => { const b = new TextEncoder().encode(s); let x = ''; for (let i = 0; i < b.length; i += 0x8000) x += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(x); };
+const mksUnB64 = s => new TextDecoder().decode(Uint8Array.from(atob(String(s).replace(/\s/g, '')), c => c.charCodeAt(0)));
+async function mksGh(path, method, body) {
+  const r = await fetch(`https://api.github.com/repos/${MKS_GH.owner}/${MKS_GH.repo}/contents/${path}` + (method ? '' : '?ref=' + MKS_GH.br + '&t=' + Date.now()), {
+    method: method || 'GET', cache: 'no-store', headers: { Authorization: 'Bearer ' + mksTok(), Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 404 && !method) return null;
+  if (!r.ok) { let t = ''; try { t = (await r.json()).message || ''; } catch (e) {} const er = new Error(r.status + ' ' + t); er.code = r.status; throw er; }
+  return r.status === 204 ? {} : r.json();
+}
+async function mksGhIndex(fn, msg) {   // index.json'u oku → değiştir → yaz (aynı anda yazılırsa tekrar dene)
+  for (let i = 0; i < 4; i++) {
+    const cur = await mksGh('index.json'); let L = []; try { L = cur ? JSON.parse(mksUnB64(cur.content)) : []; } catch (e) { L = []; }
+    L = fn(Array.isArray(L) ? L : []);
+    try { await mksGh('index.json', 'PUT', { message: msg, content: mksB64(JSON.stringify(L, null, 1)), branch: MKS_GH.br, ...(cur ? { sha: cur.sha } : {}) }); return; }
+    catch (e) { if (!(e.code === 409 || e.code === 422) || i === 3) throw e; await new Promise(r => setTimeout(r, 600)); }
+  }
+}
+async function mksGhPublish(e, m) {
+  const p = 'm/' + e.id + '.json', old = await mksGh(p);
+  await mksGh(p, 'PUT', { message: '🗺️ ' + e.title, content: mksB64(JSON.stringify(m)), branch: MKS_GH.br, ...(old ? { sha: old.sha } : {}) });
+  await mksGhIndex(L => { const o = L.find(x => x && x.id === e.id); e.v = Math.max(e.v, ((o && +o.v) || 0) + 1); const { src, ...pub } = e; return [pub].concat(L.filter(x => x && x.id !== e.id)); }, '🏪 ' + e.title);
+}
+async function mksGhRemove(id, title) {
+  await mksGhIndex(L => L.filter(x => x && x.id !== id), '🗑️ ' + title);
+  try { const old = await mksGh('m/' + id + '.json'); if (old) await mksGh('m/' + id + '.json', 'DELETE', { message: '🗑️ ' + title, sha: old.sha, branch: MKS_GH.br }); } catch (e) {}
+}
+function mksPubOpen(id) {
+  if (!mkAdm()) { G.showMsg(G.adT('🔒 Yayınlamak sadece admin'), 1.8); return; }
+  const m = MK.map && MK.map.id === id ? MK.map : mkLoadMap(id); if (!m) { G.showMsg(G.adT('⚠️ Harita açılamadı'), 1.6); return; }
+  if (!m.objs.length) { G.showMsg(G.adT('📦 Boş harita yayınlanmaz — önce eşya koy'), 2); return; }
+  const P = mksList(MKS_PUB).find(x => x.id === id) || {}, own = P.owner || (() => { try { return localStorage.getItem('sftHaritaSahip') || ''; } catch (e) { return ''; } })() || (G.MP && G.MP.me && G.MP.me.name) || '';
+  const tok = !!mksTok(), mpOn = !!(G.MP && G.MP.on);
+  mkDlg(`<div class="mkH"><b>📤 ${G.adT('Mağazada yayınla')}</b><button class="mkB" data-a="x">✖</button></div>
+    <div class="tip">🗺️ ${mkEsc(m.name)} · ${m.objs.length} ${G.adT('eşya')}${P.v ? ' · ' + G.adT('yayında') + ' v' + P.v : ''}</div>
+    <div class="mkSub">${G.adT('Başlık')}</div><input type="text" id="mksT" maxlength="48" value="${mkEsc(P.title || m.name)}">
+    <div class="mkSub">${G.adT('Açıklama')}</div><textarea id="mksD" maxlength="300" placeholder="${G.adT('ör. Canavarlardan kaç, bitiş bayrağına ulaş! 3 gizli sandık var.')}">${mkEsc(P.desc || '')}</textarea>
+    <div class="mkSub">${G.adT('Harita sahibi')}</div><input type="text" id="mksO" maxlength="24" value="${mkEsc(own)}" placeholder="${G.adT('ör. Buket')}">
+    <div class="tip">${tok ? '🌐 ' + G.adT('Herkese açık mağazaya gönderilir (GitHub bağlı).') : '🌐 ' + G.adT('GitHub bağlı değil: sadece bu cihazda ve odadaki arkadaşlarında görünür. Herkese açmak için Mağaza → 📤 Yayınladıklarım → GitHub bağla.')}${mpOn ? '<br>👥 ' + G.adT('Odadaki arkadaşlarına da gönderilir.') : ''}</div>
+    <div class="mkRow" style="margin-top:10px"><button class="mkB pri" data-a="go">📤 ${G.adT(P.v ? 'Güncelle' : 'Yayınla')}</button><button class="mkB" data-a="x">${G.adT('Vazgeç')}</button></div>
+    <div class="tip" id="mksSt"></div>`, async (a, b) => {
+    if (a !== 'go' || b.disabled) return;
+    const title = G.$('mksT').value.trim().slice(0, 48), desc = G.$('mksD').value.trim().slice(0, 300), owner = G.$('mksO').value.trim().slice(0, 24), st = G.$('mksSt');
+    if (!title || !owner) { st.textContent = '⚠️ ' + G.adT('Başlık ve harita sahibi gerekli'); return; }
+    try { localStorage.setItem('sftHaritaSahip', owner); } catch (e) {}
+    if (MK.map && MK.map.id === id) mkSaveNow(true);
+    const snap = JSON.parse(JSON.stringify(MK.map && MK.map.id === id ? MK.map : m)); delete snap.best; delete snap.dl;
+    const e = { id, title, desc, owner, t: Date.now(), n: snap.objs.length, v: (P.v || 0) + 1, g: snap.env.ground, sz: JSON.stringify(snap).length };
+    if (!mksSet(mksPubKey(id), snap)) return;
+    b.disabled = true; st.textContent = '⏳ ' + G.adT('Yayınlanıyor…');
+    const lines = ['✅ ' + G.adT('Bu cihazda yayında')];
+    if (mpOn) { try { await mksRoomSend(e, snap); lines.push('✅ ' + G.adT('Odadaki arkadaşlarına gönderildi')); } catch (x) { lines.push('⚠️ ' + G.adT('Odaya gönderilemedi')); } }
+    if (mksTok()) { try { await mksGhPublish(e, snap); lines.push('✅ ' + G.adT('Herkese açık mağazada! (1-5 dk içinde herkeste görünür)')); MKS.web = null; } catch (x) { lines.push('⚠️ GitHub: ' + mkEsc(x.message || x) + (x.code === 401 || x.code === 403 ? ' — ' + G.adT('anahtar geçersiz ya da izni yok') : '')); } }
+    const L = mksList(MKS_PUB).filter(x => x.id !== id); L.unshift(e); mksSet(MKS_PUB, L);
+    st.innerHTML = lines.join('<br>'); b.disabled = false; b.textContent = '📤 ' + G.adT('Güncelle'); G.play('goal', { gain: .5 });
+  });
+}
+async function mksUnpub(id) {
+  const e = mksList(MKS_PUB).find(x => x.id === id); if (!e) return;
+  mksSet(MKS_PUB, mksList(MKS_PUB).filter(x => x.id !== id)); try { localStorage.removeItem(mksPubKey(id)); } catch (x) {}
+  if (G.MP && G.MP.on) try { G.mpSend({ t: 'mkp', del: id }); } catch (x) {}
+  if (mksTok()) { MKS.msg = '⏳ ' + G.adT('Mağazadan kaldırılıyor…'); mksRender(); try { await mksGhRemove(id, e.title); MKS.msg = '🗑️ ' + G.adT('Mağazadan kaldırıldı'); MKS.web = null; } catch (x) { MKS.msg = '⚠️ GitHub: ' + (x.message || x); } }
+  else MKS.msg = '🗑️ ' + G.adT('Yayından kaldırıldı');
+  mksRender();
+}
+// 👥 oda: yayınlanan haritalar arkadaşlara doğrudan gider (sıkıştırılmış)
+async function mksZip(obj) { const js = JSON.stringify(obj); if (!window.CompressionStream) return { s: js }; const cs = new Blob([js]).stream().pipeThrough(new CompressionStream('gzip')); return { z: new Uint8Array(await new Response(cs).arrayBuffer()) }; }
+async function mksUnzip(m) { if (m.s) return JSON.parse(m.s); const ds = new Blob([m.z]).stream().pipeThrough(new DecompressionStream('gzip')); return JSON.parse(await new Response(ds).text()); }
+async function mksRoomSend(e, snap, to) { const p = await mksZip(snap), { src, ...pub } = e; const msg = Object.assign({ t: 'mkp', e: pub }, p); if (to) msg.to = to; G.mpSend(msg); }
+function mksRoomAsk() { if (G.MP && G.MP.on) try { G.mpSend({ t: 'mkq' }); } catch (e) {} }
+window.__mkNet = async m => {
+  if (m.t === 'mkq') { for (const e of mksList(MKS_PUB).slice(0, 12)) { const s = mksGet(mksPubKey(e.id)); if (s) try { await mksRoomSend(e, s, m.f); } catch (x) {} } return; }
+  if (m.t !== 'mkp') return;
+  if (m.del) { delete MKS.room[m.del]; mksRender(); return; }
+  const e = mksEntry(m.e, 'room'); if (!e || (!m.z && !m.s)) return;
+  let raw = null; try { raw = await mksUnzip(m); } catch (x) { return; }
+  if (!mkSanitize(JSON.parse(JSON.stringify(raw)))) return;
+  const isNew = !MKS.room[e.id]; MKS.room[e.id] = { e, m: raw, f: m.f };
+  if (isNew && !m.to) G.showMsg('🏪 ' + G.adT('Yeni harita yayınlandı') + ': ' + e.title + ' (👤 ' + e.owner + ')', 2.6);
+  mksRender();
+};
+// 🪟 mağaza penceresi
+function mksCard(e, btns) {
+  return `<div class="mkMap mksC" data-id="${mkEsc(e.id)}" data-src="${e.src}"><div class="mi"><b>🗺️ ${mkEsc(e.title)}</b><small>👤 ${mkEsc(e.owner)} · ${mksGround(e.g)} ${e.n} ${G.adT('eşya')}${e.t ? ' · 🗓️ ' + mksDate(e.t) : ''}${e.v > 1 ? ' · v' + e.v : ''}${e.best ? ' · 🏆 ' + (+e.best).toFixed(1) + ' sn' : ''}</small>${e.desc ? `<div class="ds">${mkEsc(e.desc)}</div>` : ''}</div><div class="ma">${btns}</div></div>`;
+}
+function mksDlBtns(e) {
+  const d = mksList(MKS_DL).find(x => x.id === e.id);
+  if (!d) return `<button class="mkB pri" data-a="dl">📥 ${G.adT('İndir')}</button>`;
+  return (e.v > (d.v || 1) ? `<button class="mkB" data-a="dl">🔄 ${G.adT('Güncelle')}</button>` : '') + `<button class="mkB pri" data-a="play">▶️ ${G.adT('Oyna')}</button>`;
+}
+function mksOpen(tab) {
+  if (tab) MKS.tab = tab; if (MKS.tab === 'pub' && !mkAdm()) MKS.tab = 'web'; MKS.msg = '';
+  mksRender(true); if (MKS.tab === 'web') mksWebLoad(); mksRoomAsk();
+}
+function mksRender(force) {
+  if (!force && !(MK.dlgOn && MK.dlgFn === mksClick)) return;
+  const adm = mkAdm(), roomL = Object.values(MKS.room).map(r => r.e), dl = mksList(MKS_DL), mpOn = !!(G.MP && G.MP.on);
+  const tabs = [['web', '🌐 ' + G.adT('Mağaza')], ['room', `👥 ${G.adT('Oda')} (${roomL.length})`], ['dl', `📥 ${G.adT('İndirdiklerim')} (${dl.length})`]].concat(adm ? [['pub', '📤 ' + G.adT('Yayınladıklarım')]] : []);
+  let body = '';
+  if (MKS.tab === 'web') {
+    if (MKS.loading) body = `<div class="tip">⏳ ${G.adT('Mağaza yükleniyor…')}</div>`;
+    else if (MKS.webErr) body = `<div class="tip">⚠️ ${mkEsc(MKS.webErr)}</div><div class="mkRow"><button class="mkB" data-a="reload">🔄 ${G.adT('Tekrar dene')}</button></div>`;
+    else if (MKS.web) body = (MKS.web.length ? MKS.web.map(e => mksCard(e, mksDlBtns(e))).join('') : `<div class="tip">${G.adT('Mağazada henüz harita yok. Admin bir harita yayınlayınca burada görünür.')}</div>`) + `<div class="mkRow" style="margin-top:8px"><button class="mkB" data-a="reload">🔄 ${G.adT('Yenile')}</button></div>`;
+  } else if (MKS.tab === 'room') {
+    body = !mpOn ? `<div class="tip">${G.adT('Çok oyunculu bir odaya girince, arkadaşlarının yayınladığı haritalar burada görünür.')}</div>`
+      : roomL.length ? roomL.map(e => mksCard(e, mksDlBtns(e))).join('') : `<div class="tip">${G.adT('Odada henüz yayınlanan harita yok.')}</div>`;
+  } else if (MKS.tab === 'dl') {
+    body = dl.length ? dl.map(e => mksCard(Object.assign({}, e, { src: 'dl' }), `<button class="mkB pri" data-a="play">▶️ ${G.adT('Oyna')}</button><button class="mkB warn" data-a="ddel">🗑️</button>`)).join('') : `<div class="tip">${G.adT('Henüz indirdiğin harita yok. 🌐 Mağaza’dan indir, internetsiz de oynarsın.')}</div>`;
+  } else if (MKS.tab === 'pub') {
+    const P = mksList(MKS_PUB), mine = mkIndex(), tok = mksTok();
+    body = `<div class="tip">${G.adT('Kendi haritalarından birini başlık, açıklama ve sahip adıyla yayınla. Oyuncular indirip oynar (düzenleyemez).')}</div>`;
+    body += mine.length ? mine.map(m => { const p = P.find(x => x.id === m.id); return `<div class="mkMap mksC" data-id="${mkEsc(m.id)}" data-src="mine"><div class="mi"><b>🗺️ ${mkEsc(p ? p.title : m.name)}</b><small>${m.n || 0} ${G.adT('eşya')} · ${p ? '🟢 ' + G.adT('yayında') + ' v' + p.v + ' · 👤 ' + mkEsc(p.owner) : '⚪ ' + G.adT('yayında değil')}</small></div><div class="ma"><button class="mkB pri" data-a="pub">📤 ${G.adT(p ? 'Güncelle' : 'Yayınla')}</button>${p ? `<button class="mkB warn" data-a="unpub">🗑️</button>` : ''}</div></div>`; }).join('')
+      : `<div class="tip">${G.adT('Henüz haritan yok — önce 🗺️ Harita oluştur.')}</div>`;
+    body += `<div class="mkSub">🌐 GitHub</div><div class="tip">${tok ? '🟢 ' + G.adT('Bağlı: yayınladıkların herkesin mağazasına gider.') : '⚪ ' + G.adT('Bağlı değil: yayınladıkların sadece bu cihazda ve odadaki arkadaşlarında görünür.')}</div>
+      <div class="mkRow"><input type="password" id="mksTok" placeholder="${tok ? '••••••••' : 'github_pat_…'}" style="flex:1;width:auto;min-width:160px" autocomplete="off"><button class="mkB" data-a="tok">🔑 ${G.adT(tok ? 'Değiştir' : 'Bağla')}</button>${tok ? `<button class="mkB warn" data-a="untok">${G.adT('Bağlantıyı kes')}</button>` : ''}</div>
+      <div class="tip">${G.adT('Bir kerelik: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token. Repository access: Only select repositories → sft-oyun. Permissions → Contents: Read and write. Çıkan anahtarı buraya yapıştır. Anahtar sadece bu cihazda saklanır, kimseye gönderilmez.')}</div>`;
+  }
+  mkDlg(`<div class="mkH"><b>🏪 ${G.adT('Harita Mağazası')}</b><button class="mkB" data-a="x">✖</button></div>
+    <div class="mkOpts mksTabs">${tabs.map(([k, n]) => `<button data-a="tab" data-v="${k}" class="${MKS.tab === k ? 'on' : ''}">${n}</button>`).join('')}</div>
+    ${MKS.msg ? `<div class="tip">${mkEsc(MKS.msg)}</div>` : ''}${body}`, mksClick);
+}
+function mksClick(a, b) {
+  const row = b.closest('.mksC'), id = row && row.dataset.id, src = row && row.dataset.src;
+  const ent = () => src === 'room' ? MKS.room[id] && MKS.room[id].e : src === 'web' ? (MKS.web || []).find(x => x.id === id) : null;
+  if (a === 'tab') { MKS.tab = b.dataset.v; MKS.msg = ''; G.play('ui', { gain: .4 }); if (MKS.tab === 'web') mksWebLoad(); if (MKS.tab === 'room') mksRoomAsk(); mksRender(); }
+  else if (a === 'reload') mksWebLoad(true);
+  else if (a === 'dl') { const e = ent(); if (e) { b.disabled = true; b.textContent = '⏳'; mksDownload(e, false); } }
+  else if (a === 'play') { if (src === 'dl') mksPlayDl(id); else { const d = mksList(MKS_DL).find(x => x.id === id); if (d) mksPlayDl(id); else { const e = ent(); if (e) mksDownload(e, true); } } }
+  else if (a === 'ddel') { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = '⚠️ ' + G.adT('Emin misin?'); return; } mksDelDl(id); }
+  else if (a === 'pub') mksPubOpen(id);
+  else if (a === 'unpub') { if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = '⚠️ ' + G.adT('Emin misin?'); return; } mksUnpub(id); }
+  else if (a === 'tok') { const v = (G.$('mksTok').value || '').trim(); if (!/^(github_pat_|ghp_)[\w]{20,}$/.test(v)) { MKS.msg = '⚠️ ' + G.adT('Bu bir GitHub anahtarına benzemiyor'); mksRender(); return; } try { localStorage.setItem('sftGhToken', v); } catch (e) {} MKS.msg = '⏳ ' + G.adT('Kontrol ediliyor…'); mksRender();
+    mksGh('index.json').then(() => { MKS.msg = '🟢 ' + G.adT('GitHub bağlandı!'); mksRender(); }).catch(x => { MKS.msg = '⚠️ ' + (x.code === 401 ? G.adT('Anahtar geçersiz') : x.code === 403 || x.code === 404 ? G.adT('Anahtarın sft-oyun deposuna izni yok') : 'GitHub: ' + (x.message || x)); mksRender(); }); }
+  else if (a === 'untok') { try { localStorage.removeItem('sftGhToken'); } catch (e) {} MKS.msg = G.adT('Bağlantı kesildi'); mksRender(); }
+}
+document.head.insertAdjacentHTML('beforeend', `<style>#mkDlg .mksTabs{margin-bottom:6px}#mkDlg input[type=password]{box-sizing:border-box;background:#1b2535;color:#fff;border:1px solid #3a4658;border-radius:8px;padding:8px 9px;font:14px system-ui,sans-serif}#mkDlg .mksC .ds{font-size:12px;opacity:.85;margin-top:3px;line-height:1.35;white-space:pre-wrap;overflow-wrap:anywhere}
+body.admLocked #pMaker{display:none!important}body.mk:not(.mkAdm) #mkTop .mode,body.mk:not(.mkAdm) #mkTop [data-a=env],body.mk:not(.mkAdm) #mkTop [data-a=save]{display:none}</style>`);
+
+// durdurma menüsü: 🗺️ Harita oluştur (sadece admin) ve 🏪 Harita Mağazası (herkes)
+{ const pp = G.$('pPhoto'); if (pp) pp.insertAdjacentHTML('afterend', `<button id="pMaker">🗺️ ${G.adT('Harita oluştur')} <small>${G.adT('sıfırdan dünya yap, kaydet')}</small></button>`); const b = G.$('pMaker'); if (b) { b.addEventListener('click', () => { mkListOpen(); }); b.insertAdjacentHTML('afterend', `<button id="pStore">🏪 ${G.adT('Harita Mağazası')} <small>${G.adT('haritaları indir ve oyna')}</small></button>`); G.$('pStore').addEventListener('click', () => mksOpen()); } }
 
 /* ---------- 📋 hazır şablonlar (istediğin gibi değiştirirsin) ---------- */
 const mkSeed = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
@@ -1370,6 +1638,6 @@ const MK_TPL = [
 
 /* ---------- oyuna bağlanan uçlar ---------- */
 window.__mk = { tick: mkTick, area: mkArea, ramp: (x, z, y, g) => MK.ramps.length ? mkRampAt(x, z, y, g) : g, punch: mkPunch, respawn: mkRespawn, fromCloset: mkFromCloset, uiOpen: mkUiOpen };
-window.__mkDbg = { MK, MK_I, MK_TPL, mkOpen, mkNewMap, mkListOpen, mkSaveMap, mkPickItem, mkPlace, mkAimUpdate, mkStartPlay, mkStartEdit, mkTapAt, mkAction, mkPickAt, mkCatShow, mkPropOpen, mkEnvOpen };
+window.__mkDbg = { mksOpen, mksPubOpen, mksRender, MKS, mkFreeDone, mkIndex, MK, MK_I, MK_TPL, mkOpen, mkNewMap, mkListOpen, mkSaveMap, mkPickItem, mkPlace, mkAimUpdate, mkStartPlay, mkStartEdit, mkTapAt, mkAction, mkPickAt, mkCatShow, mkPropOpen, mkEnvOpen };
 
 })(window.__sftG);

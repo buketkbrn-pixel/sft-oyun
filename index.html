@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.16</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.19</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -8575,6 +8575,7 @@ function sigmaPost(dt) {
   if (!SIGMA.built) return;
   if (act !== SIGMA.vis) {
     SIGMA.vis = act; for (const g of SIGMA.groups) g.visible = act; for (const h of SIGMA.hulls) h.visible = act;
+    try { scHairApply(); } catch (e) {}   // Sigma'da taranan saç / yüz resmi gizlenir
     if (!act) { applyBodyShape(); sigSetBars(false); SIGMA.walkW = SIGMA.standW = SIGMA.cineW = 0; SIGMA.idle = 0; if (SIGMA.shY) { playerRig.armL.sh.rotation.y = playerRig.armR.sh.rotation.y = 0; SIGMA.shY = false; } }
   }
   if (!act) return;
@@ -13144,7 +13145,7 @@ function animeAnimate(dt) {
     AJ(hips, 'y', (boy ? .03 : .05) * W, k); AJ(hips, 'z', (boy ? .025 : .055) * W, k);
     AJ(torso, 'z', (boy ? -.02 : -.045) * W, k); AJ(torso, 'y', -.04 * W, k); AJ(torso, 'x', .012 * br, k);
     // ara sıra: saç düzeltme, gerinme, etrafa bakma, eller arkada, el sallama
-    if (!A.gest && arms && A.idle > 4 && Math.random() < dt * .22) { const ids = boy ? ['cross', 'hips', 'look', 'stretch', 'wave', 'scratch'] : ['stretch', 'look', 'behind', 'wave']; A.gest = { id: ids[Math.random() * ids.length | 0], t: 0 }; }
+    if (!A.gest && arms && A.idle > 4 && Math.random() < dt * .22) { const ids = boy ? ['cross', 'hips', 'look', 'stretch', 'wave'] : ['stretch', 'look', 'behind', 'wave']; A.gest = { id: ids[Math.random() * ids.length | 0], t: 0 }; }
     if (A.gest && !arms) A.gest = null;
     let g = A.gest, gw = 0;
     if (g) { g.t += dt; const L = { hair: 2.4, stretch: 2.8, look: 3.4, behind: 4.5, wave: 2.4, cross: 5.5, hips: 4.2, scratch: 2.6 }[g.id] || 3; gw = Math.min(1, g.t / .4, (L - g.t) / .4); if (g.t > L) { A.gest = null; g = null; gw = 0; } }
@@ -26095,6 +26096,7 @@ function mpOnMsg(m) {
     case 'fo': case 'fa': case 'fc': case 'fe': case 'fz': try { mpxFileMsg(m); } catch (e) { console.warn('mpd', e); } break;
     case 'pnt': case 'pns': case 'gal': try { paintNet(m); } catch (e) { console.warn('paint', e); } break;
     case 'note': mpNote(m.text, 3); break;
+    case 'mkp': case 'mkq': try { if (window.__mkNet) window.__mkNet(m); } catch (e) { console.warn('mk', e); } break;   // 🏪 harita mağazası (odadakiler)
     case 'em': mpEmoteShow(f, m.id); if (m.to === MP.me.id && m.ask) mpEmoteAsk(f, m.id); break;
     case 'emr': mpEmoteResult(f, m); break;
     case 'vs': mpVoteShow(m); break;
@@ -26141,7 +26143,7 @@ function mpState() {
 }
 function mpAvatar(p) {
   const holder = new THREE.Group(); holder.rotation.order = 'YXZ'; const body = new THREE.Group(); holder.add(body); const rig = createStickman(p.color);
-  body.add(rig.stick); try { humanize(rig, { shirt: p.color, pants: 0x263238 }); } catch (e) {}
+  body.add(rig.stick); try { humanize(rig, { shirt: p.color, pants: 0x263238, bald: true }); } catch (e) {}   // arkadaşın gerçek görünümü gelene kadar: rastgele saç yok
   scene.add(holder); const av = { holder, body, rig, lab: null, bub: null, bubT: 0, emo: null, emoT: 0 }; p.av = av; p.holder = holder; p.facing = 0; mpAvLabel(p); return av;
 }
 function mpTxtSprite(txt, bg, w = 512, fs = 34) {
@@ -26717,7 +26719,8 @@ async function mpLookBuild(L) {
   const m = { t: 'lk', v: ++MP_LK.v, type: L.type, kind: L.kind };
   if (L.type === 'snap') {
     const old = L.J.map(o => o.name); L.J.forEach((o, i) => { o.name = 'mpj' + i; });
-    let js; try { const vis = L.root.visible; L.root.visible = true; js = JSON.stringify(L.root.toJSON()); L.root.visible = vis; } finally { L.J.forEach((o, i) => { o.name = old[i]; }); }
+    const fP = typeof SCN_FACE !== 'undefined' && SCN_FACE.parent; if (fP) fP.remove(SCN_FACE);   // 🔒 yüz resmi arkadaşlara gönderilmez
+    let js; try { const vis = L.root.visible; L.root.visible = true; js = JSON.stringify(L.root.toJSON()); L.root.visible = vis; } finally { L.J.forEach((o, i) => { o.name = old[i]; }); if (fP) fP.add(SCN_FACE); }
     m.n = L.J.length;
     if (window.CompressionStream) { const cs = new Blob([js]).stream().pipeThrough(new CompressionStream('gzip')); m.z = new Uint8Array(await new Response(cs).arrayBuffer()); } else m.s = js;
   }
@@ -27186,8 +27189,8 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 document.body.insertAdjacentHTML('beforeend', `<div id="scanBox"><div class="scIn">
   <div class="scHead"><b>📷 ${adT('Optimize karakter')}</b><button data-sc="x" aria-label="${adT('Kapat')}">✕</button></div>
   <div id="scS1">
-    <div>${adT('Kamera seni baştan ayağa görsün, sonra yavaşça kendi etrafında bir tur dön (360°). Kıyafet, ten ve saç renklerini, saçının uzunluğunu ve vücut oranlarını okur, karakterini sana benzetir.')}</div>
-    <div class="scNote">📱 ${adT('Telefonu masaya ya da yere dik koy, 2-3 adım uzaklaş. Arka kamerayla bir arkadaşın da seni tarayabilir.')}<br>🔒 ${adT('Görüntü hiçbir yere gönderilmez ve kaydedilmez; renkler sadece bu cihazda okunur.')}<br>🧠 ${adT('Kişilik kameradan okunamaz — karakterini en sonda sen seçersin.')}</div>
+    <div>${adT('Kamera seni baştan ayağa görsün, sonra yavaşça kendi etrafında bir tur dön (360°). Kıyafet ve ceket, ten ve saç renklerini, saçının uzunluğunu, yüzünü ve vücut şeklini (silüetinden) okur, karakterini sana benzetir.')}</div>
+    <div class="scNote">📱 ${adT('Telefonu masaya ya da yere dik koy, 2-3 adım uzaklaş. Arka kamerayla bir arkadaşın da seni tarayabilir.')}<br>🙆 ${adT('Kollarını hafif yana aç: vücut şeklin daha doğru ölçülür.')}<br>🔒 ${adT('Görüntü hiçbir yere gönderilmez. Sadece yüzünün küçük bir resmi bu cihazda saklanır (istersen kapat); arkadaşlarına gönderilmez.')}<br>🧠 ${adT('Kişilik kameradan okunamaz — karakterini en sonda sen seçersin.')}</div>
     <div class="scBtns"><button class="scBig" data-sc="user">🤳 ${adT('Ön kamera')}</button><button class="scBig" data-sc="environment">📱 ${adT('Arka kamera')}</button></div>
   </div>
   <div id="scS2" style="display:none">
@@ -27198,9 +27201,11 @@ document.body.insertAdjacentHTML('beforeend', `<div id="scanBox"><div class="scI
   <div id="scS3" style="display:none">
     <div>✨ ${adT('Tarama bitti! İstersen renkleri düzelt:')}</div>
     <div class="scRes" id="scRes"></div>
+    <div id="scFaceRow" style="display:none"><div class="scOptT">🙂 ${adT('Yüz')}</div><div style="display:flex;align-items:center;gap:10px"><img id="scFaceImg" alt=""><div class="scOpt" data-so="faceOn"><button data-v="1">${adT('Benim yüzüm')}</button><button data-v="0">${adT('Çizgi yüz')}</button></div></div></div>
+    <div class="scOptT">🧥 ${adT('Ceket')}</div><div class="scOpt" data-so="jacket"><button data-v="0">${adT('Yok')}</button><button data-v="1">${adT('Blazer')}</button><button data-v="2">${adT('Deri ceket')}</button><button data-v="3">${adT('Kapüşonlu')}</button><button data-v="4">${adT('Şişme yelek')}</button><button data-v="5">${adT('Kot ceket')}</button><button data-v="6">${adT('Smokin')}</button><button data-v="7">${adT('Yağmurluk')}</button></div>
     <div class="scOptT">💇 ${adT('Saç')}</div><div class="scOpt" data-so="hairL"><button data-v="0">${adT('Kısa')}</button><button data-v="1">${adT('Uzun')}</button><button data-v="2">${adT('Yok')}</button></div>
     <div class="scOptT">👖 ${adT('Alt')}</div><div class="scOpt" data-so="shorts"><button data-v="0">${adT('Pantolon')}</button><button data-v="1">${adT('Şort')}</button></div>
-    <div class="scOptT">🧍 ${adT('Vücut yapısı')}</div><div class="scOpt" data-so="build"><button data-v="-1">${adT('İnce')}</button><button data-v="0">${adT('Normal')}</button><button data-v="1">${adT('İri')}</button></div>
+    <div class="scOptT">🧍 ${adT('Vücut yapısı')}</div><div class="scOpt" data-so="build"><button data-v="9">📏 ${adT('Ölçülen')}</button><button data-v="-1">${adT('İnce')}</button><button data-v="0">${adT('Normal')}</button><button data-v="1">${adT('İri')}</button></div>
     <div class="scNote" id="scInfo"></div>
     <div style="margin-top:12px;font-weight:600">${adT('Karakterin kime benzesin?')}</div>
     <div class="scBtns"><button class="scBig" data-sc="stick">🕴️ ${adT('Çöp adam gibi')}</button><button class="scBig" data-sc="pati">🐾 ${adT('Pati gibi')}</button></div>
@@ -27223,16 +27228,26 @@ function scShow(n) { for (const i of [1, 2, 3]) $('scS' + i).style.display = i =
 function scOpen() { $('scanBox').style.display = 'flex'; scShow(1); }
 function scClose() { scStopCam(); $('scanBox').style.display = 'none'; }
 function scStopCam() { SCN.on = false; SCN.st = 'off'; if (SCN.stream) { SCN.stream.getTracks().forEach(t => t.stop()); SCN.stream = null; } const v = $('scVid'); if (v) v.srcObject = null; }
+// tarama için ayrı model: tam (daha isabetli) iskelet + vücut silüeti (maske) → gerçek vücut genişlikleri ölçülür
+async function poseSegLM() {
+  if (V4.pls) return V4.pls; if (V4.plsP) return V4.plsP;
+  V4.plsP = (async () => { const { V, fs } = await htVision(); const opt = d => ({ baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task', delegate: d }, runningMode: 'VIDEO', numPoses: 1, outputSegmentationMasks: true, minPoseDetectionConfidence: .5, minPosePresenceConfidence: .5, minTrackingConfidence: .5 });
+    try { V4.pls = await V.PoseLandmarker.createFromOptions(fs, opt('GPU')); } catch (x) { V4.pls = await V.PoseLandmarker.createFromOptions(fs, opt('CPU')); } return V4.pls; })();
+  try { return await V4.plsP; } finally { V4.plsP = null; }
+}
 async function scStart(cam) {
   scStopCam(); SCN.cam = cam; scShow(2);
   try { if (HT.on) htStop(true); if (V4.on) v4Stop(true); if (window.__v5on) v5Stop(true); } catch (e) {}
-  Object.assign(SCN, { bins: new Array(8).fill(0), lastB: -1, runB: 0, wmax: 0, t0: performance.now(), ok: 0, okT: 0, S: { shirt: [], thigh: [], shin: [], shoes: [], skin: [], hand: [], hairF: [], hairB: [], nape: [] }, M: { sw: [], hw: [], th: [], head: [] } });
+  Object.assign(SCN, { bins: new Array(8).fill(0), lastB: -1, runB: 0, wmax: 0, t0: performance.now(), ok: 0, okT: 0, faceS: 0, faceT: 0, faceCv: null, n: 0,
+    S: { shirt: [], mid: [], side: [], back: [], ua: [], fa: [], hood: [], coat: [], thigh: [], shin: [], shoes: [], skin: [], hand: [], hairF: [], hairB: [], nape: [] },
+    M: { sw: [], hw: [], th: [], head: [], cw: [], ww: [], hp: [], cd: [], bd: [], ua: [], fa: [], tw: [], sn: [] } });
   $('scVid').parentElement.classList.toggle('mir', cam === 'user'); scMsg('📷 ' + adT('Kamera açılıyor…')); scRing();
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { scMsg('⚠️ ' + adT('Bu tarayıcıda kamera açılamıyor.')); return; }
   try { const st = await camOpen(cam); if ($('scanBox').style.display === 'none' || SCN.cam !== cam) { st.getTracks().forEach(t => t.stop()); return; } SCN.stream = st; const v = $('scVid'); v.srcObject = st; await v.play(); }
   catch (e) { scMsg('⚠️ ' + adT('Kamera açılamadı. Tarayıcıya kamera izni ver (adres çubuğundaki kilit simgesi).')); return; }
   scMsg('🧠 ' + adT('Vücut tanıma yükleniyor…'));
-  try { await poseLM(); } catch (e) { scMsg('⚠️ ' + adT('Vücut tanıma yüklenemedi (internet gerekli).')); return; }
+  try { SCN.pl = await poseSegLM(); SCN.seg = true; }
+  catch (e) { try { SCN.pl = await poseLM(); SCN.seg = false; } catch (e2) { scMsg('⚠️ ' + adT('Vücut tanıma yüklenemedi (internet gerekli).')); return; } }
   if (!SCN.stream) return; SCN.on = true; SCN.st = 'run'; SCN.t0 = performance.now(); scLoop();
 }
 function scMsg(t) { const m = $('scMsg'); if (m && m.textContent !== t) m.textContent = t; }
@@ -27243,16 +27258,39 @@ function scRing() {
 function scLoop() {
   const v = $('scVid'); if (!SCN.on || !v) return;
   const next = () => { if (!SCN.on) return; if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(scLoop); else requestAnimationFrame(scLoop); };
-  if (v.readyState < 2 || !V4.pl) { next(); return; }
-  let res; try { res = V4.pl.detectForVideo(v, performance.now()); } catch (e) { next(); return; }
+  const pl = SCN.pl || V4.pl;
+  if (v.readyState < 2 || !pl) { next(); return; }
+  let res; try { res = pl.detectForVideo(v, performance.now()); } catch (e) { next(); return; }
   try { scFrame(v, res); } catch (e) { sftErr(e); }
+  try { if (res && res.segmentationMasks) for (const m of res.segmentationMasks) m.close(); } catch (e) {}
   next();
+}
+// 🙂 yüz: en iyi önden karede yüz kırpılır, eğimi düzeltilir, oval yumuşak kenarla küçük bir resme çevrilir (sadece bu cihazda)
+function scFaceGrab(v, L) {
+  const vw = v.videoWidth, vh = v.videoHeight; if (!vw || !vh) return;
+  const px = i => ({ x: L[i].x * vw, y: L[i].y * vh }), E = { x: (px(2).x + px(5).x) / 2, y: (px(2).y + px(5).y) / 2 }, N = px(0);
+  const ed = Math.hypot(px(7).x - px(8).x, px(7).y - px(8).y), size = ed * 1.42; if (size < 40) return;   // yüz çok küçükse alma
+  const c = { x: E.x + (N.x - E.x) * .3, y: E.y + (N.y - E.y) * .3 }, a = Math.atan2(px(2).y - px(5).y, px(2).x - px(5).x);
+  const cv = SCN.faceCv || (SCN.faceCv = document.createElement('canvas')); cv.width = cv.height = 160; const g = cv.getContext('2d');
+  g.clearRect(0, 0, 160, 160); g.save(); g.translate(80, 80); g.rotate(-a); const k = 160 / size; g.scale(k, k); g.drawImage(v, -c.x, -c.y); g.restore();
+  // hafif çizgi film: biraz doygun ve parlak (kamera renkleri soluk)
+  try { const d = g.getImageData(0, 0, 160, 160), p = d.data; for (let i = 0; i < p.length; i += 4) { const l = (p[i] + p[i + 1] + p[i + 2]) / 3; for (let j = 0; j < 3; j++) p[i + j] = Math.max(0, Math.min(255, (l + (p[i + j] - l) * 1.15 - 128) * 1.08 + 136)); } g.putImageData(d, 0, 0); } catch (e) {}
+  g.globalCompositeOperation = 'destination-in'; g.save(); g.translate(80, 84); g.scale(1, 1.16);
+  const gr = g.createRadialGradient(0, 0, 0, 0, 0, 68); gr.addColorStop(0, '#000'); gr.addColorStop(.74, '#000'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 68, 0, 7); g.fill(); g.restore(); g.globalCompositeOperation = 'source-over';
 }
 function scFrame(v, res) {
   const L = res && res.landmarks && res.landmarks[0], W = res && res.worldLandmarks && res.worldLandmarks[0], cv = $('scCv'), g = cv.getContext('2d');
   g.clearRect(0, 0, cv.width, cv.height);
   if (!L) { scMsg('🙋 ' + adT('Seni göremiyorum — kameranın karşısına geç')); return; }
   const vis = i => (L[i].visibility ?? 1) > .5 && L[i].x > -.02 && L[i].x < 1.02 && L[i].y > -.02 && L[i].y < 1.02;
+  const mk = SCN.seg && res.segmentationMasks && res.segmentationMasks[0];
+  SCN.n = (SCN.n || 0) + 1;
+  // silüet önizlemesi (her 3 karede bir): ölçülen bölgeyi gösterir
+  let MA = null, mw = 0, mh = 0;
+  if (mk && SCN.n % 2 === 0) { try { mw = mk.width; mh = mk.height; MA = mk.getAsFloat32Array(); } catch (e) { MA = null; } }
+  if (MA && SCN.n % 6 === 0) { try { const id = g.createImageData(cv.width, cv.height), d = id.data; for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) { const m = MA[((y * mh / cv.height) | 0) * mw + ((x * mw / cv.width) | 0)]; if (m > .5) { const k = (y * cv.width + x) * 4; d[k] = 105; d[k + 1] = 240; d[k + 2] = 174; d[k + 3] = 60; } } SCN.silImg = id; } catch (e) {} }
+  if (SCN.silImg && mk) g.putImageData(SCN.silImg, 0, 0);
   g.fillStyle = '#69f0ae'; for (const i of [0, 7, 8, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 31, 32]) if (vis(i)) { g.beginPath(); g.arc(L[i].x * cv.width, L[i].y * cv.height, 3, 0, 7); g.fill(); }
   if (!vis(11) || !vis(12) || !vis(23) || !vis(24)) { scMsg('🙋 ' + adT('Omuzların ve belin görünsün')); return; }
   const feet = vis(27) && vis(28) && L[27].y < .97 && L[28].y < .97;
@@ -27271,37 +27309,68 @@ function scFrame(v, res) {
   const bin = ((Math.round(yaw / (Math.PI / 4)) % 8) + 8) % 8;
   if (bin === SCN.lastB) SCN.runB++; else { SCN.lastB = bin; SCN.runB = 0; }
   if (SCN.runB >= 2) SCN.bins[bin]++;
-  // gövde: üst kıyafet
-  for (const t of [.28, .45, .62]) for (const u of [-.22, 0, .22]) px(add(lerp(Sm, Hm, t), shv, u).x, add(lerp(Sm, Hm, t), shv, u).y, S.shirt);
+  const upN = { x: upv.x / tH, y: upv.y / tH }, latN = { x: shv.x / (sW || 1), y: shv.y / (sW || 1) };   // ekranda "yukarı" ve "yan" (en-boy oranına göre birim)
+  const hs = vis(7) && vis(8) ? Math.max(len(sub(P(7), P(8))), sW * .3) : sW * .42;
+  const frontish = c > .72;
+  // gövde: üst kıyafet (genel), göğüs ortası (açık ceketin içi), yanlar ve sırt (ceket), kollar (kol boyu), kalça altı (uzun palto)
+  for (const t of [.28, .45, .62]) for (const u of [-.22, 0, .22]) { const q = add(lerp(Sm, Hm, t), shv, u); px(q.x, q.y, S.shirt); }
+  if (frontish) for (const t of [.22, .38, .54]) { const c0 = lerp(Sm, Hm, t); px(c0.x, c0.y, face ? S.mid : S.back); if (face) for (const u of [-.4, .4]) { const q = add(c0, shv, u); px(q.x, q.y, S.side); } else for (const u of [-.25, .25]) { const q = add(c0, shv, u); px(q.x, q.y, S.back); } }
+  for (const [sh, el, wr] of [[11, 13, 15], [12, 14, 16]]) if (vis(sh) && vis(el)) { const q = lerp(P(sh), P(el), .55); px(q.x, q.y, S.ua); if (vis(wr)) { const q2 = lerp(P(el), P(wr), .45); px(q2.x, q2.y, S.fa); } }
+  if (frontish && vis(25) && vis(26)) { const q = add(lerp(Hm, lerp(P(25), P(26), .5), .32), latN, sW * .32 * (Math.random() < .5 ? 1 : -1)); px(q.x, q.y, S.coat); }
   // bacaklar: uyluk ve baldır (şort mu?)
   for (const [h, k, a] of [[23, 25, 27], [24, 26, 28]]) { if (vis(k)) { for (const t of [.35, .6]) { const q = lerp(P(h), P(k), t); px(q.x, q.y, S.thigh); } if (vis(a)) { const q = lerp(P(k), P(a), .5); px(q.x, q.y, S.shin); } } }
   // ayakkabı
   for (const [a, h, f] of [[27, 29, 31], [28, 30, 32]]) if (vis(a) && vis(f)) { const q = lerp(P(a), P(f), .55), q2 = lerp(P(h), P(f), .5); px(q.x, q.y, S.shoes); px(q2.x, q2.y, S.shoes); }
   // baş: ten ve saç
-  const hs = vis(7) && vis(8) ? Math.max(len(sub(P(7), P(8))), sW * .3) : sW * .42;
-  const upN = { x: upv.x / tH, y: upv.y / tH }, latN = { x: shv.x / (sW || 1), y: shv.y / (sW || 1) };   // ekranda "yukarı" ve "yan" (en-boy oranına göre birim)
   if (face) {
     const E = lerp(P(2), P(5), .5), N = P(0), ev = sub(P(2), P(5));
     for (const s of [-.55, .55]) { const q = add(add(N, ev, s), sub(N, E), .5); px(q.x, q.y, S.skin); }
     px(N.x, N.y + .004, S.skin, 0);
     for (const k of [.42, .58]) for (const s of [-.22, 0, .22]) { const q = add(add(E, upN, hs * k), latN, hs * s); px(q.x, q.y, S.hairF); }
+    if (c > .86 && vis(7) && vis(8) && (L[2].visibility ?? 0) > .8 && (L[5].visibility ?? 0) > .8) {   // en iyi önden yüz karesi
+      const sc2 = len(sub(P(7), P(8))) * (L[0].visibility ?? 1) * c, now = performance.now();
+      if (sc2 > SCN.faceS * 1.01 && now - SCN.faceT > 300) { SCN.faceS = sc2; SCN.faceT = now; try { scFaceGrab(v, L); } catch (e) {} }
+    }
   } else if (vis(7) || vis(8) || W) {
     const hc = vis(7) && vis(8) ? lerp(P(7), P(8), .5) : add(Sm, upN, hs * 1.15);
     for (const k of [0, .3]) for (const s of [-.25, 0, .25]) { const q = add(add(hc, upN, hs * k), latN, hs * s); px(q.x, q.y, S.hairB); }
     { const q = add(Sm, upN, hs * .12); px(q.x, q.y, S.nape); const q2 = add(Sm, upN, -hs * .2); px(q2.x, q2.y, S.nape); }   // ense / sırt üstü: uzun saç mı?
+    if (frontish) for (const s of [-.3, .3]) { const q = add(add(Sm, upN, hs * .32), latN, hs * s); px(q.x, q.y, S.hood); }   // ensede toplanan kapüşon
   }
   for (const [w, ix] of [[15, 19], [16, 20]]) if (vis(w) && vis(ix)) { const q = lerp(P(w), P(ix), .5); px(q.x, q.y, S.hand, 0); }
   // ölçüler (önden bakarken, dünya koordinatlarıyla)
   if (W && face && c > .85) { const d = (a, b) => Math.hypot(W[a].x - W[b].x, W[a].y - W[b].y, W[a].z - W[b].z), mid = (a, b) => ({ x: (W[a].x + W[b].x) / 2, y: (W[a].y + W[b].y) / 2, z: (W[a].z + W[b].z) / 2 });
     const sm = mid(11, 12), hm = mid(23, 24), th = Math.hypot(sm.x - hm.x, sm.y - hm.y, sm.z - hm.z); SCN.M.sw.push(d(11, 12) / th); SCN.M.hw.push(d(23, 24) / th); if (vis(7) && vis(8)) SCN.M.head.push(d(7, 8) / d(11, 12)); }
+  // 📏 silüetten gerçek genişlikler: göğüs, bel, kalça (önden), göğüs ve karın derinliği (yandan), kol / bacak kalınlığı
+  if (MA) {
+    const at = q => { const X = Math.round(q.x * mw), Y = Math.round(q.y * mh); return X >= 0 && Y >= 0 && X < mw && Y < mh && MA[Y * mw + X] > .5; };
+    const walk = (p, dir, max) => { const st = .0035; let s = 0; while (s < max) { if (!at({ x: p.x + dir.x * s, y: p.y + dir.y * s })) break; s += st; } return s; };
+    const perpOf = u => ({ x: -u.y / asp, y: u.x * asp });   // görüntüde dik yön (en-boy düzeltilmiş birim)
+    const dot = (a, b) => a.x * asp * b.x * asp + a.y * b.y, MM = SCN.M, ctr = lerp(Sm, Hm, .5);
+    if (face && c > .85) {
+      for (const [t, key, arm] of [[.3, 'cw', 13], [.66, 'ww', 15], [1, 'hp', 15]]) {
+        const c0 = lerp(Sm, Hm, t); let w = 0, ok = true;
+        for (const sg of [1, -1]) { const ai = sg > 0 ? arm : arm + 1; let lim = tH * .7; if (vis(ai)) { const o = dot(sub(P(ai), c0), latN) * sg; if (o > 0) lim = Math.max(tH * .12, o - tH * .07); } const s = walk(c0, { x: latN.x * sg, y: latN.y * sg }, lim); if (s >= lim - .004 && lim >= tH * .7) ok = false; w += s; }
+        if (ok && w > tH * .2) MM[key].push(w / tH);
+      }
+      const limb = (a, b, t, key, base) => { if (!vis(a) || !vis(b)) return; const p = lerp(P(a), P(b), t), u0 = sub(P(b), P(a)), l0 = len(u0); if (l0 < tH * .15) return;
+        let n = perpOf({ x: u0.x / l0, y: u0.y / l0 }); if (dot(sub(p, ctr), n) < 0) n = { x: -n.x, y: -n.y };
+        const s = walk(p, n, tH * .4); if (s > tH * .02 && s < tH * .38) MM[key].push(s * 2 / tH); };
+      limb(11, 13, .5, 'ua'); limb(12, 14, .5, 'ua'); limb(13, 15, .4, 'fa'); limb(14, 16, .4, 'fa');
+      limb(23, 25, .35, 'tw'); limb(24, 26, .35, 'tw'); limb(25, 27, .35, 'sn'); limb(26, 28, .35, 'sn');
+    } else if (c < .42) {   // yandan: derinlik
+      const n = perpOf(upN);
+      for (const [t, key] of [[.3, 'cd'], [.66, 'bd']]) { const c0 = lerp(Sm, Hm, t), w = walk(c0, n, tH * .8) + walk(c0, { x: -n.x, y: -n.y }, tH * .8); if (w > tH * .2 && w < tH * 1.4) MM[key].push(w / tH); }
+    }
+  }
   SCN.ok++;
   const done = SCN.bins.filter(n => n >= 3).length, el = (performance.now() - SCN.t0) / 1000;
   scRing();
   if (!feet) scMsg('🦶 ' + adT('Biraz uzaklaş — ayakların da görünsün') + ` · ${done}/8`);
-  else if (done < 2) scMsg('✅ ' + adT('Seni görüyorum! Şimdi yavaşça kendi etrafında dön') + ` · ${done}/8`);
+  else if (done < 2) scMsg('✅ ' + adT('Seni görüyorum! Kollarını hafif yana aç, yavaşça kendi etrafında dön') + ` · ${done}/8`);
   else if (done < 6) scMsg('🔄 ' + adT('Güzel, dönmeye devam et…') + ` · ${done}/8`);
   else { scMsg('🎉 ' + adT('Tamam! Tarama bitti')); scFinish(); return; }
-  if (el > 40 && done >= 2) scFinish();
+  if (el > 45 && done >= 2) scFinish();
 }
 // baskın renk: kaba renk kutularında en kalabalık küme (arka plan ve gölge karışsa da doğru rengi bulur)
 function scDom(arr, def) {
@@ -27317,32 +27386,73 @@ function scDom(arr, def) {
   return '#' + col.getHexString(THREE.SRGBColorSpace);
 }
 const scDist = (a, b) => { const A = new THREE.Color(a), B = new THREE.Color(b); return Math.hypot(A.r - B.r, A.g - B.g, A.b - B.b); };
-const scMed = a => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+const scMed = a => { if (!a || !a.length) return null; const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+const scHsl = h => { const o = {}; new THREE.Color(h).getHSL(o, THREE.SRGBColorSpace); return o; };
+// ölçülen oranlar → çöp adam kalınlıkları (ortalama insan = 1; çöp adam farkı biraz abartır ki görünsün)
+function scShape(M) {
+  const md = k => (M[k] && M[k].length >= 3 ? scMed(M[k]) : null), cl = v => THREE.MathUtils.clamp(v, .55, 2.3), amp = (f, k = 2.4) => f == null ? null : cl(1 + (f - 1) * k);
+  const cw = md('cw'), ww = md('ww'), hp = md('hp'), cd = md('cd'), bd = md('bd');
+  if (!cw && !ww) return null;
+  const fW = (cw ? cw / .7 : ww / .6) * .4 + (ww ? ww / .6 : cw / .7) * .4 + (hp ? hp / .72 : 1) * .2;
+  const tW = amp(fW, 2), fD = cd || bd ? ((cd ? cd / .5 : bd / .48) * .4 + (bd ? bd / .48 : cd / .5) * .6) : null;
+  const R = { torsoW: tW, torsoD: fD != null ? amp(fD, 2) : cl(1 + (tW - 1) * .85),
+    ua: amp(md('ua') && md('ua') / .22, 2) ?? cl(1 + (tW - 1) * .6), fa: amp(md('fa') && md('fa') / .17, 2) ?? cl(1 + (tW - 1) * .5),
+    th: amp(md('tw') && md('tw') / .32, 2) ?? cl(1 + (tW - 1) * .6), sn: amp(md('sn') && md('sn') / .21, 2) ?? cl(1 + (tW - 1) * .5) };
+  R.belly = bd && cd ? bd / cd : 1; return R;
+}
 function scFinish() {
   if (!SCN.S || SCN.ok < 4) { scMsg('🙋 ' + adT('Önce seni biraz görmem lazım')); return; }
-  const S = SCN.S, M = SCN.M, skin = scDom(S.skin.length >= 12 ? S.skin : S.hand, '#e0ac69'), shirt = scDom(S.shirt, '#3a86ff'), thigh = scDom(S.thigh, '#2b2d42'), shin = scDom(S.shin, thigh), shoes = scDom(S.shoes, '#f4f4f4');
+  const S = SCN.S, M = SCN.M, skin = scDom(S.skin.length >= 12 ? S.skin : S.hand, '#e0ac69'), shirt0 = scDom(S.shirt, '#3a86ff'), thigh = scDom(S.thigh, '#2b2d42'), shin = scDom(S.shin, thigh), shoes = scDom(S.shoes, '#f4f4f4');
   const hair = scDom(S.hairB.length >= 30 ? S.hairB.concat(S.hairB, S.hairF) : S.hairF, '#3b2a1e');
   const shorts = S.shin.length > 20 && scDist(shin, skin) < .22 && scDist(thigh, skin) > .28 ? 1 : 0;
-  const nape = S.nape.length > 20 ? scDom(S.nape, shirt) : null, hairL = nape && scDist(nape, hair) < .18 && scDist(nape, shirt) > .2 ? 1 : (scDist(hair, skin) < .12 ? 2 : 0);
+  const nape = S.nape.length > 30 ? scDom(S.nape, shirt0) : null, hairL = nape && scDist(nape, hair) < .16 && scDist(nape, shirt0) > .22 && scDist(nape, skin) > .15 ? 1 : (scDist(hair, skin) < .12 ? 2 : 0);
+  // 🧥 ceket: göğüs ortası ile yanlar / kollar farklıysa önü açık ceket; gövde ile kollar farklıysa yelek; ensede kapüşon
+  const mid = S.mid.length >= 12 ? scDom(S.mid, shirt0) : shirt0, side = S.side.length >= 12 ? scDom(S.side, shirt0) : shirt0, back = S.back.length >= 12 ? scDom(S.back, side) : side;
+  const ua = S.ua.length >= 8 ? scDom(S.ua, side) : side, fa = S.fa.length >= 8 ? scDom(S.fa, skin) : skin, coat = S.coat.length >= 10 ? scDom(S.coat, thigh) : thigh;
+  const skinish = h => scDist(h, skin) < .17, hood = S.hood.length >= 10 && (() => { const h = scDom(S.hood, side); return scDist(h, side) < .2 && scDist(h, hair) > .18 && !skinish(h); })();
+  const longSl = !skinish(fa) && scDist(fa, ua) < .22, jStyle = (col, inner) => { const h = scHsl(col);
+    if (scDist(coat, col) < .16 && scDist(coat, thigh) > .2) return 7;                                   // kalçanın altına inen: yağmurluk / palto
+    if (h.l < .16 && scHsl(inner).l > .75) return 6;                                                      // siyah ceket + beyaz gömlek: smokin
+    if (h.h > .54 && h.h < .68 && h.s > .18 && h.s < .62 && h.l > .3 && h.l < .64) return 5;                           // kot
+    if (h.l < .17) return 2;                                                                              // koyu: deri ceket
+    return hood ? 3 : 1; };
+  let jacket = 0, jcol = side, shirt = shirt0;
+  if (!skinish(side) && scDist(mid, side) > .24 && scDist(side, ua) < .22) { jcol = side; shirt = mid; jacket = jStyle(jcol, mid); }   // önü açık
+  else if (!skinish(side) && !skinish(ua) && scDist(ua, side) > .27 && scDist(mid, side) < .2) { jacket = 4; jcol = side; shirt = ua; }   // yelek
+  else if (hood && longSl && scDist(ua, side) < .22) { jacket = 3; jcol = side; shirt = mid; }                                           // kapüşonlu (kapalı)
+  else shirt = S.mid.length >= 12 ? mid : shirt0;
   const sw = scMed(M.sw), hw = scMed(M.hw), hd = scMed(M.head), wr = sw ? (sw / .66 + (hw || .42) / .42) / 2 : 1;
-  const build = wr > 1.12 ? 1 : wr < .9 ? -1 : 0, head = hd ? THREE.MathUtils.clamp(.9 + (hd / .45 - 1) * .8, .8, 1.25) : 1;
-  SCN.res = { col: { shirt, pants: thigh, shoes, skin, hair }, shorts, hairL, build, head, wr };
+  const shape = scShape(M), build = shape ? 9 : wr > 1.12 ? 1 : wr < .9 ? -1 : 0, head = hd ? THREE.MathUtils.clamp(.9 + (hd / .45 - 1) * .8, .8, 1.25) : 1;
+  let faceURL = null; if (SCN.faceCv && SCN.faceS) { try { faceURL = SCN.faceCv.toDataURL('image/webp', .86); if (!faceURL.startsWith('data:image/webp')) faceURL = SCN.faceCv.toDataURL('image/png'); } catch (e) { faceURL = null; } }
+  SCN.res = { col: { shirt, jacket: jcol, pants: thigh, shoes, skin, hair }, jacket, shorts, hairL, build, head, wr, shape, face: faceURL, faceOn: faceURL ? 1 : 0 };
   SCN.done = true; scShow(3); scResUI();
 }
 function scResUI() {
-  const R = SCN.res; if (!R) return; const N = { shirt: '👕 ' + adT('Üst'), pants: '👖 ' + adT('Alt'), shoes: '👟 ' + adT('Ayakkabı'), skin: '🙂 ' + adT('Ten'), hair: '💇 ' + adT('Saç') };
+  const R = SCN.res; if (!R) return; const N = { shirt: '👕 ' + adT('Üst'), jacket: '🧥 ' + adT('Ceket'), pants: '👖 ' + adT('Alt'), shoes: '👟 ' + adT('Ayakkabı'), skin: '🙂 ' + adT('Ten'), hair: '💇 ' + adT('Saç') };
   if (!$('scRes').children.length || $('scRes').dataset.k !== JSON.stringify(R.col)) { $('scRes').innerHTML = Object.keys(N).map(k => `<label><input type="color" data-sk="${k}" value="${R.col[k]}"><span>${N[k]}</span></label>`).join(''); $('scRes').dataset.k = JSON.stringify(R.col); }
   for (const el of document.querySelectorAll('#scanBox [data-so]')) { const v = R[el.dataset.so]; for (const b of el.children) b.classList.toggle('on', +b.dataset.v === v); }
-  const cov = SCN.bins.filter(n => n >= 3).length;
-  $('scInfo').textContent = `${adT('Taranan açı')}: ${cov}/8 · ${adT('kafa oranı')} ${R.head.toFixed(2)}x · ${adT('Kişilik kameradan okunamaz; karakterini sen seç.')}`;
+  const fb = $('scFaceRow'); if (fb) { fb.style.display = R.face ? '' : 'none'; const im = $('scFaceImg'); if (im && R.face && im.src !== R.face) im.src = R.face; }
+  const mb = document.querySelector('#scanBox [data-so="build"] [data-v="9"]'); if (mb) mb.style.display = R.shape ? '' : 'none';
+  const cov = SCN.bins.filter(n => n >= 3).length, sh = R.shape;
+  $('scInfo').textContent = `${adT('Taranan açı')}: ${cov}/8 · ${adT('kafa oranı')} ${R.head.toFixed(2)}x` + (sh ? ` · 📏 ${adT('gövde')} ${sh.torsoW.toFixed(2)}x, ${adT('kol')} ${sh.ua.toFixed(2)}x, ${adT('bacak')} ${sh.th.toFixed(2)}x` : ` · ${adT('vücut silüeti okunamadı, oranlar omuz/kalçadan')}`) + ` · ${adT('Kişilik kameradan okunamaz; karakterini sen seç.')}`;
 }
-// 💇 çöp adamın saçı (taramadan)
+// 💇 çöp adamın saçı ve 🙂 yüzü (taramadan). Sigma kendi görünümünü kullanır: orada saç / yüz resmi gösterilmez.
 const SCN_HAIR = (() => { const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: 0x3b2a1e, roughness: .8 });
   const cap = new THREE.Mesh(new THREE.SphereGeometry(.178, 16, 10, 0, 6.283, 0, 1.62), m); cap.position.set(0, .02, -.01); cap.rotation.x = -.5;
-  const lng = new THREE.Mesh(new THREE.BoxGeometry(.3, .34, .1), m); lng.position.set(0, -.13, -.11); g.add(cap, lng); g.visible = false; g.userData.cap = cap; g.userData.lng = lng; g.userData.m = m; playerRig.head.add(g); return g; })();
+  const lng = new THREE.Mesh(new THREE.BoxGeometry(.3, .34, .1), m); lng.position.set(0, -.13, -.11); g.add(cap, lng); g.visible = false; g.userData.cap = cap; g.userData.lng = lng; g.userData.m = m; g.name = 'scHair'; playerRig.head.add(g); return g; })();
+const SCN_FACE = (() => { const m = new THREE.MeshStandardMaterial({ transparent: true, roughness: .72, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const f = new THREE.Mesh(new THREE.SphereGeometry(.1716, 30, 22, Math.PI / 2 - 1.08, 2.16, Math.PI / 2 - 1.12, 2.16), m); f.visible = false; f.name = 'scFace'; f.renderOrder = 2; playerRig.head.add(f); return f; })();
+const scStickEyes = () => playerRig.head.children.filter(o => o.isMesh && o.geometry && o.geometry.parameters && o.geometry.parameters.radius === .025);
 function scHairApply(L = SCN.look) {
-  if (!L || !L.hair || L.hairL === 2 || !L.stick) { SCN_HAIR.visible = false; return; }
-  SCN_HAIR.userData.m.color.set(L.hair); SCN_HAIR.userData.lng.visible = L.hairL === 1; SCN_HAIR.visible = true;
+  const sig = typeof sigmaActive === 'function' && sigmaActive(), on = !!(L && L.stick && !sig);
+  if (!on || !L.hair || L.hairL === 2) SCN_HAIR.visible = false;
+  else { SCN_HAIR.userData.m.color.set(L.hair); SCN_HAIR.userData.lng.visible = L.hairL === 1; SCN_HAIR.visible = true; }
+  const fOn = on && !!L.face && L.faceOn !== 0;
+  if (fOn && SCN_FACE.userData.src !== L.face) {
+    SCN_FACE.userData.src = L.face; const old = SCN_FACE.material.map;
+    new THREE.TextureLoader().load(L.face, t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; SCN_FACE.material.map = t; SCN_FACE.material.needsUpdate = true; if (old) old.dispose(); });
+  }
+  SCN_FACE.visible = fOn; for (const e of scStickEyes()) e.visible = !fOn;
 }
 function patiOwnMats() {   // Pati'nin malzemeleri başkalarıyla ortak: önce kendine ait kopyalar
   const P = HERO.rigs && HERO.rigs.pati; if (!P || !P.mats) return null; if (P.own) return P.own;
@@ -27359,23 +27469,45 @@ function scApply(kind) {
   const R = SCN.res; if (!R) return; const C = R.col, near = h => { let bi = 0, bd = 9; OUT_COLORS.forEach((c, i) => { const d = scDist(c, h); if (d < bd) { bd = d; bi = i; } }); return bi; };
   if (kind === 'stick') {
     const blue = (() => { const c = new THREE.Color(C.pants), s = {}; c.getHSL(s); return s.h > .52 && s.h < .7 && s.s > .18; })();
-    Object.assign(OUTFIT.shirt, { s: 1, c: near(C.shirt), h: C.shirt }); Object.assign(OUTFIT.jacket, { s: 0 });
+    Object.assign(OUTFIT.shirt, { s: 1, c: near(C.shirt), h: C.shirt });
+    if (R.jacket) Object.assign(OUTFIT.jacket, { s: R.jacket, c: near(C.jacket), h: C.jacket }); else Object.assign(OUTFIT.jacket, { s: 0 });
     Object.assign(OUTFIT.pants, { s: R.shorts ? 2 : blue ? 1 : 4, c: near(C.pants), h: C.pants }); Object.assign(OUTFIT.shoes, { s: 1, c: near(C.shoes), h: C.shoes });
     saveOutfit(); applyOutfit();
     try { applyHead(C.skin); applyBody(C.skin); } catch (e) {}
-    const b = R.build, tw = b < 0 ? .62 : b > 0 ? 1.7 : 1, lk = 1 + (tw - 1) * .6;
-    for (const [k, , , lr] of BODY_PARTS) { const v = k === 'head' ? R.head : k === 'torsoW' ? tw : k === 'torsoD' ? 1 + (tw - 1) * .8 : ['ua', 'fa', 'th', 'sn'].includes(k) ? lk : 1; if (lr) BODY[k + 'L'] = BODY[k + 'R'] = v; else BODY[k] = v; }
+    const b = R.build, sh = b === 9 && R.shape ? R.shape : null, tw = b < 0 ? .62 : b > 0 && b !== 9 ? 1.7 : 1, lk = 1 + (tw - 1) * .6;
+    const val = k => sh ? (k === 'shJ' ? (sh.ua + sh.torsoW) / 2 : k === 'elJ' ? (sh.ua + sh.fa) / 2 : k === 'hipJ' ? sh.th : k === 'knJ' ? (sh.th + sh.sn) / 2 : k === 'neck' ? THREE.MathUtils.clamp(1 + (sh.torsoW - 1) * .35, .8, 1.4) : sh[k] ?? 1)
+      : (k === 'torsoW' ? tw : k === 'torsoD' ? 1 + (tw - 1) * .8 : ['ua', 'fa', 'th', 'sn'].includes(k) ? lk : 1);
+    for (const [k, , , lr] of BODY_PARTS) { const v = k === 'head' ? R.head : val(k); if (lr) BODY[k + 'L'] = BODY[k + 'R'] = v; else BODY[k] = v; }
     BODY.link = true; applyBodyShape(); saveBody(); try { syncSettings(); } catch (e) {}
-    SCN.look = Object.assign({}, SCN.look || {}, { stick: true, hair: C.hair, hairL: R.hairL }); scHairApply();
-    pickChar('stick'); showMsg('🕴️ ' + adT('Çöp adamın sana benzedi!'), 2.2);
+    SCN.look = Object.assign({}, SCN.look || {}, { stick: true, hair: C.hair, hairL: R.hairL, face: R.face && R.faceOn ? R.face : null, faceOn: R.face && R.faceOn ? 1 : 0 });
+    pickChar('stick'); scHairApply(); showMsg('🕴️ ' + adT('Çöp adamın sana benzedi!'), 2.2);
   } else {
     patiColors(C); SCN.look = Object.assign({}, SCN.look || {}, { pati: { ...C } });
     pickChar('pati'); showMsg('🐾 ' + adT('Pati sana benzedi!'), 2.2);
   }
-  try { localStorage.setItem('sftTarama', JSON.stringify(SCN.look)); } catch (e) {}
-  scClose();
+  try { localStorage.setItem('sftTarama', JSON.stringify(SCN.look)); } catch (e) { try { const L2 = Object.assign({}, SCN.look, { face: null }); localStorage.setItem('sftTarama', JSON.stringify(L2)); } catch (e2) {} }
+  scLookUI(); scClose();
 }
-try { scHairApply(); if (SCN.look && SCN.look.pati) patiColors(SCN.look.pati); } catch (e) {}
+// Ayarlar → Karakter: taramadan gelen saç ve yüz istenince değiştirilir (yeniden taramadan)
+function scLookSet(k, v) { const L = SCN.look; if (!L || !L.stick) { showMsg('📷 ' + adT('Önce "Beni tara" ile tara'), 1.8); return; } L[k] = v; try { localStorage.setItem('sftTarama', JSON.stringify(L)); } catch (e) {} scHairApply(); scLookUI(); try { MP_LK.sig = ''; } catch (e) {} }
+function scLookUI() {
+  const L = SCN.look, row = $('scLookRow'); if (!row) return; row.style.display = L && L.stick ? '' : 'none'; if (!L) return;
+  for (const b of row.querySelectorAll('[data-slh]')) b.classList.toggle('on', +b.dataset.slh === (L.hairL ?? 0));
+  const fb = row.querySelector('[data-slf]'); if (fb) { fb.style.display = L.face ? '' : 'none'; fb.classList.toggle('on', L.faceOn !== 0); fb.textContent = (L.faceOn !== 0 ? '🙂 ' : '😶 ') + adT(L.faceOn !== 0 ? 'Yüzüm açık' : 'Yüzüm kapalı'); }
+}
+{
+  const r0 = $('scOpen') && $('scOpen').closest('.setRow');
+  if (r0) { r0.nextElementSibling.insertAdjacentHTML('afterend', `<div class="setRow" id="scLookRow" style="display:none"><span>💇 ${adT('Taranan saç / yüz')}</span><span class="scLk"><button class="btn" data-slh="0">${adT('Kısa')}</button><button class="btn" data-slh="1">${adT('Uzun')}</button><button class="btn" data-slh="2">${adT('Yok')}</button><button class="btn" data-slf="1"></button></span></div>`);
+    $('scLookRow').addEventListener('click', e => { const h = e.target.closest('[data-slh]'), f = e.target.closest('[data-slf]'); if (h) { play('ui'); scLookSet('hairL', +h.dataset.slh); } else if (f) { play('ui'); scLookSet('faceOn', SCN.look && SCN.look.faceOn !== 0 ? 0 : 1); } }); }
+  document.head.insertAdjacentHTML('beforeend', '<style>#scLookRow .scLk{display:flex;gap:4px;flex-wrap:wrap}#scLookRow .btn.on{background:#3a86ff;color:#fff}#scFaceImg{width:64px;height:64px;border-radius:50%;object-fit:cover;background:#0b1220;border:2px solid rgba(255,255,255,.25)}</style>');
+}
+Object.assign(L_EN, { 'Kollarını hafif yana aç: vücut şeklin daha doğru ölçülür.': 'Hold your arms slightly out: your body shape is measured more accurately.',
+  'Görüntü hiçbir yere gönderilmez. Sadece yüzünün küçük bir resmi bu cihazda saklanır (istersen kapat); arkadaşlarına gönderilmez.': 'The video is never sent anywhere. Only a small picture of your face is kept on this device (you can turn it off); it is never sent to friends.',
+  'Seni görüyorum! Kollarını hafif yana aç, yavaşça kendi etrafında dön': 'I can see you! Hold your arms slightly out and slowly turn around',
+  'Yüz': 'Face', 'Benim yüzüm': 'My face', 'Çizgi yüz': 'Cartoon face', 'Ceket': 'Jacket', 'Blazer': 'Blazer', 'Deri ceket': 'Leather jacket', 'Kapüşonlu': 'Hoodie', 'Şişme yelek': 'Puffer vest', 'Kot ceket': 'Denim jacket', 'Smokin': 'Tuxedo', 'Yağmurluk': 'Raincoat',
+  'Ölçülen': 'Measured', 'gövde': 'torso', 'kol': 'arm', 'bacak': 'leg', 'vücut silüeti okunamadı, oranlar omuz/kalçadan': 'body silhouette not read, proportions from shoulders/hips',
+  'Taranan saç / yüz': 'Scanned hair / face', 'Yüzüm açık': 'My face on', 'Yüzüm kapalı': 'My face off', 'Önce "Beni tara" ile tara': 'Scan first with "Scan me"' });
+try { scHairApply(); scLookUI(); if (SCN.look && SCN.look.pati) patiColors(SCN.look.pati); } catch (e) {}
 
 /* =====================================================================
    🏙️ ŞEHİR BOYUTU (Ayarlar → Şehir boyutu ya da durdurma menüsü): 1–20 kat (alan). Yeşil arazi hep aynı, şehir büyüyüp küçülür.
@@ -30510,7 +30642,7 @@ function updateRTree() {
 /* 🗺️ Harita oluşturucu: maker.js ayrı dosyadır (sayfa boyutu sınırı). Oyunun içindeki değişkenlere bu G tablosuyla erişir. */
 var inMaker = false;
 window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G, k, st ? { get: g, set: st, enumerable: true } : { get: g, enumerable: true });
-  d('$', () => $); d('ADM', () => ADM); d('AREAS', () => AREAS); d('BAKED_BUSH', () => BAKED_BUSH);
+  d('$', () => $); d('ADM', () => ADM); d('ADM_UNLOCK', () => ADM_UNLOCK); d('MP', () => MP); d('mpSend', () => mpSend); d('AREAS', () => AREAS); d('BAKED_BUSH', () => BAKED_BUSH);
   d('BAKED_TREE', () => BAKED_TREE); d('BENCHES', () => BENCHES); d('CLOSET', () => CLOSET); d('DAY', () => DAY);
   d('DEG', () => DEG); d('DT_LAST', () => DT_LAST, v => { DT_LAST = v; }); d('FLY', () => FLY); d('HOUSE_VARIANTS', () => HOUSE_VARIANTS);
   d('HPMAX', () => HPMAX, v => { HPMAX = v; }); d('LOAD_NAMES', () => LOAD_NAMES); d('M', () => M); d('NV_DEF', () => NV_DEF, v => { NV_DEF = v; });
@@ -30531,7 +30663,7 @@ window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G
   d('teleporting', () => teleporting, v => { teleporting = v; }); d('touchMode', () => touchMode, v => { touchMode = v; }); d('tryLock', () => tryLock); d('vel', () => vel);
   d('vy', () => vy, v => { vy = v; }); d('wrapAng', () => wrapAng); d('yaw', () => yaw, v => { yaw = v; });
   return G; })();
-{ const s = document.createElement('script'); s.src = 'maker.js'; s.onerror = () => console.warn('🗺️ maker.js yüklenemedi'); document.head.appendChild(s); }
+{ const s = document.createElement('script'), ms = document.getElementById('sftMakerSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'maker.js'; s.onerror = () => console.warn('🗺️ maker.js yüklenemedi'); document.head.appendChild(s); }
 
 renderer.setAnimationLoop(() => {
   try {   // bir alt sistem hata verse bile oyun donmasın: hata ekranda gösterilir, çizim sürer
