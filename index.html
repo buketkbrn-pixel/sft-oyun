@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.20</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.21</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -14206,7 +14206,7 @@ function brBuildWorld() {
     const gun = new THREE.Mesh(gunGeo, gunMat); gun.position.set(0, -.36, -.02); gun.rotation.x = Math.PI / 2; gun.visible = false; rig.armR.el.add(gun);
     const gl = new THREE.Mesh(brGliderGeo, new THREE.MeshStandardMaterial({ color: new THREE.Color(color).offsetHSL(.5, 0, 0), side: THREE.DoubleSide })); gl.position.y = 2.9; gl.visible = false; holder.add(gl);
     holder.traverse(o => { if (o.isMesh) o.castShadow = true; });
-    BR.bots.push({ i, name: 'Bot ' + BR_NAMES[i % BR_NAMES.length], rig, holder, body, pos: holder.position, vel: new THREE.Vector3(), vy: 0, facing: 0, gun, gl, goal: new THREE.Vector3(), last: new THREE.Vector3() });
+    BR.bots.push({ i, name: 'Bot ' + BR_NAMES[i % BR_NAMES.length], name0: 'Bot ' + BR_NAMES[i % BR_NAMES.length], col0: color, team: i + 1, rig, holder, body, pos: holder.position, vel: new THREE.Vector3(), vy: 0, facing: 0, gun, gl, goal: new THREE.Vector3(), last: new THREE.Vector3() });
   }
 }
 /* ---- Alan geçişleri ---- */
@@ -14256,16 +14256,25 @@ function brStart() {
   const a = Math.random() * Math.PI * 2, dx = Math.cos(a), dz = Math.sin(a), off = (Math.random() - .5) * 140;
   BR.bus = { p0: new THREE.Vector3(BRT.cx - dx * 420 - dz * off, 118, BRT.cz - dz * 420 + dx * off), p1: new THREE.Vector3(BRT.cx + dx * 420 - dz * off, 118, BRT.cz + dz * 420 + dx * off), t: 0, dur: 840 / 26, dir: new THREE.Vector3(dx, 0, dz) };
   BR_SHIP.visible = true; BR_SHIP.rotation.y = Math.atan2(dx, dz);
+  // 👥 Takımlar: odada kaç kişiysek o kadar kişilik takımlar (tek başına = tek kişilik). Botlar da aynı boyda takım kurar,
+  // birlikte atlar, birlikte gezer, birbirine ateş etmez, takım arkadaşına saldırana birlikte saldırır.
+  const TN = BR.teamN = Math.max(1, Math.min(8, typeof MP !== 'undefined' && MP.on ? Object.keys(MP.players).length : 1));
+  BR.teamLand = {}; BR.teamDrop = {};
+  for (const b of BR.bots) {
+    b.team = 1 + Math.floor(b.i / TN); b.name = TN > 1 ? b.name0 + ' · T' + b.team : b.name0;
+    b.rig.bodyMat.color.setHex(TN > 1 ? new THREE.Color().setHSL((b.team * .137) % 1, .7, .45).getHex() : b.col0);
+    if (BR.teamDrop[b.team] == null) BR.teamDrop[b.team] = .06 + Math.random() * .82;
+  }
   // Botlar
   for (const b of BR.bots) {
-    Object.assign(b, { alive: true, st: 'bus', hp: 100, sh: 0, w: null, mag: 0, wood: 20 + Math.random() * 60 | 0, kills: 0, tgt: null, react: 0, fireT: 0, rlT: 0, thinkT: Math.random() * .4, dropAt: .06 + Math.random() * .82, glide: false, buildT: 0, strafe: Math.random() < .5 ? 1 : -1, strafeT: 0, stuckT: 0, deadT: 0, meleeT: 0, loots: 0, onG: false, wander: null, hurtBy: null, hurtT: 0 });
+    Object.assign(b, { alive: true, st: 'bus', hp: 100, sh: 0, w: null, mag: 0, wood: 20 + Math.random() * 60 | 0, kills: 0, tgt: null, react: 0, fireT: 0, rlT: 0, thinkT: Math.random() * .4, dropAt: Math.min(.95, BR.teamDrop[b.team] + (b.i % BR.teamN) * .008), glide: false, buildT: 0, strafe: Math.random() < .5 ? 1 : -1, strafeT: 0, stuckT: 0, deadT: 0, meleeT: 0, loots: 0, onG: false, wander: null, hurtBy: null, hurtT: 0 });
     b.holder.visible = false; b.body.rotation.x = 0; b.body.position.y = 0; b.gun.visible = false; b.gl.visible = false; b.vel.set(0, 0, 0); b.vy = 0;
   }
   // Fırtına
   BR.storm = { i: 0, ph: 'wait', t: BR_STORM[0][1], cur: { x: 0, z: 0, r: 340 }, from: null, to: brNextCircle({ x: 0, z: 0, r: 340 }, BR_STORM[0][0]) };
   dist = 16; charHolder.visible = false; BR_GLIDER.visible = false; yaw = Math.atan2(dx, dz) + Math.PI; pitch = .32;
   BR.feed = []; brFeedDraw(); BR.res.style.display = 'none';
-  brBig('🎈 Savaş zeplini kalkıyor! Atlamak için ' + (touchMode ? 'Zıpla' : 'Boşluk'), 4.5);
+  brBig('🎈 Savaş zeplini kalkıyor! Atlamak için ' + (touchMode ? 'Zıpla' : 'Boşluk') + (TN > 1 ? `\n👥 ${TN} kişilik takımlar — odadakiler senin takımın` : ''), 4.5);
   brHud(true);
 }
 function brNextCircle(c, r) {
@@ -14488,7 +14497,7 @@ function brHurtPlayer(d, src, storm) {
   brHud(true);
   if (hp <= 0) {
     dead = true; deadT = 0; mouseHeld = false; slide = null; punch = null; BR.use = null;
-    BR.place = BR.bots.filter(b => b.alive).length + 1;
+    BR.place = new Set(BR.bots.filter(b => b.alive).map(b => b.team)).size + 1;
     brFeed(storm ? '🌀 Fırtına seni eledi' : `☠ ${src ? src.name : '?'} seni eledi`);
     BR.state = 'over'; BR.overT = 2.2;
     for (const s of BR.slots) if (s && s.k !== 'p') brDropLoot(s, player.position.x + (Math.random() - .5) * 2, player.position.z + (Math.random() - .5) * 2);
@@ -14496,6 +14505,7 @@ function brHurtPlayer(d, src, storm) {
 }
 function brHurtBot(b, d, src) {
   if (!b.alive) return;
+  if (src && typeof src === 'object' && src !== b && src.team === b.team) return;   // takım arkadaşı vurmaz
   if (src === 'player') { if (ADM.ohk) d = 99999; else if (ADM.superPunch) d *= 3; }
   if (src !== 'storm' && b.sh > 0) { const a = Math.min(b.sh, d); b.sh -= a; d -= a; }
   b.hp -= d;
@@ -14564,11 +14574,18 @@ function brBotThink(b) {
     if (d > 12 && !alert && Math.abs(wrapAng(Math.atan2(x - b.pos.x, z - b.pos.z) - b.facing)) > 65 * DEG) return;
     if (d < 4 || brLOS(ea, brTmp2.set(x, y + 1.4, z))) { best = o; bd = d; } };
   if (!dead && BR.state === 'play') tryT('player', P.x, P.y, P.z);
-  const bbR = bd; if (b.calm <= 0 || alert) { bd = Math.min(bbR, alert ? bbR : bbR * .5); for (const o of BR.bots) if (o !== b && o.alive && o.st !== 'bus' && o.st !== 'fall' && (alert || o.tgt !== null || Math.random() < .5)) tryT(o, o.pos.x, o.pos.y, o.pos.z); if (best === null) bd = bbR; }
+  const bbR = bd; if (b.calm <= 0 || alert) { bd = Math.min(bbR, alert ? bbR : bbR * .5); for (const o of BR.bots) if (o !== b && o.team !== b.team && o.alive && o.st !== 'bus' && o.st !== 'fall' && (alert || o.tgt !== null || Math.random() < .5)) tryT(o, o.pos.x, o.pos.y, o.pos.z); if (best === null) bd = bbR; }
   if (best !== b.tgt) { b.tgt = best; b.react = .7 + Math.random() * .9; }
   // hedef nokta
   const safe = S.ph === 'wait' ? S.to : S.cur, dS = Math.hypot(b.pos.x - BRT.cx - safe.x, b.pos.z - BRT.cz - safe.z);
   if (dS > safe.r * .92 && (!b.tgt || dS > safe.r + 10)) { const a = Math.atan2(b.pos.z - BRT.cz - safe.z, b.pos.x - BRT.cx - safe.x) + (Math.random() - .5) * .8, r = safe.r * (.3 + Math.random() * .4); b.goal.set(BRT.cx + safe.x + Math.cos(a) * r, 0, BRT.cz + safe.z + Math.sin(a) * r); b.mode = 'storm'; return; }
+  if (BR.teamN > 1 && !b.tgt) {   // 👥 takım: arkadaşının hedefine koş, yoksa liderin yanında kal
+    let mate = null, md = 45; for (const o of BR.bots) if (o !== b && o.alive && o.team === b.team && o.tgt && o.st !== 'fall') { const d = Math.hypot(o.pos.x - b.pos.x, o.pos.z - b.pos.z); if (d < md) { md = d; mate = o; } }
+    const mt = mate && (mate.tgt === 'player' ? (dead ? null : P) : mate.tgt.alive ? mate.tgt.pos : null);
+    if (mt && b.w) { b.goal.set(mt.x, 0, mt.z); b.mode = 'help'; b.wander = null; return; }
+    const lead = BR.bots.find(o => o.alive && o.team === b.team);
+    if (lead && lead !== b && b.w && b.loots >= 1) { const d = Math.hypot(lead.pos.x - b.pos.x, lead.pos.z - b.pos.z); if (d > 9) { const a = b.i * 2.1; b.goal.set(lead.pos.x + Math.cos(a) * 3, 0, lead.pos.z + Math.sin(a) * 3); b.mode = 'follow'; b.wander = null; return; } }
+  }
   if (!b.w || b.loots < 2) {
     let c = null, cd = b.w ? 40 : 70;
     for (const ch of BR.chests) if (!ch.open) { const d = Math.hypot(ch.x - b.pos.x, ch.z - b.pos.z); if (d < cd) { cd = d; c = ch; } }
@@ -14680,8 +14697,11 @@ function updateRoyale(dt) {
     }
     for (const b of BR.bots) if (b.st === 'bus' && k >= b.dropAt) {
       b.st = 'fall'; b.holder.visible = true; b.pos.copy(BR_SHIP.position).y -= 7; b.vy = -2; b.glide = false;
-      const p = Math.random() < .72 ? BR_POIS[Math.random() * BR_POIS.length | 0] : null, a = Math.random() * 6.28, r = p ? Math.random() * p.r : 40 + Math.random() * 220;
-      b.land = new THREE.Vector3(BRT.cx + (p ? p.x : 0) + Math.cos(a) * r, 0, BRT.cz + (p ? p.z : 0) + Math.sin(a) * r);
+      let L0 = BR.teamN > 1 ? BR.teamLand[b.team] : null;
+      if (!L0) { const p = Math.random() < .72 ? BR_POIS[Math.random() * BR_POIS.length | 0] : null, a = Math.random() * 6.28, r = p ? Math.random() * p.r : 40 + Math.random() * 220;
+        L0 = new THREE.Vector3(BRT.cx + (p ? p.x : 0) + Math.cos(a) * r, 0, BRT.cz + (p ? p.z : 0) + Math.sin(a) * r); if (BR.teamN > 1) BR.teamLand[b.team] = L0.clone(); else BR.teamLand[b.team] = null; }
+      const ta = Math.random() * 6.28, tr = BR.teamN > 1 ? 2.5 + Math.random() * 4 : 0;
+      b.land = new THREE.Vector3(L0.x + Math.cos(ta) * tr, 0, L0.z + Math.sin(ta) * tr);
     }
   }
   // oyuncu: süzülme ve iniş
@@ -14830,8 +14850,8 @@ function brPopsUpdate(dt) {
 }
 function brHud(force) {
   if (!inRoyale) return;
-  const S = BR.storm, alive = BR.bots.filter(b => b.alive).length + (dead ? 0 : 1);
-  $('brAlive').textContent = '👥 ' + alive; $('brKills').textContent = '☠ ' + BR.kills;
+  const S = BR.storm, alive = BR.bots.filter(b => b.alive).length + (dead ? 0 : 1), teamsLeft = BR.teamN > 1 ? new Set(BR.bots.filter(b => b.alive).map(b => b.team)).size + (dead ? 0 : 1) : 0;
+  $('brAlive').textContent = '👥 ' + alive + (teamsLeft ? ' · 🚩 ' + teamsLeft : ''); $('brKills').textContent = '☠ ' + BR.kills;
   if (S) { const m = Math.max(0, Math.ceil(S.t)); $('brStorm').textContent = BR.state === 'bus' ? '🎈 Zeplinde' : S.ph === 'wait' ? `🌀 ${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} sonra daralır` : S.i === BR_STORM.length - 1 && S.t <= 0 ? '🌀 Son çember' : '🌀 Daralıyor!'; }
   const bars = BR.hud.querySelectorAll('#brBars .bar');
   bars[0].firstChild.style.width = BR.sh + '%'; bars[0].lastChild.textContent = '🛡️ ' + Math.ceil(BR.sh);
@@ -14864,7 +14884,7 @@ function brMap() {
 function brResult() {
   const win = BR.place === 1;
   $('brResT').textContent = win ? '🏆 #1 ZAFER!' : `#${BR.place}`;
-  $('brResS').textContent = (win ? 'Son kalan sensin! ' : 'Elendin. ') + `Eleme: ${BR.kills}` + (touchMode ? '' : '  ·  Boşluk: tekrar · V: köye dön');
+  $('brResS').textContent = (win ? (BR.teamN > 1 ? 'Son kalan takım sizsiniz! ' : 'Son kalan sensin! ') : 'Elendin. ') + `Eleme: ${BR.kills}` + (touchMode ? '' : '  ·  Boşluk: tekrar · V: köye dön');
   BR.res.style.display = 'flex';
 }
 /* ---------- Araziyi kur: düzlükler, tümsekler, yükseklik ızgarası, kabartmalı zemin, patikalar; her şeyi yüzeye oturt ---------- */
