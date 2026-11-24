@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.21</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.22</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -7973,6 +7973,7 @@ const ADV_TRIPS = [
   { key: 'parkour', icon: '🏃', name: 'Parkur', desc: 'Gökyüzünde zıplamalı yarış, süren kaydedilir', say: 'Suya düşersen son kontrol noktasından başlarsın. Hadi bakalım!' },
   { key: 'luna', icon: '🎡', name: 'Lunapark', desc: 'Dönme dolap, atlıkarınca, güç ölçer, pamuk şeker', say: 'Lunaparka gidiyoruz! Dönme dolabın tepesinden köy çok güzel görünür.' },
   { key: 'royale', icon: '🪂', name: 'Battle royale', desc: 'Büyük ada, 30 kişi (29 bot), son kalan kazanır', say: 'Zepline bin, istediğin yerde atla, en son ayakta kalan sen ol!' },
+  { key: 'race', icon: '🏎️', name: 'Yarış', desc: 'Drift, nitro, güç kutuları ve özel güçlerle araba yarışı', say: 'Kemerini bağla! Drift yap, nitroyu doldur, kutulardan güç topla!' },
 ];
 const ADV_HELLO = ['Selam yolcu! Bugün nereye gidiyoruz?', 'Ooo, macera arıyorsun galiba. Seç bakalım!', 'Haritamda altı yer var. Hangisi?', 'Çantamı hazırladım bile. Nereye?'];
 function advOpen() {
@@ -7992,6 +7993,7 @@ $('advMenu').addEventListener('click', e => { const b = e.target.closest('[data-
 for (const ev of ['pointerdown', 'mousedown']) $('advMenu').addEventListener(ev, e => e.stopPropagation());
 function advTravel(key) {
   if (key === 'royale') { brEnter(); return; }
+  if (key === 'race') { if (window.__race) __race.open(); return; }
   if (key === 'parkour') { const s = PK.start; teleportTo('parkour', s.x, s.z, 0, '🏃 Parkur! Sona ulaş', () => pkReset(true)); return; }
   if (key === 'luna') { const w = LUNA.W(0, LUNA.R + 4.5); teleportTo('hub', w.x, w.z, LUNA.rot + Math.PI, '🎡 Lunapark! Dolaba ve atlıkarıncaya V ile bin'); return; }
   setArenaTheme(key);
@@ -8756,7 +8758,7 @@ function keyAction(code) {
   if (code === 'KeyJ' && inCity && !giant && !RIDE.on) { const n = cyTalkNear(2.8); if (n) { cyTalkOpen(n); return; } }
   if (vehKey(code)) return;   // araba / ejderha sürerken
   if (inRoyale && brKey(code)) return;
-  if (ADV.open && /^(Digit|Numpad)[1-7]$/.test(code)) { const n = +code.slice(-1); advChoose(n === ADV_TRIPS.length + 1 ? 'no' : ADV_TRIPS[n - 1].key); return; }
+  if (ADV.open && /^(Digit|Numpad)[1-8]$/.test(code)) { const n = +code.slice(-1); advChoose(n === ADV_TRIPS.length + 1 ? 'no' : ADV_TRIPS[n - 1].key); return; }
   if (HERO.on && heroKey(code)) return;
   if (code === 'Space' && WEB.att) webRelease(true);
   if (code === 'KeyG' && INV.eq === 'superfight' && !giant) { superDown('hado'); return; }
@@ -8821,6 +8823,7 @@ addEventListener('keydown', e => {
   if (photoMode) { if (e.code === 'Enter' || e.code === 'KeyP') takePhoto(); return; }
   if (INV.open) { if (e.code === 'KeyI' || e.code === 'Escape') closeInv(); return; }
   if (paused) { if (e.code === 'KeyF') toggleFullscreen(); return; }
+  if (RACE_LOCK) { if (window.__race) __race.key(e.code); return; }   // 🏎️ yarışta tuşlar arabaya
   keyAction(e.code);
 });
 addEventListener('keyup', e => { if (TET.open) tetrisKey(e, false); keyRelease(e.code); });
@@ -8864,6 +8867,7 @@ let dragging = false;
 canvas.addEventListener('mousedown', e => {
   dragging = true;
   if (paused || CINE || DRESS.open || TET.open || !(isLocked() || lockFailed)) return;
+  if (RACE_LOCK) { if (e.button === 0 && window.__race) __race.key('Mouse0'); return; }
   if (e.button === 2) { if (HR.on) { hrRelease(true); return; } if (inRoyale) { BR.zoom = true; return; } if (!giant && INV.eq === 'superfight') { superDown('kick'); return; } if (!giant && INV.eq === 'robo' && ROBO.open) laserHeld = true; else grabReq = true; return; }
   if (e.button === 1 && !giant && INV.eq === 'superfight') { e.preventDefault(); superDown('hado'); return; }   // sağ tık: robot kollarla lazer / (devken) al-bırak
   if (e.button !== 0) return;
@@ -9523,7 +9527,8 @@ function groundAt(x, z, y) {   // her eşyanın üstünde durulabilir (ağaçlar
   if (OBG.on) obgEach(x, z, 1, one);
   if (inRoyale && BR.builds.length) g = brRampAt(x, z, y, g);
   if (ADM.brb && ADM.brb.length) g = admRampAt(x, z, y, g);
-  if (inMaker && window.__mk) g = __mk.ramp(x, z, y, g);   // 🗺️ harita rampaları / merdivenleri
+  if (inMaker && window.__mk) g = __mk.ramp(x, z, y, g);
+  if (inRace && window.__race) g = __race.ground(x, z, y, g);   // 🏎️ pist yüksekliği   // 🗺️ harita rampaları / merdivenleri
   return g;
 }
 // Engellerden itme (çalı ve portalın içinden geçilir, kayanın tepesindeysek itme yok) + bölge sınırı
@@ -9942,7 +9947,7 @@ function teleportTo(key, x, z, face, msg, onArrive) {
     if (PARTS[curKey] && curKey !== key) scene.remove(PARTS[curKey]);   // çıktığımız iç mekân sahneden ayrılır
     if (PARTS[key]) scene.add(PARTS[key]);                                // girdiğimiz iç mekân yüklenir
     curKey = key;
-    curArea = AREAS[key]; inArena = key === 'arena'; inHouse = key === 'house'; inMall = key === 'mall'; inCloset = key === 'closet'; inHome = key === 'home'; inParkour = key === 'parkour'; inRoyale = key === 'royale'; inIce = key === 'ice'; inDesert = key === 'desert'; inQuest = key === 'quest'; inBlank = key === 'blank'; inCity = key === 'city'; inMaker = key === 'maker'; applyArea(curArea);
+    curArea = AREAS[key]; inArena = key === 'arena'; inHouse = key === 'house'; inMall = key === 'mall'; inCloset = key === 'closet'; inHome = key === 'home'; inParkour = key === 'parkour'; inRoyale = key === 'royale'; inIce = key === 'ice'; inDesert = key === 'desert'; inQuest = key === 'quest'; inBlank = key === 'blank'; inCity = key === 'city'; inMaker = key === 'maker'; inRace = key === 'race'; applyArea(curArea);
     if (!inMall && !inCloset && !inHome && !inParkour) objEl.style.display = 'none';
     for (const l of HOME.lights) l.visible = inHome;
     if (!inHome) { if (HOME.video && !HOME.video.paused) HOME.video.pause(); if (TET.open) closeTetris(); HOME.act = null; HOME.sleep = null; $('sleepFx').classList.remove('on', 'day'); HOME.broom.visible = HOME.pan.visible = false; }
@@ -9955,7 +9960,7 @@ function teleportTo(key, x, z, face, msg, onArrive) {
     camBase.copy(player.position).y += 1.5;
     if (inArena) { kills = 0; $('kills').textContent = `Yenilen ${killNoun()}: 0`; }
     if (inParkour || inRoyale) { giant = false; ROBO.open = false; }
-    brArea(); iceArea(); desertArea(); questArea(); blankArea(); cityArea(); try { deskArea(); } catch (e) { sftErr(e); } try { if (window.__mk) __mk.area(); } catch (e) { sftErr(e); }
+    brArea(); iceArea(); desertArea(); questArea(); blankArea(); cityArea(); try { deskArea(); } catch (e) { sftErr(e); } try { if (window.__mk) __mk.area(); } catch (e) { sftErr(e); } try { if (window.__race) __race.area(); } catch (e) { sftErr(e); }
     $('hpWrap').style.display = $('kills').style.display = inArena ? 'block' : 'none';
     if (onArrive) onArrive();
     if (!inHouse && !inMall && !inCloset && !inHome && !inParkour) for (let i = 0; i < 20; i++) spawnDust(x, 0, z, 1.5, 2, 0, 0, 0xc9a2ff);
@@ -10659,7 +10664,7 @@ function update(dt) {
   const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
   if (CINE) updateCine(dt);
   updateParkour(dt);
-  const ctl = canAct && !CINE && !DRESS.open && !grabAct && !stomp && !TET.open && !HOME.act && !HOME.sleep;
+  const ctl = canAct && !CINE && !DRESS.open && !grabAct && !stomp && !TET.open && !HOME.act && !HOME.sleep && !RACE_LOCK;
   let ix = ctl ? (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) : 0;
   let iz = ctl ? (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) : 0;
   if (ADM.autoRun && ctl && !ix && !iz) iz = 1;   // admin: otomatik yürü
@@ -10667,7 +10672,7 @@ function update(dt) {
   const joyMag = joy.id !== null && !CINE ? Math.hypot(joy.x, joy.y) : 0;
   if (ctl && joyMag > .15) { ix = THREE.MathUtils.clamp(ix + joy.x, -1, 1); iz = THREE.MathUtils.clamp(iz - joy.y, -1, 1); }
   const analog = CINE ? .6 : keyMoving || joyMag >= .8 ? 1 : Math.max(.35, joyMag / .8);   // joystick az itilince yavaş yürür
-  if (sitting && !RIDE.on && (keyMoving || joyMag > .3 || keys.Space || !canAct)) sitting = null;   // hareket edince kalkar
+  if (sitting && !RIDE.on && !RACE_LOCK && (keyMoving || joyMag > .3 || keys.Space || !canAct)) sitting = null;   // hareket edince kalkar
   if (gSit && (keyMoving || joyMag > .3 || keys.Space || !canAct)) standUp();         // yerden kalkar (ezilenler düzelir)
   if (lieReq) { lieReq = false; if (canAct && !CINE && !DRESS.open) toggleLie(); }
   stillT = keyMoving || joyMag > .15 || !onGround ? 0 : stillT + dt;
@@ -10860,7 +10865,7 @@ function update(dt) {
   // Dikey hareket: zıplama, uçuş, yerçekimi, kaya tepesine konma
   if (HERO.on) heroVertical(dt, pos, canAct);
   const admSp = !!keys.Space && !ADM.spPrev, admG = onGround; ADM.spPrev = !!keys.Space;
-  if (canAct && keys.Space && onGround && !slide && !shielding && !flying && !giant && !RIDE.on && !HERO.on) { vy = (ROBO.active ? (ROBO.titan ? 21 : ROBO.volt ? 18 : ROBO.ultra ? 15 : 10.5) : 7.2) * (ADM.jump3 ? 3.5 : ADM.jump ? 2.1 : 1) * CHEAT.jmp * (giantS >= 1 ? Math.sqrt(giantS) : Math.pow(giantS, .3)); onGround = false; play('jump'); }
+  if (canAct && keys.Space && onGround && !slide && !shielding && !flying && !giant && !RIDE.on && !HERO.on && !RACE_LOCK) { vy = (ROBO.active ? (ROBO.titan ? 21 : ROBO.volt ? 18 : ROBO.ultra ? 15 : 10.5) : 7.2) * (ADM.jump3 ? 3.5 : ADM.jump ? 2.1 : 1) * CHEAT.jmp * (giantS >= 1 ? Math.sqrt(giantS) : Math.pow(giantS, .3)); onGround = false; play('jump'); }
   else if (ADM.airJump && admSp && !admG && canAct && !flying && !giant && !HERO.on && !CLIMB.on && !RIDE.on) { vy = 7.2 * (ADM.jump ? 1.6 : 1); play('jump'); for (let i = 0; i < 10; i++) spawnDust(pos.x, pos.y, pos.z, .35, .5, 0, 0, 0xffffff); }   // admin: havada tekrar zıpla
   let g = giant && !inCity ? terrH(pos.x, pos.z) : groundAt(pos.x, pos.z, pos.y);
   if (!giant && !inArena && !inHouse && !inMall && !inCloset) {   // iris çukur: çerçevenin üstü biraz yüksek, açıkken ortası boşluk
@@ -11017,13 +11022,13 @@ function update(dt) {
 
   // Dünya: köyde NPC'ler, çocuklar ve çalılar; arenada canavarlar; evde içerideki NPC
   if (!inHouse && !inMall && !inHome && !COMP.active) chatAnsEl.style.display = 'none';
-  if (COMP.active && !inHouse && !inArena && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !inMaker) updateCompanion(dt);
+  if (COMP.active && !inHouse && !inArena && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !inMaker && !inRace) updateCompanion(dt);
   if (inMall) updateMall(dt);
   if (inCloset) updateCloset(dt);
   if (inHome) updateHome(dt);
   if (TET.open) tetrisTick(dt);
   if (tvReq) { tvReq = false; if (inHome) tvMain(); }
-  if (!inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'desk' && curKey !== 'school' && curKey !== 'uni' && !inMaker) updatePit(dt);
+  if (!inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'desk' && curKey !== 'school' && curKey !== 'uni' && !inMaker && !inRace) updatePit(dt);
   if (DRESS.poseT > 0) DRESS.poseT -= dt;
   if (inHouse) { updateHouseNpc(wdt); placeTeaProps(wdt); }
   else if (!inArena) {
@@ -11068,7 +11073,7 @@ function update(dt) {
   }
   // Stadyum 7/24: maç her zaman sürer; yakındaysak oyuncular, seyirciler ve teknik direktörler görünür ve canlanır
   {
-    const inHub = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !inMaker, sd = Math.hypot(pos.x - STADIUM.x, pos.z - STADIUM.z), near = inHub && sd < 115;   // stadyum: oyuncular, taraftarlar, hocalar yaklaşınca yüklenir
+    const inHub = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !inMaker && !inRace, sd = Math.hypot(pos.x - STADIUM.x, pos.z - STADIUM.z), near = inHub && sd < 115;   // stadyum: oyuncular, taraftarlar, hocalar yaklaşınca yüklenir
     for (const k of STADIUM_FIELD.kids) k.holder.visible = near;
     STADIUM_FIELD.ball.holder.visible = near;
     if (near) updateField(STADIUM_FIELD, ADM.npcStop ? 0 : wdt);   // maç yakındayken oynanır
@@ -11085,13 +11090,13 @@ function update(dt) {
   updateCyclists(ADM.npcStop ? 0 : wdt);
   updateSquash(wdt);
   {
-    const hubNow = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni' && !inMaker;
+    const hubNow = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni' && !inMaker && !inRace;
     for (const fl of flocks) for (const b of fl.birds) b.obj.visible = hubNow && !DAY.night && Math.abs(b.pos.x - pos.x) + Math.abs(b.pos.z - pos.z) < 115;
     if (!hubNow) for (const k of birdKids) k.holder.visible = false;
     updateHoods(ADM.npcStop ? 0 : wdt, hubNow); updateAmbience(wdt, hubNow); updateAdventurer(wdt, hubNow); updateLife(wdt, hubNow); updateLuna(wdt, hubNow); updateRoyale(dt); updateFlight(dt); updateIce(wdt); updateDesert(wdt); questUpdate(wdt); cityUpdate(wdt); updateDetail(wdt, hubNow);
     for (const g of SIGNS) g.visible = hubNow && Math.abs(g.position.x - pos.x) + Math.abs(g.position.z - pos.z) < 140;
   }
-  grass.visible = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni' && !inMaker;
+  grass.visible = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni' && !inMaker && !inRace;
   grassMat.uniforms.uWalk.value = onGround && !flying ? 1 : 0;
   {   // çimen alanı kameranın baktığı yöne kaydırılır: arkada boşa çimen çizilmez, önde daha uzağa kadar çimen olur
     const U = grassMat.uniforms, fx = -Math.sin(yaw), fz = -Math.cos(yaw), sh = GRASS_S * .19;
@@ -11151,6 +11156,7 @@ function update(dt) {
     else if (!giant && !HERO.on && onGround && !flying && !inHouse && !inCloset && !sitting && !slide) { vAction = toggleGroundSit; if (stillT > 1.3) promptText = 'V — Yere otur  ·  L — Uzan'; }
   }
   const promptEl = $('prompt');
+  if (RACE_LOCK) { promptText = ''; vAction = null; }   // 🏎️ yarışta ipucu yazısı yok
   promptEl.style.display = promptText ? 'block' : 'none';
   if (promptText) promptEl.textContent = touchMode ? promptText.replace('V — ', '👆 ').replace('H — ', inHome ? '✋ ' : '☕ ').replace('J — ', '⚽ ').replace('L — ', '🛌 ') : promptText;
   if (touchMode) updateTouchUI(flying);
@@ -11950,7 +11956,7 @@ function updateDay(dt) {
   DK.moonV.copy(DK.sunV).negate();
   const N = DAY.N = THREE.MathUtils.clamp((.05 - DK.sunV.y) / .26, 0, 1);
   if (!DAY.night && N > .6) DAY.night = true; else if (DAY.night && N < .45) DAY.night = false;
-  const hub = curArea === AREAS.hub || (typeof inCity !== 'undefined' && inCity) || curArea === AREAS.miami || inMaker;
+  const hub = curArea === AREAS.hub || (typeof inCity !== 'undefined' && inCity) || curArea === AREAS.miami || inMaker || inRace;
   // Ana ışık (gölge yapan): gündüz güneş, gece ay; çok alçaktayken gölgeler sonsuz uzamasın diye en az 12°
   const L = DK.sunV.y > 0 ? DK.sunV : DK.moonV, hz = Math.hypot(L.x, L.z), ly = Math.max(L.y, .21), kk = Math.sqrt(1 - ly * ly) / hz;
   if (hub) DK.LD.set(L.x * kk, ly, L.z * kk); else DK.LD.copy(DEFAULT_SUN);
@@ -12139,7 +12145,7 @@ function pickWeather() {
 }
 const WXC = new THREE.Color(), WX_GRAY = new THREE.Color(0x8a94a0), WX_FOG = new THREE.Color(0xa7b1bc);
 function updateWeather(dt) {
-  const hub = curArea === AREAS.hub || inMaker;
+  const hub = curArea === AREAS.hub || inMaker || inRace;
   if (WX.mode === 'auto' && dt > 0) { WX.next -= dt; if (WX.next <= 0) pickWeather(); }
   const wet = WX.cur === 'rain' || WX.cur === 'storm', snow = WX.cur === 'snow', fog = WX.cur === 'fog';
   WX.k = THREE.MathUtils.lerp(WX.k, hub && WX.cur !== 'clear' ? 1 : 0, 1 - Math.exp(-.8 * Math.max(dt, .016)));
@@ -14199,9 +14205,12 @@ function brBuildWorld() {
     BR.mapImg = c;
   }
   // Botlar
-  const NB = IS_COARSE ? 19 : 29, gunGeo = new THREE.BoxGeometry(.07, .09, .52), gunMat = IT_M.dark;
-  for (let i = 0; i < NB; i++) {
-    const color = new THREE.Color().setHSL(rr(), .55 + rr() * .35, .42 + rr() * .16).getHex(), rig = createStickman(color);
+  const NB = IS_COARSE ? 19 : 29;
+  for (let i = 0; i < NB; i++) brMakeBot(i, new THREE.Color().setHSL(rr(), .55 + rr() * .35, .42 + rr() * .16).getHex());
+}
+const BR_GUN_GEO = new THREE.BoxGeometry(.07, .09, .52);
+function brMakeBot(i, color) {
+  { const gunGeo = BR_GUN_GEO, gunMat = IT_M.dark, rig = createStickman(color);
     const holder = new THREE.Group(), body = new THREE.Group(); holder.add(body); body.add(rig.stick); holder.visible = false; BR.g.add(holder);
     const gun = new THREE.Mesh(gunGeo, gunMat); gun.position.set(0, -.36, -.02); gun.rotation.x = Math.PI / 2; gun.visible = false; rig.armR.el.add(gun);
     const gl = new THREE.Mesh(brGliderGeo, new THREE.MeshStandardMaterial({ color: new THREE.Color(color).offsetHSL(.5, 0, 0), side: THREE.DoubleSide })); gl.position.y = 2.9; gl.visible = false; holder.add(gl);
@@ -14274,8 +14283,98 @@ function brStart() {
   BR.storm = { i: 0, ph: 'wait', t: BR_STORM[0][1], cur: { x: 0, z: 0, r: 340 }, from: null, to: brNextCircle({ x: 0, z: 0, r: 340 }, BR_STORM[0][0]) };
   dist = 16; charHolder.visible = false; BR_GLIDER.visible = false; yaw = Math.atan2(dx, dz) + Math.PI; pitch = .32;
   BR.feed = []; brFeedDraw(); BR.res.style.display = 'none';
+  try { brShareStart(); } catch (e) { sftErr(e); }
   brBig('🎈 Savaş zeplini kalkıyor! Atlamak için ' + (touchMode ? 'Zıpla' : 'Boşluk') + (TN > 1 ? `\n👥 ${TN} kişilik takımlar — odadakiler senin takımın` : ''), 4.5);
   brHud(true);
+}
+/* ---------- 🤝 ORTAK BATTLE ROYALE: çok oyunculu odada botları oda sahibi yönetir, herkes aynı botları, aynı zeplini ve aynı fırtınayı görür.
+   Odadakiler tek takım; senin vurduğun bot herkesin ekranında ölür, botlar herkese saldırır. ---------- */
+const brMP = () => typeof MP !== 'undefined' && MP.on && MP.started && Object.keys(MP.players).length > 1;
+const brR1 = v => Math.round(v * 10) / 10;
+function brShareStart() {   // brStart sonunda
+  BR.shared = brMP(); BR.client = false; BR.snapT = 0; BR.lastSnap = 0; BR.fireQ = []; BR.featQ = []; BR.rp = {};
+  if (!BR.shared) return;
+  if (MP.host) brShareSend();
+  else { BR.client = true; BR.lastSnap = elapsed; mpSend({ t: 'brq' }); }   // oda sahibinden bilgi iste (3 sn gelmezse kendi botlarını yönetir)
+}
+function brShareSend(to) {
+  const B = BR.bus, S = BR.storm; const m = { t: 'brs', n: BR.bots.length, tn: BR.teamN, bt: brR1(BR.t), bus: B ? { p0: [B.p0.x, B.p0.y, B.p0.z], p1: [B.p1.x, B.p1.y, B.p1.z], d: [B.dir.x, B.dir.z], dur: B.dur, t: B.t } : null,
+    st: { i: S.i, ph: S.ph, t: S.t, cur: S.cur, to: S.to, from: S.from }, ch: BR.chests.filter(c => c.open).map(c => c.i) };
+  if (to) m.to = to; mpSend(m);
+}
+function brNet(m) {   // gelen mesajlar (mpOnMsg)
+  if (!inRoyale || BR.state === 'off') { if (m.t === 'brq' && MP.host && inRoyale) brShareSend(m.f); return; }
+  if (m.t === 'brs' && !MP.host) {
+    while (BR.bots.length < m.n) brMakeBot(BR.bots.length, 0x888888);
+    for (const b of BR.bots) { if (b.i >= m.n) { b.alive = false; b.st = 'dead'; b.holder.visible = false; b.gone = true; continue; } b.gone = false; b.team = 1 + Math.floor(b.i / (m.tn || 1)); b.name = (m.tn > 1 ? b.name0 + ' · T' + b.team : b.name0); b.rig.bodyMat.color.setHex(m.tn > 1 ? new THREE.Color().setHSL((b.team * .137) % 1, .7, .45).getHex() : b.col0); b.net = null; }
+    BR.teamN = m.tn || BR.teamN; BR.shared = true; BR.client = true; BR.lastSnap = elapsed;
+    if (m.bus && BR.bus) { const B = BR.bus; B.p0.set(...m.bus.p0); B.p1.set(...m.bus.p1); B.dir.set(m.bus.d[0], 0, m.bus.d[1]); B.dur = m.bus.dur; B.t = m.bus.t; BR_SHIP.visible = B.t < B.dur; BR_SHIP.rotation.y = Math.atan2(B.dir.x, B.dir.z); }
+    Object.assign(BR.storm, m.st); BR.t = m.bt;
+    for (const i of m.ch || []) { const c = BR.chests.find(x => x.i === i); if (c && !c.open) brChestNet(c); }
+    return;
+  }
+  if (m.t === 'brb' && BR.client) {   // bot anlık görüntüsü
+    BR.lastSnap = elapsed;
+    for (const e of m.b) { const b = BR.bots[e[0]]; if (!b || b.gone) continue; const wasAlive = b.alive;
+      b.net = { x: e[1], y: e[2], z: e[3], f: e[4] / 100, s: e[5], w: e[6], gl: e[7] };
+      b.alive = e[5] !== 3; b.st = ['bus', 'fall', 'play', 'dead'][e[5]];
+      if (wasAlive && !b.alive) { b.deadT = 0; b.gun.visible = false; b.gl.visible = false; if (Math.random() < .8) brDropLoot(Math.random() < .6 ? brWeapon([40, 32, 18, 8, 2]) : brCons(), e[1] + .6, e[3]); }
+      if (b.st !== 'bus' && !b.holder.visible && b.alive) { b.holder.visible = true; b.pos.set(e[1], e[2], e[3]); }
+    }
+    for (const f of m.f || []) { const b = BR.bots[f[0]]; if (!b) continue; const from = new THREE.Vector3(b.pos.x + Math.sin(b.facing) * .45, b.pos.y + 1.45, b.pos.z + Math.cos(b.facing) * .45); spawnTracer(from, new THREE.Vector3(f[1], f[2], f[3])); play(f[4] || 'shot', { at: from, range: 130, gain: .45 }); }
+    for (const t of m.k || []) brFeed(t);
+    if (m.st) { const S = BR.storm; const ph = S.ph; Object.assign(S, m.st); if (ph === 'wait' && S.ph === 'shrink') brBig('🌀 Fırtına daralıyor!', 2.2); }
+    BR.hostAlive = m.n; brHud();
+    return;
+  }
+  if (m.t === 'brh' && MP.host && !BR.client) {   // biri bir botu vurdu
+    const b = BR.bots[m.i]; if (!b || !b.alive) return; const px = brProxy(m.f); brHurtBot(b, m.d, px); return;
+  }
+  if (m.t === 'brd') { if (BR.state === 'play' && !dead) brHurtPlayer(m.d, { name: m.n, pos: { x: m.x, y: 0, z: m.z } }); return; }   // bot bana vurdu
+  if (m.t === 'brk') { BR.kills++; progKill(null); play('ding', { gain: .5 }); brBig('☠ ' + m.n + ' elendi', 1.3); brHud(true); return; }
+  if (m.t === 'brc') { const c = BR.chests.find(x => x.i === m.i); if (c && !c.open) brChestNet(c); return; }
+  if (m.t === 'brq' && MP.host && !BR.client) brShareSend(m.f);
+}
+function brChestNet(c) { c.open = true; brLid(c); BR.chestLid.instanceMatrix.needsUpdate = true; const gp = BR.chestGlow.geometry.attributes.position; gp.setY(c.i, -999); gp.needsUpdate = true; }
+function brProxy(id) {   // oda sahibinde: başka oyuncu, botların hedefi olabilsin diye
+  const p = MP.players[id]; let o = BR.rp[id]; if (!o) o = BR.rp[id] = { remote: id, name: p ? p.name : '?', pos: new THREE.Vector3(), vel: new THREE.Vector3(), alive: false, team: 0, kills: 0 };
+  return o;
+}
+function brProxyTick(dt) {   // oda sahibi: odadakilerin konumu → bot hedefleri
+  for (const id in MP.players) { if (id === MP.me.id) continue; const p = MP.players[id], st = p.st, o = brProxy(id);
+    const ok = !!st && st.a === 'royale' && !st.dd && elapsed - (p.stT || 0) < 4 && BR.state !== 'bus' && st.p[1] - terrH(st.p[0], st.p[2]) < 25;
+    if (ok) { const nx = st.p[0], ny = st.p[1], nz = st.p[2]; if (dt > 0) o.vel.set((nx - o.pos.x) / Math.max(dt, .016), 0, (nz - o.pos.z) / Math.max(dt, .016)).clampLength(0, 12); o.pos.set(nx, ny, nz); }
+    o.alive = ok; o.name = p.name || o.name; }
+  for (const id in BR.rp) if (!MP.players[id]) BR.rp[id].alive = false;
+}
+function brShareTick(dt) {   // updateRoyale içinde
+  if (!BR.shared) return;
+  if (!MP.on) { BR.shared = BR.client = false; return; }
+  if (MP.host) {
+    brProxyTick(dt);
+    BR.snapT -= dt; if (BR.snapT <= 0) { BR.snapT = .12;
+      const b = [], S = BR.storm;
+      for (const o of BR.bots) { if (o.st === 'bus' && !o.alive) continue; if (o.st === 'dead' && o.netDead) continue; const s = o.st === 'bus' ? 0 : o.st === 'fall' ? 1 : o.st === 'dead' ? 3 : 2; if (s === 3) o.netDead = (o.netDead || 0) + 1; if (o.netDead > 3) continue;
+        b.push([o.i, brR1(o.pos.x), brR1(o.pos.y), brR1(o.pos.z), Math.round(o.facing * 100), s, o.w ? (BR_W[o.w.id].vis === 'rifle' ? 2 : 1) : 0, o.glide ? 1 : 0]); }
+      const m = { t: 'brb', b, n: BR.bots.filter(o => o.alive).length };
+      if (BR.fireQ.length) { m.f = BR.fireQ.splice(0); } if (BR.featQ.length) m.k = BR.featQ.splice(0);
+      BR.stT = (BR.stT || 0) - .12; if (BR.stT <= 0 || BR.stDirty) { BR.stT = 1.5; BR.stDirty = false; m.st = { i: S.i, ph: S.ph, t: S.t, cur: S.cur, to: S.to, from: S.from }; }
+      mpSend(m);
+    }
+  } else if (BR.client && elapsed - BR.lastSnap > 3.5) { BR.client = false; BR.shared = false; brFeed('⚠️ Oda sahibi yok — botları sen yönetiyorsun'); }   // oda sahibi ayrıldı: kendi botların
+}
+function brUpdateBotNet(b, dt, P) {   // misafir: oda sahibinin botunu yumuşakça izle
+  const n = b.net; if (!n) { b.holder.visible = false; return; }
+  if (b.st === 'dead') { b.deadT = (b.deadT || 0) + dt; b.body.rotation.x = THREE.MathUtils.lerp(b.body.rotation.x, -1.45, 1 - Math.exp(-6 * dt)); b.body.position.y = .1; if (b.deadT > 4) b.holder.visible = false; return; }
+  if (b.st === 'bus') { b.holder.visible = false; return; }
+  b.body.rotation.x = 0; b.body.position.y = 0;
+  const k = 1 - Math.exp(-10 * dt), ox = b.pos.x, oz = b.pos.z, oy = b.pos.y;
+  if (Math.hypot(n.x - b.pos.x, n.z - b.pos.z) > 25) b.pos.set(n.x, n.y, n.z); else { b.pos.x += (n.x - b.pos.x) * k; b.pos.y += (n.y - b.pos.y) * k; b.pos.z += (n.z - b.pos.z) * k; }
+  b.facing += wrapAng(n.f - b.facing) * k; b.holder.rotation.y = b.facing;
+  const sp = dt > 0 ? Math.hypot(b.pos.x - ox, b.pos.z - oz) / dt : 0, vyy = dt > 0 ? (b.pos.y - oy) / dt : 0;
+  b.gun.visible = n.w > 0; b.gun.scale.z = n.w === 2 ? 1.35 : 1; b.gl.visible = !!n.gl;
+  const far = Math.hypot(b.pos.x - P.x, b.pos.z - P.z); b.holder.visible = far < 240;
+  if (far < 140) animateStick(b.rig, dt, b.st === 'fall' ? { speed: 0, airborne: true, vy: vyy, fly: n.gl ? null : 'super' } : { speed: sp, running: sp > 4.8, airborne: Math.abs(vyy) > 3, vy: vyy, gun: n.w > 0, rifle: n.w === 2, aimPitch: 0 });
 }
 function brNextCircle(c, r) {
   for (let k = 0; k < 40; k++) {
@@ -14313,6 +14412,7 @@ function brDropLoot(it, x, z) {
 function brRemoveLoot(l) { const i = BR.loot.indexOf(l); if (i >= 0) BR.loot.splice(i, 1); BR.g.remove(l.spr, l.beam); l.spr.material.dispose(); }
 function brOpenChest(c, who) {
   if (c.open) return;
+  if (BR.shared) try { mpSend({ t: 'brc', i: c.i }); } catch (e) {}
   c.open = true; brLid(c); BR.chestLid.instanceMatrix.needsUpdate = true;
   const gp = BR.chestGlow.geometry.attributes.position; gp.setY(c.i, -999); gp.needsUpdate = true;
   play('ding', { at: new THREE.Vector3(c.x, c.y, c.z), range: 40, gain: .7 });
@@ -14505,6 +14605,7 @@ function brHurtPlayer(d, src, storm) {
 }
 function brHurtBot(b, d, src) {
   if (!b.alive) return;
+  if (BR.client && src === 'player') { if (ADM.ohk) d = 99999; else if (ADM.superPunch) d *= 3; mpSend({ t: 'brh', i: b.i, d: Math.round(d) }); b.hurtT = 3; return; }   // 🤝 oda sahibine bildir
   if (src && typeof src === 'object' && src !== b && src.team === b.team) return;   // takım arkadaşı vurmaz
   if (src === 'player') { if (ADM.ohk) d = 99999; else if (ADM.superPunch) d *= 3; }
   if (src !== 'storm' && b.sh > 0) { const a = Math.min(b.sh, d); b.sh -= a; d -= a; }
@@ -14516,8 +14617,9 @@ function brBotDie(b, src) {
   b.alive = false; b.st = 'dead'; b.deadT = 0; b.gun.visible = false; b.gl.visible = false;
   const who = src === 'player' ? 'Sen' : src === 'storm' ? '🌀 Fırtına' : src ? src.name : '?';
   if (src === 'player') { BR.kills++; progKill(null); play('ding', { gain: .5 }); brBig('☠ ' + b.name + ' elendi', 1.3); }
+  else if (src && src.remote) { src.kills++; mpSend({ t: 'brk', to: src.remote, n: b.name }); }
   else if (src && src !== 'storm') src.kills++;
-  brFeed(`${who} → ${b.name}`);
+  brFeed(`${who} → ${b.name}`); if (BR.shared && MP.host) BR.featQ.push(`${src === 'player' ? MP.me.name || 'Oda sahibi' : who} → ${b.name}`);
   if (b.w) brDropLoot(b.w, b.pos.x + .6, b.pos.z);
   if (Math.random() < .6) brDropLoot(brCons(), b.pos.x - .6, b.pos.z + .3);
   brHud(true);
@@ -14574,6 +14676,7 @@ function brBotThink(b) {
     if (d > 12 && !alert && Math.abs(wrapAng(Math.atan2(x - b.pos.x, z - b.pos.z) - b.facing)) > 65 * DEG) return;
     if (d < 4 || brLOS(ea, brTmp2.set(x, y + 1.4, z))) { best = o; bd = d; } };
   if (!dead && BR.state === 'play') tryT('player', P.x, P.y, P.z);
+  if (BR.shared && BR.rp) for (const id in BR.rp) { const o = BR.rp[id]; if (o.alive) tryT(o, o.pos.x, o.pos.y, o.pos.z); }   // 🤝 odadaki arkadaşlar
   const bbR = bd; if (b.calm <= 0 || alert) { bd = Math.min(bbR, alert ? bbR : bbR * .5); for (const o of BR.bots) if (o !== b && o.team !== b.team && o.alive && o.st !== 'bus' && o.st !== 'fall' && (alert || o.tgt !== null || Math.random() < .5)) tryT(o, o.pos.x, o.pos.y, o.pos.z); if (best === null) bd = bbR; }
   if (best !== b.tgt) { b.tgt = best; b.react = .7 + Math.random() * .9; }
   // hedef nokta
@@ -14607,16 +14710,17 @@ function brBotFire(b, T, tx, ty, tz) {
   const to = brTmp2.set(tx, ty + 1.2, tz);
   play(W.snd, { at: from, range: 130, gain: .5 });
   const blk = brBuildBlock(from, to);
-  const tm = T === 'player' ? Math.hypot(vel.x, vel.z) > 2 : T.vel.length() > 2;
+  const tm = T === 'player' ? Math.hypot(vel.x, vel.z) > 2 : T.vel && T.vel.length() > 2;
   let acc = W.acc * (1 - Math.min(.85, d / W.rng * .95)) * (tm ? .72 : 1) * .62;
   if (T === 'player' && !onGround) acc *= .7;
   let hits = 0; for (let p = 0; p < (W.pel || 1); p++) if (Math.random() < acc) hits++;
   const end = hits ? to.clone() : to.clone().add(new THREE.Vector3((Math.random() - .5) * 2.4, (Math.random() - .3) * 1.6, (Math.random() - .5) * 2.4));
+  if (BR.shared && MP.host) BR.fireQ.push([b.i, brR1(end.x), brR1(end.y), brR1(end.z), W.snd]);
   if (blk) { brDamageBuild(blk, W.dmg * rm * Math.max(1, hits)); spawnTracer(from, end.lerp(from, .3)); return; }
   spawnTracer(from, end);
   if (!hits) return;
   const dmg = W.dmg * rm * hits;
-  if (T === 'player') brHurtPlayer(dmg, b); else brHurtBot(T, dmg * .6, b);
+  if (T === 'player') brHurtPlayer(dmg, b); else if (T.remote) mpSend({ t: 'brd', to: T.remote, d: Math.round(dmg), n: b.name, x: brR1(b.pos.x), z: brR1(b.pos.z) }); else brHurtBot(T, dmg * .6, b);
 }
 function brUpdateBot(b, dt, P) {
   const far = Math.hypot(b.pos.x - P.x, b.pos.z - P.z);
@@ -14652,8 +14756,8 @@ function brUpdateBot(b, dt, P) {
     const app = d > want + 4 ? 1 : d < want - 4 ? -.7 : 0;
     mx = dx / d * app + dz / d * b.strafe * .8; mz = dz / d * app - dx / d * b.strafe * .8; sp = W ? 4.6 : 6.2;
     if (b.w && b.react <= 0) { if (b.rlT > 0) { b.rlT -= dt; if (b.rlT <= 0) b.mag = BR_W[b.w.id].mag; } else if ((b.fireT -= dt) <= 0) brBotFire(b, T, tp.x, tp.y, tp.z); }
-    if (!b.w && d < 2.2 && b.meleeT <= 0 && Math.abs(tp.y - b.pos.y) < 1.5) { b.meleeT = .95; if (T === 'player') brHurtPlayer(15, b); else brHurtBot(T, 9, b); play('punch', { at: b.pos, range: 30, gain: .5 }); }
-    if (b.hurtT > 0 && b.buildT <= 0 && b.wood >= 10 && d > 7 && Math.random() < .45) { b.buildT = 4 + Math.random() * 3; const f = b.facing; brBuild('wall', b); b.facing = f; }
+    if (!b.w && d < 2.2 && b.meleeT <= 0 && Math.abs(tp.y - b.pos.y) < 1.5) { b.meleeT = .95; if (T === 'player') brHurtPlayer(15, b); else if (T.remote) mpSend({ t: 'brd', to: T.remote, d: 15, n: b.name, x: brR1(b.pos.x), z: brR1(b.pos.z) }); else brHurtBot(T, 9, b); play('punch', { at: b.pos, range: 30, gain: .5 }); }
+    if (!BR.shared && b.hurtT > 0 && b.buildT <= 0 && b.wood >= 10 && d > 7 && Math.random() < .45) { b.buildT = 4 + Math.random() * 3; const f = b.facing; brBuild('wall', b); b.facing = f; }
   } else {
     const dx = b.goal.x - b.pos.x, dz = b.goal.z - b.pos.z, d = Math.hypot(dx, dz);
     if (d > 1.2) { mx = dx / d; mz = dz / d; b.facing = Math.atan2(dx, dz); }
@@ -14695,7 +14799,7 @@ function updateRoyale(dt) {
       P.copy(BR_SHIP.position).addScaledVector(bus.dir, -26).y += 9; vel.set(0, 0, 0); vy = 0;
       if (keys.Space || k > .97) brDrop();
     }
-    for (const b of BR.bots) if (b.st === 'bus' && k >= b.dropAt) {
+    if (!BR.client) for (const b of BR.bots) if (b.st === 'bus' && k >= b.dropAt) {
       b.st = 'fall'; b.holder.visible = true; b.pos.copy(BR_SHIP.position).y -= 7; b.vy = -2; b.glide = false;
       let L0 = BR.teamN > 1 ? BR.teamLand[b.team] : null;
       if (!L0) { const p = Math.random() < .72 ? BR_POIS[Math.random() * BR_POIS.length | 0] : null, a = Math.random() * 6.28, r = p ? Math.random() * p.r : 40 + Math.random() * 220;
@@ -14715,11 +14819,11 @@ function updateRoyale(dt) {
   const S = BR.storm;
   if (BR.state !== 'bus') {
     S.t -= dt;
-    if (S.ph === 'wait' && S.t <= 0) { S.ph = 'shrink'; S.t = BR_STORM[S.i][2]; S.from = { ...S.cur }; brBig('🌀 Fırtına daralıyor!', 2.2); }
+    if (S.ph === 'wait' && S.t <= 0 && !BR.client) { BR.stDirty = true; S.ph = 'shrink'; S.t = BR_STORM[S.i][2]; S.from = { ...S.cur }; brBig('🌀 Fırtına daralıyor!', 2.2); }
     else if (S.ph === 'shrink') {
       const k = 1 - Math.max(0, S.t) / BR_STORM[S.i][2];
       S.cur = { x: S.from.x + (S.to.x - S.from.x) * k, z: S.from.z + (S.to.z - S.from.z) * k, r: S.from.r + (S.to.r - S.from.r) * k };
-      if (S.t <= 0 && S.i < BR_STORM.length - 1) { S.i++; S.ph = 'wait'; S.t = BR_STORM[S.i][1]; S.to = brNextCircle(S.cur, BR_STORM[S.i][0]); }
+      if (S.t <= 0 && S.i < BR_STORM.length - 1 && !BR.client) { S.i++; S.ph = 'wait'; S.t = BR_STORM[S.i][1]; S.to = brNextCircle(S.cur, BR_STORM[S.i][0]); BR.stDirty = true; }
     }
   }
   BR_STORM_MESH.position.set(BRT.cx + S.cur.x, -40, BRT.cz + S.cur.z); BR_STORM_MESH.scale.set(Math.max(.5, S.cur.r), 330, Math.max(.5, S.cur.r));
@@ -14727,7 +14831,8 @@ function updateRoyale(dt) {
   BR.fx.style.opacity = out && BR.state !== 'bus' ? '1' : '0';
   if (out && BR.state === 'play' && !dead && !ADM.noStorm) { BR.stormT = (BR.stormT || 0) + dt; if (BR.stormT > 1) { BR.stormT = 0; brHurtPlayer(BR_STORM[Math.min(S.i, BR_STORM.length - 1)][3], null, true); } }
   // botlar
-  for (const b of BR.bots) if (b.alive || b.st === 'dead') brUpdateBot(b, dt, P);
+  try { brShareTick(dt); } catch (e) { sftErr(e); }
+  for (const b of BR.bots) { if (b.gone) continue; if (BR.client) brUpdateBotNet(b, dt, P); else if (b.alive || b.st === 'dead') brUpdateBot(b, dt, P); }
   // ganimet: süzülme, uzakta gizle
   for (const l of BR.loot) { const near = Math.abs(l.x - P.x) + Math.abs(l.z - P.z) < 90; l.spr.visible = l.beam.visible = near; if (near) { l.t += dt; l.spr.position.y = l.y + Math.sin(l.t * 2.2) * .12; } }
   // yapılar: büyüme animasyonu, vurulunca parlama
@@ -14759,7 +14864,7 @@ function updateRoyale(dt) {
     }
   }
   // zafer
-  if (BR.state === 'play' && !dead && !BR.bots.some(b => b.alive)) {
+  if (BR.state === 'play' && !dead && !BR.bots.some(b => b.alive && !b.gone) && (!BR.client || BR.hostAlive === 0)) {
     BR.state = 'over'; BR.place = 1; BR.overT = 1.2;
     for (let i = 0; i < 6; i++) setTimeout(() => play('fwboom', { gain: .6 }), i * 260);
   }
@@ -25982,7 +26087,7 @@ function crigUI() {
    · Admin panelinde yapılan her şey odadaki herkese de uygulanır · odada GLB (kendi modelim) yasak
    ===================================================================== */
 const MP_MAX = 5, MP_PFX = 'sftbrk-oda-', MP_COLORS = [0xe53935, 0x1e88e5, 0x43a047, 0xfdd835, 0x8e24aa], MP_VER = 1;
-const MP_REGIONS = { hub: '🏡 Köy', city: '🏙️ Şehir', ankara: '🗺️ Ankara', miami: '🌴 Miami', paint: '🎨 Resim odası', gallery: '🖼️ Sergi', uni: '🎓 Üniversite', arena: '👹 Canavar dünyası', parkour: '🏃 Parkur', royale: '🔫 Battle royale', ice: '🧊 Buzullar', desert: '🏜️ Çöl', quest: '🧭 Görev dünyası', blank: '⬜ Boş arazi' };
+const MP_REGIONS = { hub: '🏡 Köy', city: '🏙️ Şehir', ankara: '🗺️ Ankara', miami: '🌴 Miami', paint: '🎨 Resim odası', gallery: '🖼️ Sergi', uni: '🎓 Üniversite', arena: '👹 Canavar dünyası', parkour: '🏃 Parkur', royale: '🔫 Battle royale', race: '🏎️ Yarış', ice: '🧊 Buzullar', desert: '🏜️ Çöl', quest: '🧭 Görev dünyası', blank: '⬜ Boş arazi' };
 const MP = { on: false, host: false, code: '', peer: null, conns: {}, hc: null, me: { id: '', name: '', slot: 0 }, players: {}, started: false, region: 'hub', regHint: null,
   allowTp: false, allowKey: null, hint: null, vote: null, myVote: null, pend: null, sendT: 0, npcT: 0, spec: null, ctlBy: null, ctlTgt: null, ctlKeys: {}, locked: false, plock: false,
   heldBy: null, heldP: null, holding: null, follow: null, muteMe: false, mutes: {}, perm: {}, houses: [], myHouse: '', houseLock: false, set: { collide: true, pvp: false, ownerKick: true, protect: {}, grab: true },
@@ -26116,6 +26221,8 @@ function mpOnMsg(m) {
     case 'fo': case 'fa': case 'fc': case 'fe': case 'fz': try { mpxFileMsg(m); } catch (e) { console.warn('mpd', e); } break;
     case 'pnt': case 'pns': case 'gal': try { paintNet(m); } catch (e) { console.warn('paint', e); } break;
     case 'note': mpNote(m.text, 3); break;
+    case 'rcar': case 'rgo': case 'rq': case 'rst': case 'rbt': case 'rfx': try { if (window.__race) __race.net(m); } catch (e) { console.warn('race', e); } break;   // 🏎️ yarış
+    case 'brs': case 'brb': case 'brh': case 'brd': case 'brk': case 'brc': case 'brq': try { brNet(m); } catch (e) { console.warn('br', e); } break;   // 🤝 ortak battle royale
     case 'mkp': case 'mkq': try { if (window.__mkNet) window.__mkNet(m); } catch (e) { console.warn('mk', e); } break;   // 🏪 harita mağazası (odadakiler)
     case 'em': mpEmoteShow(f, m.id); if (m.to === MP.me.id && m.ask) mpEmoteAsk(f, m.id); break;
     case 'emr': mpEmoteResult(f, m); break;
@@ -26177,7 +26284,7 @@ function mpAvLabel(p) {
 }
 function mpAvTick(p, dt) {
   const st = p.st; if (!st) return; const av = p.av || mpAvatar(p), H = av.holder;
-  const here = st.a === curKey && (!inHouse || st.h === MP.myHouse) && !st.iv && elapsed - (p.stT || 0) < 6; H.visible = here; if (!here) return;
+  const here = st.a === curKey && (!inHouse || st.h === MP.myHouse) && !st.iv && elapsed - (p.stT || 0) < 6 && !(curKey === 'race' && window.__race && __race.hideAv(p)); H.visible = here; if (!here) return;
   const held = carried && carried.type === 'mp' && carried.ref === p, k = Math.min(1, dt * 12);
   if (!held) { H.position.x += (st.p[0] - H.position.x) * k; H.position.y += (st.p[1] - H.position.y) * k; H.position.z += (st.p[2] - H.position.z) * k; H.rotation.y += wrapAng(st.ry - H.rotation.y) * k; }
   H.rotation.x += (st.rx - H.rotation.x) * k; H.rotation.z += (st.rz - H.rotation.z) * k; const sc = H.scale.x + (st.s - H.scale.x) * k; H.scale.setScalar(sc); p.facing = H.rotation.y;
@@ -30091,13 +30198,14 @@ document.head.insertAdjacentHTML('beforeend', `<style>
    dokununca dalga (ripple), basınca küçülür; ayarlar, oylama ve bildirimler de aynı dilde.
    ===================================================================== */
 const A12 = { on: true };
-const TP_LIST = [['hub', '🏡', 'Köy'], ['city', '🏙️', 'Şehir'], ['miami', '🌴', 'Miami'], ['ankara', '🗺️', 'Ankara'], ['paint', '🎨', 'Resim odası'], ['gallery', '🖼️', 'Sergi'], ['uni', '🎓', 'Üniversite'], ['blank', '⬜', 'Boş arazi']];   // maceracı yerleri (canavar, parkur, battle royale, buzul, çöl, görev) sadece admin ve maceracıda
+const TP_LIST = [['hub', '🏡', 'Köy'], ['city', '🏙️', 'Şehir'], ['miami', '🌴', 'Miami'], ['ankara', '🗺️', 'Ankara'], ['paint', '🎨', 'Resim odası'], ['gallery', '🖼️', 'Sergi'], ['uni', '🎓', 'Üniversite'], ['race', '🏎️', 'Yarış pisti'], ['blank', '⬜', 'Boş arazi']];   // maceracı yerleri (canavar, parkur, battle royale, buzul, çöl, görev) sadece admin ve maceracıda
 function tpGo(k) {
   setTimeout(() => {
     if (k === curKey && k !== 'ankara' && k !== 'miami') { showMsg('📍 ' + adT('Zaten buradasın'), 1.4); return; }
     if (k === 'ankara') return ankGo('kizilay'); if (k === 'miami') return ankGo('southbeach'); if (k === 'paint') return paintGo(); if (k === 'gallery') return galGo(); if (k === 'uni') return uniGo();
     if (k === 'city') return cityGo(); if (k === 'quest') return questGo(adT('🧭 Görev dünyası'));
     if (k === 'hub') return teleportTo('hub', 0, 7.5, 0, adT('🏡 Köy'));
+    if (k === 'race' && window.__race) return __race.open();
     const A = AREAS[k]; if (!A) return; const msg = adT(MP_REGIONS[k] || k);
     if (k === 'parkour') return teleportTo(k, A.cx, A.cz + 7, 0, msg, () => pkReset(true));
     if (k === 'royale') return teleportTo(k, A.cx, A.cz + 7, 0, msg, brStart);
@@ -30660,9 +30768,9 @@ function updateRTree() {
 }
 
 /* 🗺️ Harita oluşturucu: maker.js ayrı dosyadır (sayfa boyutu sınırı). Oyunun içindeki değişkenlere bu G tablosuyla erişir. */
-var inMaker = false;
+var inMaker = false, inRace = false, RACE_LOCK = false;   // 🏎️ yarış: arabadayken oyuncunun kendi hareketleri kapalı
 window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G, k, st ? { get: g, set: st, enumerable: true } : { get: g, enumerable: true });
-  d('$', () => $); d('ADM', () => ADM); d('ADM_UNLOCK', () => ADM_UNLOCK); d('MP', () => MP); d('mpSend', () => mpSend); d('AREAS', () => AREAS); d('BAKED_BUSH', () => BAKED_BUSH);
+  d('$', () => $); d('ADM', () => ADM); d('ADM_UNLOCK', () => ADM_UNLOCK); d('RACE_LOCK', () => RACE_LOCK, v => { RACE_LOCK = !!v; }); d('keys', () => keys); d('joy', () => joy); d('charHolder', () => charHolder); d('playerRig', () => playerRig); d('spawnTracer', () => spawnTracer); d('GLTFLoader', () => GLTFLoader); d('ADM_LIST', () => ADM_LIST); d('ADM_F', () => ADM_F); d('MP', () => MP); d('mpSend', () => mpSend); d('AREAS', () => AREAS); d('BAKED_BUSH', () => BAKED_BUSH);
   d('BAKED_TREE', () => BAKED_TREE); d('BENCHES', () => BENCHES); d('CLOSET', () => CLOSET); d('DAY', () => DAY);
   d('DEG', () => DEG); d('DT_LAST', () => DT_LAST, v => { DT_LAST = v; }); d('FLY', () => FLY); d('HOUSE_VARIANTS', () => HOUSE_VARIANTS);
   d('HPMAX', () => HPMAX, v => { HPMAX = v; }); d('LOAD_NAMES', () => LOAD_NAMES); d('M', () => M); d('NV_DEF', () => NV_DEF, v => { NV_DEF = v; });
@@ -30684,6 +30792,7 @@ window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G
   d('vy', () => vy, v => { vy = v; }); d('wrapAng', () => wrapAng); d('yaw', () => yaw, v => { yaw = v; });
   return G; })();
 { const s = document.createElement('script'), ms = document.getElementById('sftMakerSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'maker.js'; s.onerror = () => console.warn('🗺️ maker.js yüklenemedi'); document.head.appendChild(s); }
+{ const s = document.createElement('script'), ms = document.getElementById('sftRaceSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'race.js'; s.onerror = () => console.warn('🗺️ race.js yüklenemedi'); document.head.appendChild(s); }   // 🏎️ yarış
 
 renderer.setAnimationLoop(() => {
   try {   // bir alt sistem hata verse bile oyun donmasın: hata ekranda gösterilir, çizim sürer
@@ -30702,7 +30811,8 @@ renderer.setAnimationLoop(() => {
   try { deskTick(paused ? 0 : dt); deskLate(dt); } catch (e) { sftErr(e); }
   try { fbLate(); gv3Late(); vr3BodyLate(); htTick(paused || photoMode ? 0 : dt); roomTick(paused || photoMode ? 0 : dt); ankTick(paused || photoMode ? 0 : dt); try { paintLate(paused || photoMode ? 0 : dt); galLate(); uniTick(paused || photoMode ? 0 : dt); if (lifeOn() === 'city' && !paused && !photoMode) lifeCityTick(dt); } catch (e) { sftErr(e); } if (window.__mp) window.__mp.tick(dt); try { rcTick(dt); } catch (e) { console.warn('rc', e); } npcLblTick(paused ? 0 : dt); if (!ankIn()) ankDebrisTick(paused || photoMode ? 0 : dt); cyUltraTick(); gvDualLate(); if (inCity && CITY.built) { cyVariety(); cyVarietySync(); } } catch (e) { sftErr(e); }   // 🤲 dev avucu (kemikler yerleştikten sonra)
   try { buddyUpdate(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🤝 arkadaş: senin pozunu kopyalar
-  try { if (window.__mk) __mk.tick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🗺️ harita oluşturucu
+  try { if (window.__mk) __mk.tick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }
+  try { if (window.__race) __race.tick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🏎️ yarış   // 🗺️ harita oluşturucu
   updateDay(paused || photoMode || ADM.freeze ? 0 : dt * (ADM.daySpeed ? 40 : 1));
   updateWeather(paused || photoMode || ADM.freeze ? 0 : dt);
   admAfterWeather();
