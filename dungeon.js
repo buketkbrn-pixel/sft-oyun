@@ -116,7 +116,7 @@ function chain(rm, g, x, z, len, top = WALLH) {
   rm.chains.push({ c, ph: Math.random() * 6, p: new T.Vector3(A().cx + x, top - len * .13, A().cz + z) });
 }
 function skelDecor(g, x, z, ry, pose) {   // süs iskelet (oturan / yatan)
-  try { const r = G.makeThemeRig('skeleton'); r.stick.userData.rig = true; r.stick.position.set(x, 0, z); r.stick.rotation.y = ry;
+  try { const r = G.makeThemeRig('skeleton'); r.stick.visible = true; r.stick.userData.rig = true; r.stick.position.set(x, 0, z); r.stick.rotation.y = ry;
     if (pose === 'lie') { r.stick.rotation.order = 'YXZ'; r.stick.rotation.x = -Math.PI / 2; r.stick.position.y = .14; r.armL.sh.rotation.z = .5; r.armR.sh.rotation.z = -.9; r.look.rotation.y = .6; }
     else { r.legL.hip.rotation.x = r.legR.hip.rotation.x = -1.45; r.legL.kn.rotation.x = .2; r.stick.position.y = -.5; r.torso.rotation.x = -.2; r.look.rotation.x = .55; r.look.rotation.z = .25; r.armL.sh.rotation.z = .25; r.armR.sh.rotation.z = -.25; }
     r.armR.el.children.forEach(c => { if (c.isGroup) c.visible = false; }); g.add(r.stick); } catch (e) {}
@@ -254,7 +254,8 @@ function fuelItem(g, x, z) { const o = new T.Group(); o.position.set(x, .4, z); 
 
 /* ---------- 💀 iskeletler ---------- */
 function spawnSkel(rm, x, z, big) {
-  let rig; try { rig = G.makeThemeRig('skeleton'); } catch (e) { return null; }
+  let rig; try { rig = G.makeThemeRig('skeleton'); } catch (e) { console.warn('iskelet', e); return null; }
+  rig.stick.visible = true;   // oyunun tema iskeleti gizli başlar
   const h = new T.Group(); h.add(rig.stick); h.position.set(A().cx + x, -1.8 * (big ? 2.6 : 1), A().cz + z); h.rotation.y = Math.PI; DG.g.add(h); if (big) { h.scale.setScalar(2.6); const cr = new T.Mesh(new T.CylinderGeometry(.13, .15, .1, 8, 1, true), mats().gold); cr.position.y = .2; rig.head.add(cr); for (let i = 0; i < 5; i++) { const sp = new T.Mesh(new T.ConeGeometry(.025, .08, 4), mats().gold); sp.position.set(Math.sin(i * 1.256) * .13, .28, Math.cos(i * 1.256) * .13); rig.head.add(sp); } }
   const s = { h, rig, hp: big ? 480 : 60, max: big ? 480 : 60, big, st: 'rise', t: 0, atk: 1 + Math.random(), hurt: 0, rm, sw: 0 };
   rm.skels.push(s); snd('rattle', .8); for (let i = 0; i < 10; i++) G.spawnDust(h.position.x, 0, h.position.z, .8 * (big ? 2.6 : 1), 1.5, 0, 0, 0x6b6157); return s;
@@ -368,7 +369,7 @@ function onEnter(rm, was) {
   if (rm.i > 0 && rm.i > was) { G.showMsg(`🚪 ${adT('Oda')} ${rm.i + 1} · ${adT(TNAME[rm.type])}`, 1.6); snd('chain', .4); }
   if (rm.type === 'dark' && !DG.lighter) setTimeout(() => { if (DG.rooms[DG.cur] === rm && !DG.lighter) G.showMsg('🌑 ' + adT('Zifiri karanlık — F ile çakmağı yak'), 2.2); }, 1700);
   if ((rm.type === 'skel' || rm.type === 'boss') && !rm.started && !rm.solved) { rm.started = true;
-    if (rm.type === 'skel') { (rm.graves || []).forEach(([x, z], k) => setTimeout(() => { if (rm.built) spawnSkel(rm, x, z, false); }, 300 + k * 450)); setTimeout(() => G.showMsg('💀 ' + adT('İskeletler uyandı! Hepsini yen'), 1.8), 300); }
+    if (rm.type === 'skel') { (rm.graves || []).forEach(([x, z], k) => setTimeout(() => { if (rm.built && rm.started && !spawnSkel(rm, x, z, false)) rm.skelN--; }, 300 + k * 450)); setTimeout(() => G.showMsg('💀 ' + adT('İskeletler uyandı! Hepsini yen'), 1.8), 300); }
     else setTimeout(() => { if (rm.built) { DG.boss = spawnSkel(rm, 0, rm.z1 - 9, true); snd('roar', 1.2); G.showMsg('👑 ' + adT('Kemik Kral uyandı!'), 2.2); } }, 900); }
 }
 function roomTick(rm, dt, P, lz) {
@@ -383,8 +384,8 @@ function roomTick(rm, dt, P, lz) {
   if (rm.plates) { let all = true; for (const p of rm.plates) { if (Math.hypot(p.p.x - P.x, p.p.z - P.z) < 1 && P.y < .6) { if (p.t <= 0) snd('clunk', .6); p.t = 6; } p.t = Math.max(0, p.t - dt); p.m.position.y = p.t > 0 ? .02 : .05;
       p.m.material.emissive.setHex(p.t > 0 ? 0x06d6a0 : 0); p.m.material.emissiveIntensity = p.t > 0 ? .3 + p.t / 6 : 0; if (p.t <= 0) all = false; }
     if (all) { solve(rm, 'Hepsi yandı! Kapı açıldı'); } }
-  if (rm.skels && rm.skels.length) { for (const s of rm.skels) if (!s.gone) skelTick(s, dt, P);
-    if (rm.type === 'skel' && rm.started && !rm.solved && rm.skels.length >= rm.skelN && rm.skels.every(s => !alive(s) && s.st !== 'rise')) solve(rm, 'İskeletler yenildi! Kapı açıldı'); }
+  if (rm.skels && rm.skels.length) for (const s of rm.skels) if (!s.gone) skelTick(s, dt, P);
+  if (rm.type === 'skel' && rm.started && !rm.solved && (rm.skelN <= 0 || (rm.skels.length >= rm.skelN && rm.skels.every(s => !alive(s) && s.st !== 'rise')))) solve(rm, 'İskeletler yenildi! Kapı açıldı');
   if (rm.levers) for (const L of rm.levers) L.arm.rotation.x += ((L.on ? -.6 : .6) - L.arm.rotation.x) * Math.min(1, dt * 10);
   if (rm.chests) for (const c of rm.chests) c.lid.rotation.x += ((c.open ? -1.7 : 0) - c.lid.rotation.x) * Math.min(1, dt * 6);
   if (rm.chestT) rm.chestT.lid.rotation.x += ((rm.chestT.open ? -1.6 : 0) - rm.chestT.lid.rotation.x) * Math.min(1, dt * 5);

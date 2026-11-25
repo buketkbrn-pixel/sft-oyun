@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.25</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.26</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -10991,16 +10991,16 @@ function update(dt) {
     } else vel.lerp(tmp.set(0, 0, 0), kf);
     vy = THREE.MathUtils.lerp(vy, vyT, kf);
   } else {
-    const target = HERO.on ? heroTarget(dir, analog) : dir.multiplyScalar(gSit || stomp || grabAct ? 0 : (giant ? (slam ? .4 * giantS : 1.9 * giantS) : shielding ? (fieldMode ? 3.2 : 2.2) : running ? RUN.speed * (1 + SPRINT_MUL * sprF) : 3.6) * (running ? 1 : analog) * (INV.skate && INV.eq === 'skate' && !giant ? 1.9 : ROBO.active ? (ROBO.titan ? 4.3 : ROBO.volt ? 3.8 : ROBO.ultra ? 3.2 : 1.3) : 1) * (inRoyale && BR.drop ? (BR.drop === 'glide' ? 4.6 : 3.4) : 1) * (giant ? 1 : szK) * (ADM.speed5 ? 5 : ADM.speed ? 2.4 : 1) * (ADM.h6_skate ? 1.6 : 1) * CHEAT.spd * (ADM.slowWalk ? .4 : 1) * (ADM.boostT > 0 ? 3 : 1));
+    const target = HERO.on ? heroTarget(dir, analog) : dir.multiplyScalar(gSit || stomp || grabAct ? 0 : (giant ? (slam ? .4 * giantS : 1.9 * giantS) : shielding ? (fieldMode ? 3.2 : 2.2) : running ? RUN.speed * (1 + SPRINT_MUL * sprF) : 3.6) * (running ? 1 : analog) * (INV.skate && INV.eq === 'skate' && !giant ? 1.9 : ROBO.active ? (ROBO.titan ? 4.3 : ROBO.volt ? 3.8 : ROBO.ultra ? 3.2 : 1.3) : 1) * (inRoyale && BR.drop ? (BR.drop === 'glide' ? 4.6 : 3.4) : 1) * (giant ? 1 : szK) * (ADM.speed5 ? 5 : ADM.speed ? 2.4 : 1) * (ADM.h6_skate ? 1.6 : 1) * CHEAT.spd * (ADM.ncfly && !onGround ? 2.4 : 1) * (ADM.slowWalk ? .4 : 1) * (ADM.boostT > 0 ? 3 : 1));
     if (PIT.jumpT > 0) PIT.jumpT -= dt;   // çukura atlayışta havada yön korunur
-    else if (!(HERO.on && heroVel(dt, target)) && !webVel(dt, target)) vel.lerp(target, 1 - Math.exp(-(onGround ? 10 : HERO.on ? 6.5 : 3) * dt));
+    else if (!(HERO.on && heroVel(dt, target)) && !webVel(dt, target)) vel.lerp(target, 1 - Math.exp(-(onGround ? 10 : ADM.ncfly ? 7 : HERO.on ? 6.5 : 3) * dt));
   }
   pos.x += vel.x * dt; pos.z += vel.z * dt;
   if (sitting) { pos.x = sitting.x; pos.z = sitting.z; vel.set(0, 0, 0); }          // sandalyede oturuyor
   else if (HOME.sleep) { vel.set(0, 0, 0); }                                          // yatakta uyuyor (konum updateHome'da)
   else if (CINE && CINE.phase === 'walk') { /* ara sahnede yol önceden hesaplı, çarpışma yok */ }
   else if (giant) { collideHit = null; collideObstacles(pos, .24 * giantS, .84 * giantS); }   // dev küçük şeylerin üstünden geçer; büyüdükçe evlerin de
-  else if (ADM.noclip) collideHit = null;   // admin: duvarlardan geç
+  else if (ADM.noclip || ADM.ncfly) collideHit = null;   // admin: duvarlardan geç
   else { collideHit = null; collideObstacles(pos); }
   climbUpdate(dt, dir, moving, canAct && !flying && (!giant || inCity) && !slide && !sitting && !HERO.on && !RIDE.on && !gSit && !CINE, pos);
 
@@ -11023,14 +11023,16 @@ function update(dt) {
   else if (flying) {
     if (!wasFlying && pos.y - g < .3) for (let i = 0; i < 18; i++) spawnDust(pos.x, pos.y, pos.z, .9, 1.6, 0, 0, groundDust());
     pos.y += vy * dt; onGround = false;
-    if (pos.y > FLY_MAX) { pos.y = FLY_MAX; vy = Math.min(vy, 0); }
+    { const cap = curArea === AREAS.hub ? 215 : FLY_MAX; if (pos.y > cap) { pos.y = cap; vy = Math.min(vy, 0); } }   // ☁️ köyde uçan adalara kadar
   } else {
     if (onGround && vy <= 0 && pos.y > g + .02 && g > -10 && pos.y - g < Math.max(.09, Math.hypot(vel.x, vel.z) * dt * .5)) pos.y = g;   // yokuş aşağı: zemine yapışık yürü
     if (onGround && pos.y > g + .02) onGround = false; // kenardan düştü
+    if (ADM.ncfly && onGround && !keys.KeyC && ncFlyVy() > 1.2) { onGround = false; vy = ncFlyVy(); }   // 👻 noclip: yukarı bakıp yürüyünce havalan
     if (!onGround) {
       const light = INV.eq === 'balloon' && !BAL.free && !giant, umb = INV.eq === 'umbrella' && INV.umb && !giant;
       if (ADM.hover) vy = keys.Space ? 4.5 : keys.KeyC ? -4.5 : vy * Math.exp(-6 * dt);   // admin: havada süzül
-      vy = Math.max(vy - (HERO.on ? heroGrav() : light ? 8.5 : umb && vy < 0 ? 4 : 20) * (ADM.hover ? 0 : ADM.gravFlip ? -.35 : ADM.zeroG ? .05 : ADM.moon ? .28 : ADM.heavyG ? 2.2 : 1) * CHEAT.grav * dt, inRoyale && BR.drop === 'fall' ? -40 : -32);
+      if (ADM.ncfly) vy = ncFlyVy();   // 👻 noclip: baktığın yöne uç (Boşluk yukarı, C aşağı)
+      vy = Math.max(vy - (HERO.on ? heroGrav() : light ? 8.5 : umb && vy < 0 ? 4 : 20) * (ADM.hover || ADM.ncfly ? 0 : ADM.gravFlip ? -.35 : ADM.zeroG ? .05 : ADM.moon ? .28 : ADM.heavyG ? 2.2 : 1) * CHEAT.grav * dt, inRoyale && BR.drop === 'fall' ? -40 : -32);
       if (inRoyale && BR.drop === 'glide') vy = THREE.MathUtils.lerp(vy, -5.5, 1 - Math.exp(-3 * dt));
       if (umb && vy < -2) vy = THREE.MathUtils.lerp(vy, -2, 1 - Math.exp(-7 * dt));   // şemsiye: yavaşça süzül
       pos.y += vy * dt;
@@ -16310,7 +16312,7 @@ document.body.insertAdjacentHTML('beforeend', '<div id="admTV"></div><div id="ad
 const A_ = (id, ic, tr, en, fn) => [id, ic, tr, en, fn];
 const ADM_LIST = [
   ['⭐ En iyi hileler', '⭐ Best cheats', [
-    A_('god', '🛡️', 'Ölümsüzlük', 'God mode'), A_('ohk', '💀', 'Tek vuruşta öldür', 'One-hit kill'), A_('regen', '💚', 'Otomatik iyileşme', 'Auto heal'),
+    A_('ncfly', '👻', 'Noclip: uç + duvardan geç', 'Noclip: fly + walls'), A_('god', '🛡️', 'Ölümsüzlük', 'God mode'), A_('ohk', '💀', 'Tek vuruşta öldür', 'One-hit kill'), A_('regen', '💚', 'Otomatik iyileşme', 'Auto heal'),
     A_('heal', '❤️', 'Canı doldur', 'Full health', () => { if (dead) return '💀'; hp = HPMAX; if (inRoyale) BR.sh = 100; return '❤️'; }),
     A_('superPunch', '👊', 'Süper yumruk (4×)', 'Super punch (4×)'), A_('noKnock', '🧱', 'Geri tepme yok', 'No knockback'),
     A_('speed', '⚡', 'Süper hız', 'Super speed'), A_('speed5', '🚀', 'Işık hızı (5×)', 'Light speed (5×)'), A_('noclip', '👻', 'Duvardan geç', 'No clip'),
@@ -16659,10 +16661,19 @@ function admCss() {
   if (ADM.hueCycle) f.push(`hue-rotate(${Math.round(elapsed * 90) % 360}deg)`);
   c.style.filter = f.join(' '); c.style.transform = [ADM.flip ? 'rotate(180deg)' : '', ADM.mirror ? 'scaleX(-1)' : ''].join(' ').trim();
 }
+function ncFlyVy() {   // 👻 noclip uçuşu: ileri giderken kameranın baktığı yöne yüksel / alçal
+  if (keys.Space) return 8; if (keys.KeyC) return -8;
+  const fw = -(vel.x * Math.sin(yaw) + vel.z * Math.cos(yaw)), p = pitch - .3; return Math.abs(p) < .07 ? 0 : -Math.sin(p) * fw * 2.2;
+}
+function ncBtnSync() { const b = $('ncBtn'); if (!b) return; b.style.display = ADM_UNLOCK && started && !paused && !photoMode ? 'block' : 'none'; b.classList.toggle('on', !!ADM.ncfly); b.textContent = ADM.ncfly ? '👻 Noclip AÇIK' : '👻 Noclip'; }
+document.body.insertAdjacentHTML('beforeend', `<button id="ncBtn">👻 Noclip</button><style>#ncBtn{position:fixed;left:12px;top:calc(92px + env(safe-area-inset-top));z-index:7;display:none;padding:8px 13px;border-radius:14px;border:2px solid rgba(155,231,255,.55);background:rgba(10,16,30,.62);color:#fff;font:800 13px system-ui;cursor:pointer;-webkit-tap-highlight-color:transparent}#ncBtn.on{background:linear-gradient(135deg,#7b2ff7,#4cc9f0);border-color:#fff;box-shadow:0 0 14px rgba(76,201,240,.7)}</style>`);
+for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $('ncBtn').addEventListener(ev, e => e.stopPropagation(), { passive: true });
+$('ncBtn').addEventListener('click', e => { e.stopPropagation(); if (ADM_UNLOCK) admSet('ncfly', !ADM.ncfly); });   // 👻 tek düğme: aç / kapat
+setInterval(() => { try { ncBtnSync(); } catch (e) {} }, 400);
 function admSet(id, on, quiet) {
   const f = ADM_F[id]; ADM[id] = on;
   const b = document.querySelector(`[data-adm="${id}"]`); if (b) { b.classList.toggle('on', on); if (on && !quiet) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); setTimeout(() => b.classList.remove('pop'), 520); } }
-  admBadge(); admSet3(id, on);
+  admBadge(); admSet3(id, on); if (id === 'ncfly') { ncBtnSync(); if (on) { onGround = false; vy = Math.max(vy, 2); showMsg('👻 ' + adT('Noclip: duvardan geç ve uç · Boşluk ↑ · C ↓ · baktığın yöne uçarsın'), 2.6); } }
   if (on) for (const g of ADM_EXCL) if (g.includes(id)) for (const o of g) if (o !== id && ADM[o]) admSet(o, false, true);
   if ((id === 'god' || id === 'regen') && on && !dead) hp = HPMAX;
   if (id === 'freeze') { play(on ? 'magic' : 'portal'); if (on) shake = Math.max(shake, .25); }
@@ -26682,7 +26693,7 @@ function mpCollide() {
   for (const id in MP.players) { const p = MP.players[id]; if (id === MP.me.id || !p.av || !p.av.holder.visible || (carried && carried.ref === p)) continue; const H = p.av.holder.position, R = .45 * (giantS + p.av.holder.scale.x), dx = P.x - H.x, dz = P.z - H.z, d = Math.hypot(dx, dz);
     if (d < R && d > 1e-4 && Math.abs(P.y - H.y) < 1.6 * Math.max(giantS, p.av.holder.scale.x)) { P.x = H.x + dx / d * R; P.z = H.z + dz / d * R; } }
 }
-const noclipOn = () => !!(ADM.noclip || ADM.ghost);
+const noclipOn = () => !!(ADM.noclip || ADM.ghost || ADM.ncfly);
 function mpPvp() {
   if (!MP.set.pvp) { MP.lastPunch = punch; return; } const started = punch && !MP.lastPunch; MP.lastPunch = punch; if (!started && !(slam && !MP.slamSeen)) { if (!slam) MP.slamSeen = false; return; }
   const P = player.position, S = giantS, fx = Math.sin(facing), fz = Math.cos(facing), big = !!slam; if (slam) MP.slamSeen = true;
@@ -27929,9 +27940,12 @@ function islBuild() {
   { const [x, z, , y] = I.peak; const ch = new THREE.Group(); ch.position.set(x, y, z); ISL.g.add(ch); ch.add(mesh(new THREE.BoxGeometry(1.4, .8, .9), M(0x8b5a2b), 0, .4, 0)); const lid = mesh(new THREE.BoxGeometry(1.45, .2, .95), M(0xd4a73a), 0, .85, 0); ch.add(lid); ISL.chest = { x, z, y, got: false, lid }; }
   const cm = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: .92 });
   for (let i = 0; i < 22; i++) { const c = new THREE.Group(), a = Math.random() * 6.28, rr = 30 + Math.random() * 140; c.position.set(Math.cos(a) * rr, 148 + Math.random() * 32, Math.sin(a) * rr); for (let k = 0; k < 5; k++) c.add(mesh(new THREE.SphereGeometry(3 + Math.random() * 3, 10, 8), cm, (k - 2) * 3.5, Math.random() * 1.5, (Math.random() - .5) * 3)); c.userData.v = .5 + Math.random(); ISL.g.add(c); ISL.fx.push({ cloud: c }); }
-  { const bx = 14, bz = 16, y = terrH(bx, bz); const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 160, 18, 1, true), new THREE.MeshBasicMaterial({ color: 0x9be7ff, transparent: true, opacity: .22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); beam.position.set(bx, y + 80, bz); ISL.g.add(beam);
-    ISL.g.add(mesh(new THREE.CylinderGeometry(1.8, 2, .35, 24), M(0x9be7ff, { emissive: 0x4cc9f0, emissiveIntensity: .8 }), bx, y + .17, bz));
-    const lab = new THREE.Sprite(new THREE.SpriteMaterial({ map: islLabelTex('☁️ Uçan adalar'), transparent: true, depthWrite: false })); lab.position.set(bx, y + 3.4, bz); lab.scale.set(4, 1, 1); ISL.g.add(lab); ISL.lift0 = { x: bx, z: bz, y }; }
+  { const bx = 0, bz = 0, y = terrH(bx, bz), c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');   // ☁️ köyün ortasındaki uçuş pedi
+    const gr = g.createRadialGradient(128, 128, 20, 128, 128, 128); gr.addColorStop(0, '#e0f7ff'); gr.addColorStop(.7, '#4cc9f0'); gr.addColorStop(1, '#1b6fa8'); g.fillStyle = gr; g.beginPath(); g.arc(128, 128, 128, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 8; g.beginPath(); g.arc(128, 128, 104, 0, 7); g.stroke(); g.font = '110px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('☁️', 128, 122);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; const side = M(0x9be7ff, { emissive: 0x4cc9f0, emissiveIntensity: .7 });
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.1, .4, 32), [side, new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: .35, roughness: .5 }), side]); pad.position.set(bx, y + .2, bz); pad.receiveShadow = true; ISL.g.add(pad); ISL.padM = pad;
+    ISL.lift0 = { x: bx, z: bz, y }; }
 }
 function islHeartTex() { if (ISL.ht) return ISL.ht; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); g.font = '52px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('💗', 32, 36); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return ISL.ht = t; }
 function islLabelTex(s) { const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d'); g.fillStyle = 'rgba(10,20,40,.7)'; g.beginPath(); g.roundRect(8, 16, 496, 96, 40); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 54px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(adT(s), 256, 66); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
@@ -27958,7 +27972,8 @@ function islTick(dt) {
   for (const f of ISL.fx) { if (f.heart) f.heart.position.y = f.y0 + Math.sin(t * 1.5 + f.heart.userData.ph) * .6; else if (f.cloud) { f.cloud.position.x += dt * f.cloud.userData.v; if (f.cloud.position.x > 180) f.cloud.position.x = -180; } }
   if (dt) for (const p of ISL.pads) if (Math.hypot(P.x - p.x, P.z - p.z) < 1.3 && Math.abs(P.y - p.y) < .7 && vy <= .5) { vy = 15.5; onGround = false; play('boing'); for (let i = 0; i < 6; i++) spawnDust(P.x, p.y, P.z, .6, 1, 0, 0, 0xc77dff); }
   const C = ISL.chest; if (C && !C.got && Math.hypot(P.x - C.x, P.z - C.z) < 1.8 && Math.abs(P.y - C.y) < 2) { C.got = true; play('magic'); progAdd(50, P); showMsg('🧰 ' + adT('Tepe adanın hazinesi! +50'), 2); C.lid.position.y = 1.2; C.lid.rotation.x = -.8; }
-  const L0 = ISL.lift0; if (L0 && !ISL.lift && dt && Math.hypot(P.x - L0.x, P.z - L0.z) < 1.6 && P.y < L0.y + 2) islGo();
+  const L0 = ISL.lift0; if (L0 && !ISL.lift && dt && Math.hypot(P.x - L0.x, P.z - L0.z) < 1.8 && P.y < L0.y + 2.5 && !giant && !RIDE.on) islGo();
+  if (ISL.padM) ISL.padM.rotation.y += dt * .6;
   if (ISL.lift && dt) { const L = ISL.lift; L.t += dt / 2.6; const k = Math.min(1, L.t), e = k * k * (3 - 2 * k);
     P.lerpVectors(L.from, L.to, e); P.y += Math.sin(k * Math.PI) * 12; vel.set(0, 0, 0); vy = 0; if (Math.random() < .6) spawnDust(P.x, P.y, P.z, .6, 1, 0, 0, 0x9be7ff);
     if (k >= 1) { ISL.lift = null; vy = 0; onGround = true; showMsg('☁️ ' + adT('Uçan adalar! Parkurla diğer adalara geç'), 2); } }
