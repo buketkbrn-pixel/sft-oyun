@@ -11,3 +11,5 @@ Harita oluşturucu (durdurma menüsü → 🗺️ Harita oluştur) ayrı dosyada
 Harita oluşturma sadece admindir. Yayınlanan haritalar durdurma menüsü → 🏪 Harita Mağazası'nda görünür; açınca ağdan gelir, "🚪 Git" ile girilip oynanır (cihaza indirilmez). Herkese açık mağaza bu deponun `maps` dalında durur: `index.json` (başlık, açıklama, sahip, sürüm) ve `m/<id>.json` (harita). Admin oyunun içinden yayınlar (Mağaza → 📤 Yayınladıklarım → GitHub bağla; sadece bu depoya "Contents: Read and write" izni olan bir anahtar yeter, anahtar sadece o cihazda kalır).
 
 Yarış (maceracı → 🏎️ Yarış, Işınla menüsü ya da admin → 🏎️ Yarış) ayrı dosyadadır: `race.js`. Bütün arabalar aynı hızda; drift, nitro, ✦ güç kutuları ve her arabanın kendi özel gücü var. Çok oyunculu odada herkes aynı yarışta, botları oda sahibi yönetir. Battle royale de odada ortaktır.
+
+Battle royale'de takım: düşen arkadaşını V ile kaldır (4 sn yanında dur), Z ile işaret koy, G ile elindekini bırak (takım görür). Harita oluşturucuda 🧩 Bulmaca: renk = kanal; buton, basınç plakası, zamanlayıcı → kanal kapısı, ışık köprüsü, alev ızgarası, lamba; renkli anahtar → kilitli kapı; itilebilir kutu.

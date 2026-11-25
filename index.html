@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.22</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.23</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -10671,7 +10671,7 @@ function update(dt) {
   const keyMoving = ix !== 0 || iz !== 0;
   const joyMag = joy.id !== null && !CINE ? Math.hypot(joy.x, joy.y) : 0;
   if (ctl && joyMag > .15) { ix = THREE.MathUtils.clamp(ix + joy.x, -1, 1); iz = THREE.MathUtils.clamp(iz - joy.y, -1, 1); }
-  const analog = CINE ? .6 : keyMoving || joyMag >= .8 ? 1 : Math.max(.35, joyMag / .8);   // joystick az itilince yavaş yürür
+  const analog = (CINE ? .6 : keyMoving || joyMag >= .8 ? 1 : Math.max(.35, joyMag / .8)) * (inRoyale && BR.knock ? .28 : 1);   // 🆘 düşünce emekler   // joystick az itilince yavaş yürür
   if (sitting && !RIDE.on && !RACE_LOCK && (keyMoving || joyMag > .3 || keys.Space || !canAct)) sitting = null;   // hareket edince kalkar
   if (gSit && (keyMoving || joyMag > .3 || keys.Space || !canAct)) standUp();         // yerden kalkar (ezilenler düzelir)
   if (lieReq) { lieReq = false; if (canAct && !CINE && !DRESS.open) toggleLie(); }
@@ -14283,6 +14283,7 @@ function brStart() {
   BR.storm = { i: 0, ph: 'wait', t: BR_STORM[0][1], cur: { x: 0, z: 0, r: 340 }, from: null, to: brNextCircle({ x: 0, z: 0, r: 340 }, BR_STORM[0][0]) };
   dist = 16; charHolder.visible = false; BR_GLIDER.visible = false; yaw = Math.atan2(dx, dz) + Math.PI; pitch = .32;
   BR.feed = []; brFeedDraw(); BR.res.style.display = 'none';
+  BR.knock = null; BR.rev = null; for (const o of [...(BR.pings || [])]) brPingRm(o); BR.pings = [];
   try { brShareStart(); } catch (e) { sftErr(e); }
   brBig('🎈 Savaş zeplini kalkıyor! Atlamak için ' + (touchMode ? 'Zıpla' : 'Boşluk') + (TN > 1 ? `\n👥 ${TN} kişilik takımlar — odadakiler senin takımın` : ''), 4.5);
   brHud(true);
@@ -14342,7 +14343,7 @@ function brProxy(id) {   // oda sahibinde: başka oyuncu, botların hedefi olabi
 }
 function brProxyTick(dt) {   // oda sahibi: odadakilerin konumu → bot hedefleri
   for (const id in MP.players) { if (id === MP.me.id) continue; const p = MP.players[id], st = p.st, o = brProxy(id);
-    const ok = !!st && st.a === 'royale' && !st.dd && elapsed - (p.stT || 0) < 4 && BR.state !== 'bus' && st.p[1] - terrH(st.p[0], st.p[2]) < 25;
+    const ok = !!st && st.a === 'royale' && !st.dd && !st.kn && elapsed - (p.stT || 0) < 4 && BR.state !== 'bus' && st.p[1] - terrH(st.p[0], st.p[2]) < 25;
     if (ok) { const nx = st.p[0], ny = st.p[1], nz = st.p[2]; if (dt > 0) o.vel.set((nx - o.pos.x) / Math.max(dt, .016), 0, (nz - o.pos.z) / Math.max(dt, .016)).clampLength(0, 12); o.pos.set(nx, ny, nz); }
     o.alive = ok; o.name = p.name || o.name; }
   for (const id in BR.rp) if (!MP.players[id]) BR.rp[id].alive = false;
@@ -14409,7 +14410,7 @@ function brDropLoot(it, x, z) {
   spr.position.set(x, l.y, z); beam.position.set(x, l.y - .5, z); BR.g.add(spr, beam); BR.loot.push(l);
   return l;
 }
-function brRemoveLoot(l) { const i = BR.loot.indexOf(l); if (i >= 0) BR.loot.splice(i, 1); BR.g.remove(l.spr, l.beam); l.spr.material.dispose(); }
+function brRemoveLoot(l) { if (l.nid && BR.shared && !l.netRm) try { mpSend({ t: 'brlr', id: l.nid }); } catch (e) {} const i = BR.loot.indexOf(l); if (i >= 0) BR.loot.splice(i, 1); BR.g.remove(l.spr, l.beam); l.spr.material.dispose(); }
 function brOpenChest(c, who) {
   if (c.open) return;
   if (BR.shared) try { mpSend({ t: 'brc', i: c.i }); } catch (e) {}
@@ -14446,7 +14447,7 @@ function brSelect(i) {
 }
 function brReload() { const it = BR.slots[BR.cur]; if (!it || it.k !== 'w' || BR.rlT > 0 || it.mag >= BR_W[it.id].mag) return; BR.rlT = BR_W[it.id].rl; play('roboarm', { open: false }); }
 function brUseDown() {
-  if (BR.state !== 'play' || dead) return true;
+  if (BR.state !== 'play' || dead || BR.knock) return true;
   const it = BR.slots[BR.cur];
   if (it && it.k === 'c') {
     const C = BR_C[it.id];
@@ -14460,6 +14461,8 @@ function brKey(code) {
   if (BR.state === 'bus') { if (code === 'Space') brDrop(); return code !== 'Escape' && code !== 'KeyF'; }
   if (BR.drop === 'fall' && code === 'Space') { brGlide(); return true; }
   const m = /^(Digit|Numpad)([1-6])$/.exec(code); if (m) { brSelect(+m[2] - 1); return true; }
+  if (code === 'KeyZ') { brPing(); return true; }   // 📍 işaret
+  if (code === 'KeyG') { brDropCur(); return true; }   // 🎁 elindekini bırak (takım görür)
   if (code === 'KeyQ') { brBuild('wall'); return true; }
   if (code === 'KeyC') { brBuild('ramp'); return true; }
   if (code === 'KeyX') { brBuild('floor'); return true; }
@@ -14483,7 +14486,7 @@ const brTmp = new THREE.Vector3(), brTmp2 = new THREE.Vector3(), brBase = new TH
 function brFireTick(dt, aiming) {
   const it = BR.slots[BR.cur];
   BR.cd -= dt;
-  if (!it || it.k !== 'w' || BR.state !== 'play' || dead) return;
+  if (!it || it.k !== 'w' || BR.state !== 'play' || dead || BR.knock) return;
   const W = BR_W[it.id];
   if (BR.rlT > 0) { BR.rlT -= dt; if (BR.rlT <= 0) { it.mag = W.mag; brHud(true); } return; }
   if (it.mag <= 0) { brReload(); return; }
@@ -14548,6 +14551,7 @@ function brMelee(dir, it) {
 }
 /* ---- İnşa: duvar / rampa / zemin (4 m'lik ızgara) ---- */
 function brBuild(type, who = null) {
+  if (!who && BR.knock) return;
   const isP = !who, cost = 10, P = isP ? player.position : who.pos;
   if (isP && (BR.state !== 'play' || dead || BR.drop)) return false;
   if ((isP ? BR.wood : who.wood) < cost) { if (isP) showMsg('🪵 Malzeme yok — kazmayla ağaç, kaya, ev kır', 1.6); return false; }
@@ -14591,17 +14595,94 @@ function brRampAt(x, z, y, g) {   // groundAt yardımcısı: rampaların eğik y
 /* ---- Hasar ---- */
 function brHurtPlayer(d, src, storm) {
   if (dead || ADM.god || BR.state !== 'play') return;
+  if (BR.knock) { BR.knock.t -= storm ? d * .5 : d * .3; hurtFlash = .5; if (BR.knock.t <= 0) brDieNow(src, storm); return; }   // düşmüşken vurulursa süre kısalır
   if (!storm && BR.sh > 0) { const a = Math.min(BR.sh, d); BR.sh -= a; d -= a; }
   hp = Math.max(0, hp - d); lastHurt = elapsed; hurtFlash = storm ? .35 : .8;
   if (!storm) { shake = Math.max(shake, .15); play('hit', { oof: true }); if (src) { BR.hitDir = Math.atan2(src.pos.x - player.position.x, src.pos.z - player.position.z); BR.hitT = 1; } }
   brHud(true);
   if (hp <= 0) {
-    dead = true; deadT = 0; mouseHeld = false; slide = null; punch = null; BR.use = null;
-    BR.place = new Set(BR.bots.filter(b => b.alive).map(b => b.team)).size + 1;
-    brFeed(storm ? '🌀 Fırtına seni eledi' : `☠ ${src ? src.name : '?'} seni eledi`);
-    BR.state = 'over'; BR.overT = 2.2;
-    for (const s of BR.slots) if (s && s.k !== 'p') brDropLoot(s, player.position.x + (Math.random() - .5) * 2, player.position.z + (Math.random() - .5) * 2);
+    if (BR.shared && brMates().some(m => !m.st.kn)) {   // 🆘 takım arkadaşı varken ölmezsin: düşersin, arkadaşın kaldırır
+      hp = 1; BR.knock = { t: 30, by: storm ? 'Fırtına' : src ? src.name : '?' }; BR.use = null; mouseHeld = false; BR.rev = null;
+      brFeed(`🆘 ${BR.knock.by} seni düşürdü`); brBig('🆘 Düştün! Arkadaşın seni kaldırsın', 2.4); play('hit', { oof: true });
+      const P = player.position; brPingAdd({ x: P.x, y: P.y, z: P.z, k: 'sos', n: MP.me.name || 'Ben', own: MP.me.id }); try { mpSend({ t: 'brkn', n: MP.me.name || '?', x: brR1(P.x), y: brR1(P.y), z: brR1(P.z) }); } catch (e) {}
+      brHud(true); return;
+    }
+    brDieNow(src, storm);
   }
+}
+function brDieNow(src, storm) {
+  dead = true; deadT = 0; mouseHeld = false; slide = null; punch = null; BR.use = null; BR.knock = null; BR.rev = null; hp = 0;
+  BR.place = new Set(BR.bots.filter(b => b.alive).map(b => b.team)).size + 1;
+  brFeed(storm ? '🌀 Fırtına seni eledi' : `☠ ${src ? src.name : '?'} seni eledi`);
+  BR.state = 'over'; BR.overT = 2.2;
+  for (const s of BR.slots) if (s && s.k !== 'p') brDropShared(s, player.position.x + (Math.random() - .5) * 2, player.position.z + (Math.random() - .5) * 2);
+}
+/* ---------- 🤝 takım: arkadaşlar, canlandırma, işaret, ganimet paylaşma ---------- */
+function brMates() {   // aynı oyundaki odadakiler (hepsi senin takımın)
+  const L = []; if (!BR.shared || !MP.on) return L;
+  for (const id in MP.players) { if (id === MP.me.id) continue; const p = MP.players[id], st = p.st; if (st && st.a === 'royale' && !st.dd && elapsed - (p.stT || 0) < 4) L.push({ id, name: p.name || '?', st }); }
+  return L;
+}
+const BR_PING = { go: ['📍', 'Buraya gel', '#ffd166'], enemy: ['⚠️', 'Düşman', '#ff4d6d'], loot: ['🎁', 'Ganimet', '#06d6a0'], sos: ['🆘', 'Yardım!', '#ff70a6'] };
+const BR_PTEX = {};
+function brPingTex(k, n) {
+  const key = k + '|' + n; if (BR_PTEX[key]) return BR_PTEX[key]; const c = document.createElement('canvas'); c.width = 256; c.height = 96; const g = c.getContext('2d'), P = BR_PING[k];
+  g.fillStyle = 'rgba(10,16,28,.78)'; g.beginPath(); g.roundRect(4, 8, 248, 80, 22); g.fill(); g.strokeStyle = P[2]; g.lineWidth = 5; g.stroke();
+  g.font = '44px system-ui'; g.textBaseline = 'middle'; g.fillText(P[0], 16, 50); g.fillStyle = '#fff'; g.font = 'bold 26px system-ui'; g.fillText(adT(P[1]), 76, 36); g.fillStyle = P[2]; g.font = '20px system-ui'; g.fillText(String(n).slice(0, 14), 76, 66);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return BR_PTEX[key] = t;
+}
+function brPingAdd(p) {
+  BR.pings = BR.pings || [];
+  const mine = BR.pings.filter(q => q.own === p.own); while (mine.length > 2) { const o = mine.shift(); brPingRm(o); }
+  const col = new THREE.Color(BR_PING[p.k][2]), g = new THREE.Group();
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, 70, 6, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .45, depthWrite: false, blending: THREE.AdditiveBlending })); beam.position.y = 35; g.add(beam);
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: brPingTex(p.k, p.n), depthTest: false, depthWrite: false, transparent: true, sizeAttenuation: false })); spr.scale.set(.16, .06, 1); spr.position.y = 3.2; spr.renderOrder = 9; g.add(spr);
+  g.position.set(p.x, p.y, p.z); BR.g.add(g); const o = Object.assign({ g, t: p.k === 'sos' ? 30 : 12 }, p); BR.pings.push(o);
+  if (p.own !== MP.me.id) { play('ding', { gain: .4 }); brFeed(`${BR_PING[p.k][0]} ${p.n}: ${adT(BR_PING[p.k][1])}`); }
+  return o;
+}
+function brPingRm(o) { const i = BR.pings.indexOf(o); if (i >= 0) BR.pings.splice(i, 1); BR.g.remove(o.g); o.g.children[0].geometry.dispose(); }
+function brPing() {
+  if (BR.state !== 'play' || dead) return;
+  const o = camera.position, d = new THREE.Vector3(); camera.getWorldDirection(d);
+  let hit = null, k = 'go';
+  for (const b of BR.bots) { if (!b.alive || b.gone || b.st === 'bus') continue; const v = new THREE.Vector3(b.pos.x - o.x, b.pos.y + 1 - o.y, b.pos.z - o.z), t = v.dot(d); if (t < 2 || t > 260) continue; const perp = v.addScaledVector(d, -t).length(); if (perp < 1.6 + t * .012 && (!hit || t < hit.t)) { hit = { t, x: b.pos.x, y: b.pos.y, z: b.pos.z }; k = 'enemy'; } }
+  if (!hit) for (const l of BR.loot) { const v = new THREE.Vector3(l.x - o.x, l.y - o.y, l.z - o.z), t = v.dot(d); if (t < 1 || t > 80) continue; const perp = v.addScaledVector(d, -t).length(); if (perp < .9 + t * .01 && (!hit || t < hit.t)) { hit = { t, x: l.x, y: l.y - .5, z: l.z }; k = 'loot'; } }
+  if (!hit) for (let t = 2; t < 320; t += 2) { const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t, g = groundAt(x, z, 999); if (y <= g) { hit = { t, x, y: g, z }; break; } }
+  if (!hit) { const hx = d.x, hz = d.z, hl = Math.hypot(hx, hz) || 1, x = o.x + hx / hl * 50, z = o.z + hz / hl * 50; hit = { t: 50, x, y: groundAt(x, z, 999), z }; }   // göğe bakıyorsan 50 m ileri
+  const p = { x: brR1(hit.x), y: brR1(hit.y), z: brR1(hit.z), k, n: MP.on && MP.me.name ? MP.me.name : adT('Ben'), own: MP.on ? MP.me.id : 'me' };
+  brPingAdd(p); play('ui'); if (BR.shared) try { mpSend(Object.assign({ t: 'brp' }, p)); } catch (e) {}
+}
+function brDropShared(it, x, z) {   // 🎁 yere bırakılan eşya takımın ekranında da görünür
+  const l = brDropLoot(it, x, z); if (l && BR.shared && MP.on) { l.nid = MP.me.id + ':' + (BR.lid = (BR.lid || 0) + 1); try { mpSend({ t: 'brl', id: l.nid, it, x: brR1(x), z: brR1(z) }); } catch (e) {} }
+  return l;
+}
+function brDropCur() {
+  if (BR.state !== 'play' || dead || BR.knock) return; const it = BR.slots[BR.cur]; if (!it || it.k === 'p' || BR.cur === 0) { showMsg(adT('🎁 Elindeki eşyayı bırakırsın (kazmayı değil)'), 1.2); return; }
+  const P = player.position; brDropShared(it, P.x + Math.sin(facing) * 1.2, P.z + Math.cos(facing) * 1.2); BR.slots[BR.cur] = null; brSelect(0); play('ui'); brHud(true);
+}
+function brTeamTick(dt) {   // updateRoyale içinde
+  const P = player.position;
+  for (const o of [...(BR.pings || [])]) { o.t -= dt; if (o.t <= 0) { brPingRm(o); continue; } o.g.children[0].material.opacity = Math.min(.45, o.t * .2); o.g.children[1].material.opacity = Math.min(1, o.t); }
+  if (BR.knock && !dead) {
+    const K = BR.knock; K.t -= dt; charHolder.rotation.x = THREE.MathUtils.lerp(charHolder.rotation.x, -1.35, 1 - Math.exp(-8 * dt)); charHolder.position.y = .12;
+    K.alone = brMates().some(m => !m.st.kn) ? 0 : (K.alone || 0) + dt;
+    if (K.t <= 0 || K.alone > 2.5) { brDieNow({ name: K.by }, K.by === 'Fırtına'); return; }
+    BR.prompt = ['🆘 ' + adT('Düştün') + ` · ${Math.ceil(K.t)} ${adT('sn')} — ` + adT('arkadaşın gelip seni kaldırsın'), null];
+  }
+  if (BR.rev) {
+    const R = BR.rev, m = brMates().find(x => x.id === R.id), d = m ? Math.hypot(m.st.p[0] - P.x, m.st.p[2] - P.z) : 99;
+    if (!m || !m.st.kn || d > 3.4 || dead || BR.knock) { if (m && !m.st.kn && R.t > 3.5) {} else showMsg(adT('💚 Kaldırma yarıda kaldı'), 1); BR.rev = null; }
+    else { R.t += dt; BR.prompt = ['💚 ' + m.name + ' ' + adT('kaldırılıyor…') + ' ' + Math.min(100, Math.round(R.t / 4 * 100)) + '%', null];
+      if (R.t >= 4) { try { mpSend({ t: 'brrv', to: R.id, n: MP.me.name || '?' }); } catch (e) {} brFeed(`💚 ${m.name} ${adT('kaldırıldı')}`); play('magic', { gain: .6 }); BR.rev = null; } }
+  }
+}
+function brTeamNet(m) {
+  if (m.t === 'brrv') { if (BR.knock && !dead) { BR.knock = null; hp = 35; charHolder.rotation.x = 0; charHolder.position.y = 0; brFeed(`💚 ${m.n} ${adT('seni kaldırdı')}`); brBig('💚 ' + adT('Kalktın!'), 1.4); play('magic', { gain: .6 }); brHud(true); } return; }
+  if (m.t === 'brp') { brPingAdd({ x: m.x, y: m.y, z: m.z, k: BR_PING[m.k] ? m.k : 'go', n: m.n, own: m.f }); return; }
+  if (m.t === 'brkn') { brPingAdd({ x: m.x, y: m.y, z: m.z, k: 'sos', n: m.n, own: m.f }); brBig('🆘 ' + m.n + ' ' + adT('düştü! Gidip kaldır'), 2); return; }
+  if (m.t === 'brl') { if (!BR.loot.some(l => l.nid === m.id)) { const l = brDropLoot(m.it, m.x, m.z); if (l) l.nid = m.id; } return; }
+  if (m.t === 'brlr') { const l = BR.loot.find(q => q.nid === m.id); if (l) { l.netRm = true; brRemoveLoot(l); } }
 }
 function brHurtBot(b, d, src) {
   if (!b.alive) return;
@@ -14675,7 +14756,7 @@ function brBotThink(b) {
     const d = Math.hypot(x - b.pos.x, z - b.pos.z); if (d >= bd) return;
     if (d > 12 && !alert && Math.abs(wrapAng(Math.atan2(x - b.pos.x, z - b.pos.z) - b.facing)) > 65 * DEG) return;
     if (d < 4 || brLOS(ea, brTmp2.set(x, y + 1.4, z))) { best = o; bd = d; } };
-  if (!dead && BR.state === 'play') tryT('player', P.x, P.y, P.z);
+  if (!dead && !BR.knock && BR.state === 'play') tryT('player', P.x, P.y, P.z);
   if (BR.shared && BR.rp) for (const id in BR.rp) { const o = BR.rp[id]; if (o.alive) tryT(o, o.pos.x, o.pos.y, o.pos.z); }   // 🤝 odadaki arkadaşlar
   const bbR = bd; if (b.calm <= 0 || alert) { bd = Math.min(bbR, alert ? bbR : bbR * .5); for (const o of BR.bots) if (o !== b && o.team !== b.team && o.alive && o.st !== 'bus' && o.st !== 'fall' && (alert || o.tgt !== null || Math.random() < .5)) tryT(o, o.pos.x, o.pos.y, o.pos.z); if (best === null) bd = bbR; }
   if (best !== b.tgt) { b.tgt = best; b.react = .7 + Math.random() * .9; }
@@ -14832,6 +14913,7 @@ function updateRoyale(dt) {
   if (out && BR.state === 'play' && !dead && !ADM.noStorm) { BR.stormT = (BR.stormT || 0) + dt; if (BR.stormT > 1) { BR.stormT = 0; brHurtPlayer(BR_STORM[Math.min(S.i, BR_STORM.length - 1)][3], null, true); } }
   // botlar
   try { brShareTick(dt); } catch (e) { sftErr(e); }
+  try { brTeamTick(dt); } catch (e) { sftErr(e); }
   for (const b of BR.bots) { if (b.gone) continue; if (BR.client) brUpdateBotNet(b, dt, P); else if (b.alive || b.st === 'dead') brUpdateBot(b, dt, P); }
   // ganimet: süzülme, uzakta gizle
   for (const l of BR.loot) { const near = Math.abs(l.x - P.x) + Math.abs(l.z - P.z) < 90; l.spr.visible = l.beam.visible = near; if (near) { l.t += dt; l.spr.position.y = l.y + Math.sin(l.t * 2.2) * .12; } }
@@ -14852,8 +14934,10 @@ function updateRoyale(dt) {
   // nişan dürbünü (keskin nişancı)
   { const it = BR.slots[BR.cur], z = BR.zoom && it && it.k === 'w' && BR_W[it.id].zoom && !BR.drop ? 1 : 0; BR.zoomK += (z - BR.zoomK) * (1 - Math.exp(-12 * dt)); }
   // V istemi: sandık / yerdeki eşya
-  BR.prompt = null;
-  if (BR.state === 'play' && !dead && !BR.drop) {
+  const keepP = (BR.knock || BR.rev) && BR.prompt; BR.prompt = keepP || null;   // düşmüşken / kaldırırken o yazı kalır
+  let mateK = null; if (!keepP && BR.state === 'play' && !dead && !BR.knock && !BR.rev && BR.shared) { let md = 2.8; for (const m of brMates()) if (m.st.kn) { const d = Math.hypot(m.st.p[0] - P.x, m.st.p[2] - P.z); if (d < md) { md = d; mateK = m; } } }
+  if (mateK) BR.prompt = [(touchMode ? '👆 ' : 'V — ') + '💚 ' + mateK.name + ' ' + adT('kaldır (4 sn yanında dur)'), () => { BR.rev = { id: mateK.id, t: 0 }; play('ui'); }];
+  else if (!keepP && BR.state === 'play' && !dead && !BR.drop && !BR.knock) {
     let bc = null, bd = 2.3;
     for (const c of BR.chests) if (!c.open) { const d = Math.hypot(c.x - P.x, c.z - P.z); if (d < bd && Math.abs(c.y - P.y) < 2) { bd = d; bc = c; } }
     if (bc) BR.prompt = [(touchMode ? '👆 ' : 'V — ') + 'Sandığı aç 📦', () => brOpenChest(bc, 'player')];
@@ -14920,9 +15004,9 @@ function updateRoyale(dt) {
     <div id="brTop"><span id="brAlive">👥 30</span><span id="brKills">☠ 0</span><span id="brStorm">🌀</span></div>
     <canvas id="brMap" width="150" height="150"></canvas><div id="brFeed"></div>
     <div id="brBars"><div class="bar sh"><i></i><b></b></div><div class="bar hp"><i></i><b></b></div></div>
-    <div id="brKeys">1-6 seç · Q duvar · C rampa · X zemin · R doldur · sağ tık nişan · V al / aç</div>
+    <div id="brKeys">1-6 seç · Q duvar · C rampa · X zemin · R doldur · sağ tık nişan · V al / aç / kaldır · Z işaret · G bırak</div>
     <div id="brInfo"><div id="brAmmo"></div><div id="brWood">🪵 0</div></div><div id="brHot"></div>
-    <div id="brTouch"><button data-b="wall">🧱</button><button data-b="ramp">📐</button><button data-b="floor">⬛</button><button data-b="reload">🔄</button></div>
+    <div id="brTouch"><button data-b="wall">🧱</button><button data-b="ramp">📐</button><button data-b="floor">⬛</button><button data-b="reload">🔄</button><button data-b="ping">📍</button><button data-b="drop">🎁</button></div>
     <div id="brBig"></div><div id="brUse"><i></i></div><button id="brLeave">🏳️ Çık</button>`;
   document.body.appendChild(h);
   const r = document.createElement('div'); r.id = 'brRes'; r.innerHTML = '<div class="box"><h2 id="brResT"></h2><p id="brResS"></p><button id="brAgain" style="background:#ffd166">🔁 Tekrar oyna</button><button id="brHome" style="background:#7fc8ff">🏠 Köye dön</button></div>';
@@ -14930,7 +15014,7 @@ function updateRoyale(dt) {
   BR.hud = h; BR.res = r; BR.big = h.querySelector('#brBig'); BR.fx = h.querySelector('#brFx'); BR.mapC = h.querySelector('#brMap');
   for (const ev of ['pointerdown', 'mousedown', 'touchstart']) { h.addEventListener(ev, e => { if (e.target.closest('#brHot, #brTouch, #brLeave')) e.stopPropagation(); }); r.addEventListener(ev, e => e.stopPropagation()); }
   h.querySelector('#brHot').addEventListener('click', e => { const d = e.target.closest('[data-s]'); if (d) brSelect(+d.dataset.s); });
-  h.querySelector('#brTouch').addEventListener('pointerdown', e => { const b = e.target.closest('[data-b]'); if (!b) return; e.preventDefault(); if (b.dataset.b === 'reload') brReload(); else brBuild(b.dataset.b); });
+  h.querySelector('#brTouch').addEventListener('pointerdown', e => { const b = e.target.closest('[data-b]'); if (!b) return; e.preventDefault(); if (b.dataset.b === 'reload') brReload(); else if (b.dataset.b === 'ping') brPing(); else if (b.dataset.b === 'drop') brDropCur(); else brBuild(b.dataset.b); });
   h.querySelector('#brLeave').addEventListener('click', () => brLeave());
   r.querySelector('#brAgain').addEventListener('click', () => brEnter());
   r.querySelector('#brHome').addEventListener('click', () => brLeave());
@@ -14983,6 +15067,8 @@ function brMap() {
   if (BR.state === 'bus' && BR.bus) { g.strokeStyle = 'rgba(255,255,255,.7)'; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(X(BR.bus.p0.x), Z(BR.bus.p0.z)); g.lineTo(X(BR.bus.p1.x), Z(BR.bus.p1.z)); g.stroke(); g.setLineDash([]); }
   g.font = 'bold 8px system-ui'; g.fillStyle = '#fff'; g.textAlign = 'center';
   for (const p of BR_POIS) g.fillText(p.n, X(T.cx + p.x), Z(T.cz + p.z) - 4);
+  for (const o of BR.pings || []) { g.fillStyle = BR_PING[o.k][2]; g.beginPath(); g.arc(X(o.x), Z(o.z), 3.5, 0, 7); g.fill(); }
+  for (const m of brMates()) { g.fillStyle = m.st.kn ? '#ff70a6' : '#4cc9f0'; g.beginPath(); g.arc(X(m.st.p[0]), Z(m.st.p[2]), 3, 0, 7); g.fill(); }
   const px = X(P.x), pz = Z(P.z), a = yaw + Math.PI;
   g.save(); g.translate(px, pz); g.rotate(-a); g.fillStyle = '#ffd23f'; g.strokeStyle = '#000'; g.beginPath(); g.moveTo(0, 6); g.lineTo(4, -4); g.lineTo(0, -2); g.lineTo(-4, -4); g.closePath(); g.fill(); g.stroke(); g.restore();
 }
@@ -26222,6 +26308,7 @@ function mpOnMsg(m) {
     case 'pnt': case 'pns': case 'gal': try { paintNet(m); } catch (e) { console.warn('paint', e); } break;
     case 'note': mpNote(m.text, 3); break;
     case 'rcar': case 'rgo': case 'rq': case 'rst': case 'rbt': case 'rfx': try { if (window.__race) __race.net(m); } catch (e) { console.warn('race', e); } break;   // 🏎️ yarış
+    case 'brrv': case 'brp': case 'brkn': case 'brl': case 'brlr': try { if (inRoyale && BR.state !== 'off') brTeamNet(m); } catch (e) { console.warn('br', e); } break;
     case 'brs': case 'brb': case 'brh': case 'brd': case 'brk': case 'brc': case 'brq': try { brNet(m); } catch (e) { console.warn('br', e); } break;   // 🤝 ortak battle royale
     case 'mkp': case 'mkq': try { if (window.__mkNet) window.__mkNet(m); } catch (e) { console.warn('mk', e); } break;   // 🏪 harita mağazası (odadakiler)
     case 'em': mpEmoteShow(f, m.id); if (m.to === MP.me.id && m.ask) mpEmoteAsk(f, m.id); break;
@@ -26262,7 +26349,7 @@ const MPV = new THREE.Vector3(), MPV2 = new THREE.Vector3(), r2 = v => Math.roun
 function mpState() {
   charHolder.updateMatrixWorld(true); const p = charHolder.getWorldPosition(MPV), s = charHolder.getWorldScale(MPV2).x, J = MP.lookJ || mpJ(playerRig), j = [r2(J[0].position.y)];
   for (const o of J) j.push(r2(o.rotation.x), r2(o.rotation.y), r2(o.rotation.z));
-  const m = { t: 's', p: [r2(p.x), r2(p.y), r2(p.z)], ry: r2(charHolder.rotation.y), rx: r2(charHolder.rotation.x), rz: r2(charHolder.rotation.z), s: r2(s), a: curKey, h: inHouse ? MP.myHouse : '', j, lv: MP_LK.v, tk: MP.talk ? 1 : 0, iv: ADM.invis ? 1 : 0, dd: dead ? 1 : 0, tr: MPF.trail ? 1 : 0 };
+  const m = { t: 's', p: [r2(p.x), r2(p.y), r2(p.z)], ry: r2(charHolder.rotation.y), rx: r2(charHolder.rotation.x), rz: r2(charHolder.rotation.z), s: r2(s), a: curKey, h: inHouse ? MP.myHouse : '', j, lv: MP_LK.v, tk: MP.talk ? 1 : 0, iv: ADM.invis ? 1 : 0, dd: dead ? 1 : 0, kn: inRoyale && BR.knock ? 1 : 0, tr: MPF.trail ? 1 : 0 };
   if (carried && carried.type === 'mp') { const o = carried.ref.av && carried.ref.av.holder; if (o) m.hp = [r2(o.position.x), r2(o.position.y), r2(o.position.z)]; }
   const ob = mpObjOut(); if (ob.length) m.ob = ob;
   try { const vr = mpxVrMode(); if (vr) m.vr = vr; const xf = mpxFlags(); if (xf) m.x = xf; if (MPX.sign && mpxHas('sign')) m.sg = MPX.sign; mpxHandsOut(m); } catch (e) {}   // ✨ süsler, 🥽 VR, eller

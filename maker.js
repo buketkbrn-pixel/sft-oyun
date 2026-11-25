@@ -127,7 +127,7 @@ const MK_WATER = mkWaterMat();
    hit: c=[yarıçap, üst] (üstüne çıkılmaz) · s=[yarıçap, üst] (üstüne çıkılır) · b=[yarı en, yarı boy, üst] (dönük kutu, üstüne çıkılır)
    act: oyunda ne yapar · col: renk seçilebilir (varsayılan) · snap: ızgara adımı · flat: zemine yapışık
    ===================================================================== */
-const MK_CATS = [['yapi', '🏠', 'Yapılar'], ['doga', '🌳', 'Doğa'], ['yol', '🛣️', 'Yollar'], ['esya', '🪑', 'Eşyalar'], ['sahil', '🏖️', 'Sahil · Miami'], ['macera', '👹', 'Macera · Canavar'], ['ozel', '✨', 'Özel'], ['npc', '🧍', 'NPC'], ['sekil', '🔷', 'Şekiller']];
+const MK_CATS = [['yapi', '🏠', 'Yapılar'], ['doga', '🌳', 'Doğa'], ['yol', '🛣️', 'Yollar'], ['esya', '🪑', 'Eşyalar'], ['sahil', '🏖️', 'Sahil · Miami'], ['macera', '👹', 'Macera · Canavar'], ['bulmaca', '🧩', 'Bulmaca'], ['ozel', '✨', 'Özel'], ['npc', '🧍', 'NPC'], ['sekil', '🔷', 'Şekiller']];
 const MK_I = {};
 const mkItem = (id, cat, ic, n, f, o = {}) => { MK_I[id] = { id, cat, ic, n, f, ...o }; };
 
@@ -328,6 +328,43 @@ mkItem('bones', 'macera', '🦴', 'Kemik yığını', o => mkS('bones', g => { f
 mkItem('torch', 'macera', '🔥', 'Meşale', o => { const g = mkS('torchb', gg => { mkCy(gg, .05, .07, 1.6, 0x5c3b1e, 0, .8, 0, 6); mkCy(gg, .12, .08, .25, 0x444444, 0, 1.65, 0, 8); }); const f = mkCo(g, .13, .4, new G.THREE.MeshBasicMaterial({ color: 0xffa62b, toneMapped: false }), 0, 1.95, 0, 8); f.name = 'flame'; return g; }, { act: 'fire', hit: { c: [.1, 2] } });
 mkItem('crystal', 'macera', '💎', 'Kristal', o => { const c = mkC(o, 0x4cc9f0), g = mkS('crystal' + c, gg => { for (let i = 0; i < 5; i++) { const m = G.mesh(new G.THREE.OctahedronGeometry(.35 + (i === 0 ? .3 : 0), 0), G.M(c, { emissive: c, emissiveIntensity: .7, roughness: .2, metalness: .2, flatShading: true }), i ? Math.cos(i * 1.6) * .45 : 0, i ? .35 : .7, i ? Math.sin(i * 1.6) * .45 : 0); m.scale.y = 1.8; gg.add(m); } }); return g; }, { hit: { s: [.6, 1.3] }, col: 0x4cc9f0 });
 mkItem('target', 'macera', '🎯', 'Hedef tahtası', o => mkS('target', g => { for (const x of [-.4, .4]) mkB(g, .08, 1.6, .08, 0x6b4423, x, .8, -.1); [[.6, 0xffffff], [.48, 0xe63946], [.36, 0xffffff], [.24, 0xe63946], [.12, 0xffd166]].forEach(([r, c], i) => { const m = mkCy(g, r, r, .06, c, 0, 1.5, i * .01, 24); m.rotation.x = Math.PI / 2; }); }), { hit: { b: [.6, .1, 2.1] } });
+// 🧩 BULMACA: renk = kanal. Buton / basınç plakası / zamanlayıcı bir kanalı açar; aynı renkteki kapı açılır, köprü belirir, tuzak söner, lamba yanar.
+// Anahtar aynı renkteki kilitli kapıyı açar. İtilebilir kutuyu plakanın üstüne it.
+const PZ_COL = 0xe63946;
+const pzMat = (c, e = .25) => new G.THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: e, roughness: .4 });
+function pzDoorModel(o, locked) {
+  const c = mkC(o, locked ? 0xffd166 : PZ_COL), g = new G.THREE.Group(), frame = G.M(0x5c6370, { roughness: .6 });
+  for (const x of [-1.65, 1.65]) mkB(g, .3, 3.5, .45, frame, x, 1.75); mkB(g, 3.6, .3, .45, frame, 0, 3.55);
+  const panel = new G.THREE.Group(); panel.name = 'pzPanel'; g.add(panel);
+  const pm = locked ? G.M(0x8b5a2b, { roughness: .7 }) : new G.THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: .2, roughness: .35, transparent: true, opacity: .88 });
+  mkB(panel, 3, 3.3, .22, pm, 0, 1.65);
+  if (locked) { for (const y of [.8, 2.5]) mkB(panel, 3.02, .14, .24, G.M(0x3a3f4a), 0, y); const lk = new G.THREE.Group(); lk.position.set(0, 1.6, .2); panel.add(lk); mkB(lk, .5, .45, .14, pzMat(c, .4), 0, 0); const sh = G.mesh(new G.THREE.TorusGeometry(.16, .05, 8, 16, Math.PI), G.M(0xc0c4c8, { metalness: .8, roughness: .3 }), 0, .22, 0); lk.add(sh); }
+  else for (const y of [.6, 1.65, 2.7]) mkB(panel, 2.6, .06, .24, pzMat(c, .8), 0, y);
+  g.userData.panel = panel; return g;
+}
+mkItem('pbutton', 'bulmaca', '🔘', 'Buton', o => { const c = mkC(o, PZ_COL), g = new G.THREE.Group(); mkCy(g, .32, .4, 1, 0x5c6370, 0, .5, 0, 14); mkCy(g, .42, .42, .1, 0x3a3f4a, 0, 1.03, 0, 18); const cap = mkCy(g, .3, .3, .16, pzMat(c, .3), 0, 1.14, 0, 18); g.userData.cap = cap; return g; },
+  { act: 'pbtn', puz: true, col: PZ_COL, hit: { c: [.4, 1.1] }, hint: 'Dokununca aynı renkteki kanalı açar ya da kapatır. Ayarlar: aç / kapa ya da 8 sn açık kalsın.' });
+mkItem('pplate', 'bulmaca', '⬜', 'Basınç plakası', o => { const c = mkC(o, PZ_COL), g = new G.THREE.Group(); mkB(g, 1.9, .08, 1.9, 0x3a3f4a, 0, .04); const top = mkB(g, 1.5, .1, 1.5, pzMat(c, .25), 0, .12); g.userData.top = top; return g; },
+  { act: 'plate', puz: true, col: PZ_COL, flat: true, hint: 'Üstünde biri (sen, canavar, NPC) ya da itilebilir kutu durdukça kanalı açık tutar.' });
+mkItem('ptimer', 'bulmaca', '⏱️', 'Zamanlayıcı', o => { const c = mkC(o, PZ_COL), g = new G.THREE.Group(); mkCy(g, .08, .1, 1.6, 0x5c6370, 0, .8, 0, 8); const face = mkCy(g, .5, .5, .12, 0xf4f1ea, 0, 1.9, 0, 24); face.rotation.x = Math.PI / 2; mkCy(g, .55, .55, .1, pzMat(c, .3), 0, 1.9, -.03, 24).rotation.x = Math.PI / 2; const hand = new G.THREE.Group(); hand.position.set(0, 1.9, .08); g.add(hand); mkB(hand, .05, .4, .03, 0x222222, 0, .18); g.userData.hand = hand; return g; },
+  { act: 'ptimer', puz: true, col: PZ_COL, hit: { c: [.15, 2.4] }, hint: 'Kendi kendine birkaç saniyede bir kanalı açıp kapatır (yanıp sönen köprüler için).' });
+mkItem('pkey', 'bulmaca', '🔑', 'Renkli anahtar', o => { const c = mkC(o, 0xffd166), g = new G.THREE.Group(), k = new G.THREE.Group(); k.name = 'spinc'; k.position.y = 1.1; g.add(k); const m = pzMat(c, .45); const ring = G.mesh(new G.THREE.TorusGeometry(.22, .07, 8, 18), m, 0, .28, 0); k.add(ring); mkB(k, .09, .55, .09, m, 0, -.12); mkB(k, .2, .08, .09, m, .1, -.3); mkB(k, .14, .08, .09, m, .08, -.16); return g; },
+  { act: 'pkey', puz: true, col: 0xffd166, hint: 'Alınca aynı renkteki kilitli kapıları açar.' });
+mkItem('cdoor', 'bulmaca', '🚪', 'Kanal kapısı', o => pzDoorModel(o, false),
+  { act: 'cdoor', puz: true, col: PZ_COL, hits: [{ b: [1.5, .15, 3.4] }, { c: [.2, 3.6], o: [-1.65, 0] }, { c: [.2, 3.6], o: [1.65, 0] }], hint: 'Aynı renkteki kanal açıkken açılır (Ters: kanal açıkken kapanır).' });
+mkItem('ldoor', 'bulmaca', '🔒', 'Kilitli kapı', o => pzDoorModel(o, true),
+  { act: 'ldoor', puz: true, col: 0xffd166, hits: [{ b: [1.5, .15, 3.4] }, { c: [.2, 3.6], o: [-1.65, 0] }, { c: [.2, 3.6], o: [1.65, 0] }], hint: 'Aynı renkte anahtarla gelince açılır ve açık kalır.' });
+mkItem('lbridge', 'bulmaca', '🌉', 'Işık köprüsü', o => { const c = mkC(o, PZ_COL), g = new G.THREE.Group(); const m = new G.THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: .6, transparent: true, opacity: .55, roughness: .2 }); const p = mkB(g, 4, .3, 4, m, 0, .15); g.userData.plat = p; for (const x of [-1.9, 1.9]) mkB(g, .12, .34, 4, pzMat(c, 1), x, .17); return g; },
+  { act: 'lbridge', puz: true, col: PZ_COL, hit: { b: [2, 2, .3] }, hint: 'Kanal açıkken belirir, üstünden geçilir (Ters: kanal açıkken kaybolur). Yükseğe koymak için ⬆️ kullan.' });
+mkItem('ctrap', 'bulmaca', '🔥', 'Alev ızgarası', o => { const c = mkC(o, PZ_COL), g = new G.THREE.Group(); mkB(g, 2, .12, 2, 0x2b2d33, 0, .06); for (let i = -3; i <= 3; i++) mkB(g, .06, .14, 1.9, 0x555a63, i * .27, .1); mkB(g, 2.05, .16, .1, pzMat(c, .6), 0, .1, 1); mkB(g, 2.05, .16, .1, pzMat(c, .6), 0, .1, -1);
+  const fl = new G.THREE.Group(); fl.name = 'pzFlames'; g.add(fl); const fm = new G.THREE.MeshBasicMaterial({ color: 0xff7b00, transparent: true, opacity: .85 }), fm2 = new G.THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: .9 });
+  for (let i = 0; i < 9; i++) { const x = (i % 3 - 1) * .6, z = (Math.floor(i / 3) - 1) * .6, f = G.mesh(new G.THREE.ConeGeometry(.22, 1.1, 7), fm, x, .65, z); f.name = 'flame'; fl.add(f); fl.add(G.mesh(new G.THREE.ConeGeometry(.11, .6, 6), fm2, x, .45, z)); }
+  g.userData.fl = fl; return g; },
+  { act: 'ctrap', puz: true, col: PZ_COL, flat: true, hint: 'Normalde yanar, aynı renkteki kanal açılınca söner (Ters: kanal açılınca yanar). Değersen kontrol noktasına dönersin.' });
+mkItem('lampc', 'bulmaca', '💡', 'Kanal lambası', o => { const c = mkC(o, PZ_COL), g = new G.THREE.Group(); mkCy(g, .07, .09, 2.2, 0x3a3f4a, 0, 1.1, 0, 8); const bm = new G.THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: .05, roughness: .3 }); const b = mkSp(g, .28, bm, 0, 2.4, 0, 16); g.userData.bulb = b; return g; },
+  { act: 'lampc', puz: true, col: PZ_COL, hit: { c: [.15, 2.6] }, hint: 'Kanal açıkken yanar: oyuncuya neyin açık olduğunu gösterir.' });
+mkItem('pcrate', 'bulmaca', '📦', 'İtilebilir kutu', o => { const g = new G.THREE.Group(); mkB(g, 1.6, 1.6, 1.6, 0xb5835a, 0, .8); const st = G.M(0x6b4423); for (const y of [.12, 1.48]) { mkB(g, 1.64, .14, .14, st, 0, y, .76); mkB(g, 1.64, .14, .14, st, 0, y, -.76); mkB(g, .14, .14, 1.64, st, .76, y); mkB(g, .14, .14, 1.64, st, -.76, y); } return g; },
+  { act: 'pcrate', puz: true, hit: { b: [.8, .8, 1.6] }, hint: 'Üstüne doğru yürüyerek it. Basınç plakasının üstüne koyabilirsin.' });
 mkItem('cage', 'macera', '⛓️', 'Kafes', o => mkS('cage', g => { mkCy(g, 1.2, 1.2, .1, 0x333333, 0, .05, 0, 16); mkCy(g, 1.2, 1.2, .1, 0x333333, 0, 2.6, 0, 16); for (let i = 0; i < 16; i++) { const a = i / 16 * 6.28; mkCy(g, .03, .03, 2.6, 0x555555, Math.cos(a) * 1.15, 1.3, Math.sin(a) * 1.15, 4); } }), { hit: { s: [1.2, 2.65] } });
 
 // ✨ ÖZEL
@@ -629,7 +666,7 @@ function mkArea() {
   mkModeUI();
 }
 function mkStartPlay(fromOpen) {
-  mkCancel(true); MK.edit = false; mkGhostClear(); MK.finished = false; MK.check = null; MK.coins = 0;
+  mkCancel(true); MK.edit = false; mkGhostClear(); MK.finished = false; MK.check = null; MK.coins = 0; MK.keys = new Set(); MK.ch = {}; MK.chN = {};
   for (const r of MK.recs) mkResetRt(r);
   const sp = mkSpawnPt();
   if (!fromOpen) { G.player.position.set(sp.x, 0, sp.z); G.vel.set(0, 0, 0); G.vy = 0; G.facing = sp.f; G.yaw = sp.f - Math.PI; for (let i = 0; i < 16; i++) G.spawnDust(sp.x, 0, sp.z, 1.2, 1.6, 0, 0, 0x9ff5c8); }
@@ -641,6 +678,7 @@ function mkStartPlay(fromOpen) {
 function mkStartEdit(fromOpen) { MK.edit = true; for (const r of MK.recs) mkResetRt(r); mkModeUI(); if (!fromOpen) G.showMsg('✏️ ' + G.adT('Düzenleme'), 1); }
 function mkResetRt(rec) {
   const rt = rec.rt, a = rec.it.act; rec.g.visible = true;
+  if (rec.it.puz) mkPuzReset(rec);
   if (mkDyn(rec.it)) { rec.g.position.set(rt.hx, rec.o.y || 0, rt.hz); rec.g.rotation.y = rt.face; rec.inner.rotation.set(0, 0, 0); rec.inner.position.set(0, 0, 0); }
   if (a === 'mon') { rt.hp = rt.max; rt.st = 'idle'; rt.dead = 0; rt.kx = rt.kz = 0; rt.tx = rt.hx; rt.tz = rt.hz; }
   if (a === 'npc') { rt.tx = rt.hx; rt.tz = rt.hz; rt.wp = 0; rt.wait = Math.random(); }
@@ -893,6 +931,63 @@ function mkLightsTick(lit) {
 
 /* ---------- ⏱️ her kare ---------- */
 const MK_V3 = new G.THREE.Vector3();
+/* 🧩 bulmaca mantığı (oyunda): kanallar bir önceki karede hesaplanır */
+const PZ_DOTS = [[0xe63946, '🔴'], [0xf77f00, '🟠'], [0xffd166, '🟡'], [0x06d6a0, '🟢'], [0x2a9d8f, '🟢'], [0x3a86ff, '🔵'], [0x1d3557, '🔵'], [0x8338ec, '🟣'], [0xff70a6, '🩷'], [0x00f5d4, '🩵'], [0x8d5a2b, '🟤'], [0x222222, '⚫'], [0xffffff, '⚪']];
+function pzDot(c) { const A = new G.THREE.Color(c); let b = '⚪', bd = 9; for (const [h, e] of PZ_DOTS) { const B = new G.THREE.Color(h), d = (A.r - B.r) ** 2 + (A.g - B.g) ** 2 + (A.b - B.b) ** 2; if (d < bd) { bd = d; b = e; } } return b; }
+function mkPuzTick(rec, dt, P, gp) {
+  const { o, it, rt } = rec, a = it.act, U = rec.inner.userData, c = mkC(o, it.col), s = o.s || 1, dx = P.x - gp.x, dz = P.z - gp.z, d = Math.hypot(dx, dz), dy = P.y - gp.y;
+  const near = (r, h = 2.2) => d < r * s && dy > -.6 && dy < h;
+  if (a === 'pbtn') {
+    const inside = near(1.2, 2.6);
+    if (inside && !rt.in) { if ((o.m || 0) === 1) { rt.on = true; rt.t = 8; } else rt.on = !rt.on; G.play('ui', { at: gp, range: 30 }); for (let i = 0; i < 6; i++) G.spawnDust(gp.x, gp.y + 1.2, gp.z, .3, 1, 0, 0, c); }
+    rt.in = inside;
+    if ((o.m || 0) === 1 && rt.on) { rt.t -= dt; if (rt.t <= 0) { rt.on = false; G.play('iris', { at: gp, range: 30 }); } }
+    if (rt.on) MK.chN[c] = true;
+    U.cap.position.y = rt.on ? 1.08 : 1.14; U.cap.material.emissiveIntensity = rt.on ? 1.3 : .3;
+  } else if (a === 'plate') {
+    let on = near(1, 1.2);
+    if (!on) for (const r of MK.recs) { if (r === rec) continue; const ra = r.it.act; if (ra !== 'pcrate' && ra !== 'mon' && ra !== 'npc' && ra !== 'pet') continue; const q = r.g.position; if (Math.hypot(q.x - gp.x, q.z - gp.z) < (ra === 'pcrate' ? 1.15 : .95) * s && Math.abs(q.y - gp.y) < 1) { on = true; break; } }
+    if (on !== !!rt.on) G.play(on ? 'ui' : 'iris', { at: gp, range: 30, gain: .5 });
+    rt.on = on; if (on) MK.chN[c] = true; U.top.position.y = on ? .07 : .12; U.top.material.emissiveIntensity = on ? 1.1 : .25;
+  } else if (a === 'ptimer') {
+    const n = o.n || 3; rt.t = (rt.t || 0) + dt; if (Math.floor(rt.t / n) % 2 === 0) MK.chN[c] = true; U.hand.rotation.z = -(rt.t % n) / n * Math.PI * 2;
+  } else if (a === 'pkey') {
+    if (!rt.got && near(1.1, 2.6)) { rt.got = true; rec.g.visible = false; MK.keys.add(c); G.play('magic', { gain: .6 }); G.showMsg('🔑 ' + G.adT('Anahtar alındı!') + ' ' + pzDot(c), 1.4); for (let i = 0; i < 12; i++) G.spawnDust(gp.x, gp.y + 1, gp.z, .5, 1.5, 0, 0, c); }
+  } else if (a === 'cdoor' || a === 'ldoor') {
+    let open;
+    if (a === 'cdoor') { const on = !!MK.ch[c]; open = o.inv ? !on : on; }
+    else { if (!rt.open && d < 2.7 * s && dy > -1 && dy < 3) { if (MK.keys.has(c)) { rt.open = true; G.play('magic'); G.showMsg('🔓 ' + G.adT('Kapı açıldı!'), 1.2); } else if (!rt.warn) { rt.warn = true; G.showMsg('🔒 ' + G.adT('Bu kapı için anahtar lazım:') + ' ' + pzDot(c), 1.8); } } if (d > 4.5 * s) rt.warn = false; open = !!rt.open; }
+    const was = rt.k || 0; rt.k = G.THREE.MathUtils.clamp(was + (open ? dt / .6 : -dt / .6), 0, 1);
+    if ((was === 0 && rt.k > 0) || (was === 1 && rt.k < 1)) G.play('iris', { at: gp, range: 40 });
+    U.panel.position.y = -3.4 * rt.k; U.panel.visible = rt.k < .99; if (rec.ob[0]) rec.ob[0].pass = rt.k > .55;
+  } else if (a === 'lbridge') {
+    const on = !!MK.ch[c], show = o.inv ? !on : on; if (show !== rt.show) { rt.show = show; G.play(show ? 'magic' : 'iris', { at: gp, range: 30, gain: .4 }); }
+    rec.inner.visible = show; if (show) U.plat.material.opacity = .5 + Math.sin(G.elapsed * 3) * .08; for (const ob of rec.ob) ob.pass = !show;
+  } else if (a === 'ctrap') {
+    const on = !!MK.ch[c], burn = o.inv ? on : !on; U.fl.visible = burn;
+    if (burn) { const cs = Math.cos(o.r || 0), sn = Math.sin(o.r || 0), lx = (cs * dx - sn * dz) / s, lz = (sn * dx + cs * dz) / s; if (Math.abs(lx) < 1 && Math.abs(lz) < 1 && dy > -.3 && dy < 1.3 && !G.FLY.on) mkHurt(G.adT('🔥 Yandın!')); }
+  } else if (a === 'lampc') { const on = !!MK.ch[c]; U.bulb.material.emissiveIntensity += ((on ? 2.4 : .05) - U.bulb.material.emissiveIntensity) * Math.min(1, dt * 10); }
+  else if (a === 'pcrate') pzPush(rec, dt, P);
+}
+function pzPush(rec, dt, P) {   // 📦 kutuyu it: oyuncu kutuya doğru yürürken baskın eksende kayar, engele çarpınca durur
+  const g = rec.g, ob = rec.ob[0]; if (!ob || dt <= 0) return; const s = rec.o.s || 1, R = .8 * s, dx = g.position.x - P.x, dz = g.position.z - P.z, d = Math.hypot(dx, dz);
+  if (d > R + 1 || Math.abs(P.y - g.position.y) > 1.2) return;
+  const v = G.vel, vs = Math.hypot(v.x, v.z); if (vs < .8 || (v.x * dx + v.z * dz) / (vs * (d || 1)) < .5) return;
+  let mx = 0, mz = 0; if (Math.abs(dx) > Math.abs(dz)) mx = Math.sign(dx); else mz = Math.sign(dz);
+  const st = Math.min(vs, 3.4) * dt, nx = g.position.x + mx * st, nz = g.position.z + mz * st, Y = g.position.y;
+  for (const o2 of G.obstacles) { if (rec.ob.includes(o2) || o2.pass) continue; if (o2.y0 != null && o2.y0 > Y + 1.4) continue; if (o2.top != null && o2.top < Y + .25) continue;
+    if (o2.box) { if (Math.abs(nx - o2.x) < o2.hx + R * .92 && Math.abs(nz - o2.z) < o2.hz + R * .92) return; } else if (Math.hypot(nx - o2.x, nz - o2.z) < (o2.r || 0) + R * .92) return; }
+  const A = mkA(); if (Math.hypot(nx - A.cx, nz - A.cz) > A.r - 2) return;
+  g.position.x = nx; g.position.z = nz; ob.x += mx * st; ob.z += mz * st; if (ob.poly) for (let i = 0; i < ob.poly.length; i += 2) { ob.poly[i] += mx * st; ob.poly[i + 1] += mz * st; }
+  rec.rt.moved = true; rec.rt.sndT = (rec.rt.sndT || 0) - dt; if (rec.rt.sndT <= 0) { rec.rt.sndT = .3; G.spawnDust(g.position.x - mx * R, Y + .1, g.position.z - mz * R, .4, .6, 0, 0, 0xc8b28a); }
+}
+function mkPuzReset(rec) {
+  const rt = rec.rt, U = rec.inner.userData, a = rec.it.act; rt.on = false; rt.in = false; rt.t = 0; rt.k = 0; rt.open = false; rt.warn = false; rt.got = false; rt.show = undefined;
+  if (U.panel) { U.panel.position.y = 0; U.panel.visible = true; } if (U.cap) { U.cap.position.y = 1.14; U.cap.material.emissiveIntensity = .3; } if (U.top) { U.top.position.y = .12; U.top.material.emissiveIntensity = .25; }
+  if (U.bulb) U.bulb.material.emissiveIntensity = .05; if (U.fl) U.fl.visible = true; if (U.plat) U.plat.material.opacity = .55; rec.inner.visible = true;
+  if (a === 'pcrate' && rt.moved) { const A = mkA(); rec.g.position.set(A.cx + rec.o.x, rec.o.y || 0, A.cz + rec.o.z); mkPhys(rec); rt.moved = false; }
+  for (const ob of rec.ob) ob.pass = false;
+}
 function mkTick(dt) {
   if (!G.inMaker || !MK.map) return;
   if (MK.edit && (!mkAdm() || MK.map.dl)) mkStartPlay();
@@ -907,6 +1002,7 @@ function mkTick(dt) {
   MK.hurtT = Math.max(0, (MK.hurtT || 0) - dt); MK.portT = Math.max(0, (MK.portT || 0) - dt); MK.boostT = Math.max(0, (MK.boostT || 0) - dt);
   if (dt > 0) { MK.saveT -= dt; if (MK.dirty && MK.saveT <= 0) mkSaveNow(true); }
   // canlandırmalar
+  if (!MK.edit) { MK.ch = MK.chN || {}; MK.chN = {}; if (!MK.keys) MK.keys = new Set(); }   // 🧩 kanallar
   const cam = G.camera.position; let talk = null, td = 2.7; MK.near = null; let nd = 2.8;
   for (const rec of MK.recs) {
     const g = rec.g, gp = g.position, far = Math.abs(gp.x - cam.x) + Math.abs(gp.z - cam.z) > 170;
@@ -928,6 +1024,7 @@ function mkTick(dt) {
       if (rt.k !== was) { mkPitSet(rec.inner, rt.k); if (was === 0 || was === 1) G.play('iris', { at: gp, range: 40 }); if (rt.k === 0 || rt.k === 1) G.play('iris', { at: gp, range: 40, clank: true }); }
       if (!MK.edit && rt.k > .85 && d < MK_PIT_R * s * .85 && P.y < gp.y + .6 && !G.teleporting && !G.dead) mkFallCloset(rec);
     }
+    if (rec.it.puz) { if (!MK.edit) mkPuzTick(rec, dt, P, gp); continue; }
     if (MK.edit || far) continue;
     // ▶️ oyunda dokununca olanlar
     const dx = P.x - gp.x, dz = P.z - gp.z, d = Math.hypot(dx, dz), s = rec.o.s || 1, rt = rec.rt, dy = P.y - gp.y;
@@ -970,7 +1067,7 @@ function mkEditTick(dt) {
 function mkPlayHud() {
   const el = MK.hudEl; if (!el) return;
   const fin = MK.recs.some(r => r.it.act === 'finish'), coins = MK.recs.filter(r => r.it.act === 'coin').length;
-  const parts = []; if (fin && !MK.finished) parts.push('⏱️ ' + (G.elapsed - MK.t0).toFixed(1)); if (coins) parts.push(`🪙 ${MK.coins || 0}/${coins}`); if (MK.map.best && fin) parts.push('🏆 ' + MK.map.best.toFixed(1));
+  const parts = []; if (fin && !MK.finished) parts.push('⏱️ ' + (G.elapsed - MK.t0).toFixed(1)); if (MK.keys && MK.keys.size) parts.push('🔑 ' + [...MK.keys].map(pzDot).join('')); if (coins) parts.push(`🪙 ${MK.coins || 0}/${coins}`); if (MK.map.best && fin) parts.push('🏆 ' + MK.map.best.toFixed(1));
   const s = parts.join(' · '); if (s !== MK.hudS) { MK.hudS = s; el.textContent = s; el.style.display = s ? 'block' : 'none'; }
 }
 /* 🧍 NPC davranışı */
@@ -1166,7 +1263,7 @@ function mkUI() {
   else if (MK.sel && MK.edit) { const it = MK.sel.it; h = `<span class="lbl">${it.ic} ${G.adT(it.n)}</span><button data-a="move">✋ ${G.adT('Taşı')}</button><button data-a="up">⬆️</button><button data-a="down">⬇️</button>` + (it.col !== undefined ? `<button data-a="color">🎨</button>` : '') + `<button data-a="dup">📋 ${G.adT('Kopyala')}</button>` + (mkHasProps(it) ? `<button data-a="props">⚙️ ${G.adT('Özellikler')}</button>` : '') + (it.act === 'npc' ? `<button data-a="route">🧭 ${G.adT('Rota')}</button>` : '') + (it.free ? `<button data-a="frEdit">〰️ ${G.adT('Noktaları düzenle')}</button>` : '') + `<button class="del" data-a="del">🗑️</button><button data-a="cancel">✖</button>`; }
   S.innerHTML = h; S.classList.toggle('on', !!h && MK.edit && G.inMaker);
 }
-const mkHasProps = it => !!(it.txt || it.npc || it.act === 'mon' || it.act === 'veh' || it.act === 'chest' || it.act === 'portal');
+const mkHasProps = it => !!(it.txt || it.npc || it.act === 'mon' || it.act === 'veh' || it.act === 'chest' || it.act === 'portal' || (it.puz && it.act !== 'pcrate'));
 function mkCatShow(on) {
   if (MK.catOpen && !on) MK.uiT = performance.now(); MK.catOpen = on; G.$('mkCat').classList.toggle('on', on);
   if (on) { mkUnlock(); mkCatRender(); if (MK.ghost) MK.ghost.visible = false; } else if (document.activeElement && document.activeElement.id === 'mkQ') document.activeElement.blur();
@@ -1176,7 +1273,7 @@ function mkCatRender() {
   G.$('mkTabs').innerHTML = MK_CATS.map(([k, ic, n]) => `<button data-c="${k}" class="${!q && MK.cat === k ? 'on' : ''}">${ic} ${G.adT(n)}</button>`).join('');
   const items = Object.values(MK_I).filter(it => q ? (G.adT(it.n) + ' ' + it.n).toLocaleLowerCase('tr').includes(q) : it.cat === MK.cat);
   G.$('mkGrid').innerHTML = items.map(it => `<button data-i="${it.id}" class="${MK.item === it.id ? 'on' : ''}"><span>${it.ic}</span><small>${G.adT(it.n)}</small></button>`).join('') || `<div class="tip">${G.adT('Bulunamadı')}</div>`;
-  G.$('mkFoot').textContent = { yol: G.adT('Yollar ızgarasız: istediğin yere koy, ⟲⟳ ile 15° döndür (Alt+R daha ince). 〰️ Serbest yol ile noktaları sırayla koyup kıvrımlı yol çiz.'), npc: G.adT('NPC’yi koyduktan sonra seç → ⚙️ Özellikler: isim, söz, renk, şapka, davranış · 🧭 Rota ile yol çiz.'), macera: G.adT('Canavarlar, para, lav, trambolin, portal ▶️ Oyna’da çalışır. Aynı renkteki iki portal birbirine bağlanır.'), sekil: G.adT('Şekillerin rengini 🎨 ile, boyutunu ➖➕ ile, yüksekliğini seçip ⬆️⬇️ ile değiştir.'), ozel: G.adT('İris çukuru giyinme odasına iner. Araç noktası: oyunda V ile araç çağırırsın.') }[MK.cat] || G.adT('Bir eşya seç, nişan al (ya da ekrana dokun) ve ✅ Koy. Seçmek için 👆.');
+  G.$('mkFoot').textContent = { bulmaca: G.adT('Renk = kanal: aynı renkteki buton, plaka ve zamanlayıcı; aynı renkteki kapıyı, köprüyü, alevi ve lambayı yönetir. Rengi eşyayı seçip ⚙️ ile değiştir.'), yol: G.adT('Yollar ızgarasız: istediğin yere koy, ⟲⟳ ile 15° döndür (Alt+R daha ince). 〰️ Serbest yol ile noktaları sırayla koyup kıvrımlı yol çiz.'), npc: G.adT('NPC’yi koyduktan sonra seç → ⚙️ Özellikler: isim, söz, renk, şapka, davranış · 🧭 Rota ile yol çiz.'), macera: G.adT('Canavarlar, para, lav, trambolin, portal ▶️ Oyna’da çalışır. Aynı renkteki iki portal birbirine bağlanır.'), sekil: G.adT('Şekillerin rengini 🎨 ile, boyutunu ➖➕ ile, yüksekliğini seçip ⬆️⬇️ ile değiştir.'), ozel: G.adT('İris çukuru giyinme odasına iner. Araç noktası: oyunda V ile araç çağırırsın.') }[MK.cat] || G.adT('Bir eşya seç, nişan al (ya da ekrana dokun) ve ✅ Koy. Seçmek için 👆.');
 }
 G.$('mkTabs').addEventListener('click', e => { const b = e.target.closest('[data-c]'); if (!b) return; MK.cat = b.dataset.c; G.$('mkQ').value = ''; G.play('ui', { gain: .4 }); mkCatRender(); });
 G.$('mkGrid').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; G.play('ui', { gain: .5 }); mkPickItem(b.dataset.i); mkCatRender(); if (G.touchMode || matchMedia('(max-width: 900px)').matches) mkCatShow(false); });
@@ -1221,6 +1318,10 @@ function mkPropOpen(rec) {
   if (it.act === 'veh') h += `<div class="mkSub">${G.adT('Araç')}</div>` + opts('k', Object.keys(G.NV_DEF).map(k => [k, G.NV_DEF[k].ic + ' ' + G.NV_DEF[k].tr]), o.k || 'moto');
   if (it.act === 'chest') h += `<div class="mkSub">${G.adT('İçindeki para')}</div>` + opts('coins', [[5, '🪙 5'], [10, '🪙 10'], [25, '💰 25'], [100, '💎 100']], o.coins || 10);
   if (it.act === 'portal') h += `<div class="tip">${G.adT('Aynı renkteki kapılar birbirine bağlanır. Renk = kanal.')}</div>` + sw('c', o.c ?? it.col);
+  if (it.puz && it.act !== 'pcrate') { h += `<div class="tip">🧩 ${G.adT(it.hint)}</div><div class="mkSub">${G.adT('Renk = kanal')}</div>` + sw('c', o.c ?? it.col);
+    if (it.act === 'pbtn') h += `<div class="mkSub">${G.adT('Çalışma')}</div>` + opts('m', [[0, '🔁 Aç / kapa'], [1, '⏱️ 8 sn açık kalır']], o.m || 0);
+    if (it.act === 'ptimer') h += `<div class="mkSub">${G.adT('Aralık')}</div>` + opts('n', [[2, '2 sn'], [3, '3 sn'], [5, '5 sn'], [8, '8 sn']], o.n || 3);
+    if (['cdoor', 'lbridge', 'ctrap'].includes(it.act)) h += `<div class="mkSub">${G.adT('Yön')}</div>` + opts('inv', [[0, '➡️ Normal'], [1, '🔄 Ters']], o.inv || 0); }
   h += `<div class="mkRow" style="margin-top:14px"><button class="mkB pri" data-a="ok">✅ ${G.adT('Kaydet')}</button><button class="mkB" data-a="x">${G.adT('Vazgeç')}</button></div>`;
   const tmp = JSON.parse(JSON.stringify(o));
   mkDlg(h, (a, b) => {
