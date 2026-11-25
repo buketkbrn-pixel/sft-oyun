@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.23</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.24</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -8950,12 +8950,23 @@ $('btnPause').addEventListener('click', e => { e.stopPropagation(); if (!started
 pauseEl.addEventListener('mousedown', e => e.stopPropagation());
 
 // Kafayı gizle (gölgesi kalsın diye sadece görüntüsü kapanır)
+// 🐞 Eskiden çıkarken kafadaki HER parçayı görünür yapıyordu: gizli duran tarama saçı / yüz, Sigma parçaları "durduk yere" çıkıyordu.
+// Şimdi gizlerken her parçanın önceki hâli not edilir, çıkarken aynen geri konur; sonra saç ve Sigma kendi doğru hâllerini yeniden uygular.
+let HEAD_VIS = null;
 function setHeadHidden(h) {
-  if (h === headHidden || !playerRig) return;
+  if (!playerRig) return;
+  const kids = () => { const L = playerRig.head.children.slice(), l0 = playerRig.look.children[0]; if (l0 && l0 !== playerRig.head && !L.includes(l0)) L.push(l0); return L; };
+  if (h && headHidden) { for (const c of kids()) { if (!HEAD_VIS.has(c)) HEAD_VIS.set(c, c.visible); else if (c.visible) HEAD_VIS.set(c, true); c.visible = false; } return; }   // gizliyken başka bir şey açtıysa: not et, yine gizle
+  if (h === headHidden) return;
   headHidden = h;
   playerRig.headMat.colorWrite = !h; playerRig.headMat.depthWrite = !h;
-  for (const c of playerRig.head.children) c.visible = !h;
-  if (playerRig.look.children[0]) playerRig.look.children[0].visible = !h;
+  if (h) { HEAD_VIS = new Map(); for (const c of kids()) { HEAD_VIS.set(c, c.visible); c.visible = false; } }
+  else {
+    for (const c of kids()) if (HEAD_VIS && HEAD_VIS.has(c)) c.visible = HEAD_VIS.get(c);
+    HEAD_VIS = null;
+    try { scHairApply(); } catch (e) {}
+    try { if (SIGMA.built) { const act = sigmaActive(); for (const hh of SIGMA.hulls) if (hh.parent === playerRig.head) hh.visible = act; for (const g of SIGMA.groups) if (g.parent === playerRig.head) g.visible = act; } } catch (e) {}
+  }
 }
 // Göz konumu: kafanın ortası, biraz önü
 function eyePos(out) {
@@ -27667,6 +27678,7 @@ function scHairApply(L = SCN.look) {
     new THREE.TextureLoader().load(L.face, t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; SCN_FACE.material.map = t; SCN_FACE.material.needsUpdate = true; if (old) old.dispose(); });
   }
   SCN_FACE.visible = fOn; for (const e of scStickEyes()) e.visible = !fOn;
+  if (headHidden && HEAD_VIS) { for (const c of [SCN_HAIR, SCN_FACE, ...scStickEyes()]) { HEAD_VIS.set(c, c.visible); c.visible = false; } }   // birinci şahısta kafa gizli kalsın
 }
 function patiOwnMats() {   // Pati'nin malzemeleri başkalarıyla ortak: önce kendine ait kopyalar
   const P = HERO.rigs && HERO.rigs.pati; if (!P || !P.mats) return null; if (P.own) return P.own;
