@@ -1,4 +1,4 @@
-/* 🗝️ S.F.T · Zindan (dungeon.js) — maceracıdan gidilir. Numaralı kapılarla art arda gelen 25 oda: meşaleli koridorlar, parmaklıklı hücreler,
+/* 🗝️ S.F.T · Zindan (dungeon.js) — maceracıdan gidilir. Numaralı kapılarla art arda gelen 40 oda: meşaleli koridorlar, parmaklıklı hücreler,
    sallanan zincirler, labirent, diken ve ok tuzakları, zifiri karanlık (🔥 çakmak), kol bulmacası, anahtar sandıkları, basınç plakaları,
    uyanan iskeletler ve sonda Kemik Kral. Her girişte odalar farklı dizilir (çok oyunculuda herkes aynı zindana girer).
    index.html bunu yükler; oyunun değişkenlerine window.__sftG (G) ile erişir. Tasarımlar bu oyuna özgüdür. */
@@ -8,7 +8,7 @@ const T = G.THREE, $ = id => document.getElementById(id), adT = s => G.adT(s);
 G.AREAS.dungeon = { cx: -36000, cz: 36000, r: 3000, bg: 0x030406, fog: [4, 34], sky: 0x8a90b0, gnd: 0x45434c, sunC: 0x7d8bb0, sunI: .15 };
 G.LOAD_NAMES.dungeon = 'Zindan';
 const A = () => G.AREAS.dungeon;
-const NROOM = 24, WALLH = 5.2, TALL = 500;   // TALL: duvarlara tırmanılmasın
+const NROOM = 39, WALLH = 6.2, TALL = 500;   // TALL: duvarlara tırmanılmasın
 const DG = { g: new T.Group(), rooms: [], cur: -1, seed: 0, pend: 0, on: false, lighter: false, fuel: 100, light: null, torchL: [], boss: null, arrows: [], lastHit: -9, inv: 0, ac: null };
 DG.g.name = 'dungeonRoot';
 let RND = Math.random;
@@ -40,7 +40,7 @@ function droneOn(on) {
   const c = on ? ac() : DG.ac; if (!c) return;
   if (on && !DG.drone) { const g = c.createGain(); g.gain.value = 0; g.connect(DG.out); const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 230; f.connect(g);
     const os = [55, 82.4, 55.7].map((fr, i) => { const o = c.createOscillator(); o.type = i === 1 ? 'triangle' : 'sine'; o.frequency.value = fr; o.connect(f); o.start(); return o; });
-    g.gain.setValueAtTime(0, c.currentTime); g.gain.linearRampToValueAtTime(.07, c.currentTime + 2); DG.drone = { g, os }; }
+    g.gain.setValueAtTime(0, c.currentTime); g.gain.linearRampToValueAtTime(.03, c.currentTime + 2); DG.drone = { g, os }; }
   else if (!on && DG.drone) { const d = DG.drone; DG.drone = null; d.g.gain.cancelScheduledValues(c.currentTime); d.g.gain.setValueAtTime(d.g.gain.value, c.currentTime); d.g.gain.linearRampToValueAtTime(0, c.currentTime + .6); setTimeout(() => d.os.forEach(o => { try { o.stop(); } catch (e) {} }), 800); }
 }
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, () => { if (DG.ac && DG.ac.state === 'suspended') DG.ac.resume().catch(() => {}); }, { passive: true });
@@ -87,8 +87,8 @@ function plan(seed) {
     let type = i === 0 ? 'start' : i === NROOM ? 'boss' : null;
     if (!type) { if (!bag.length) bag = TYPES.slice().sort(() => RND() - .5); let k = bag.findIndex(t => t !== last && !(i < 3 && (t === 'skel' || t === 'dark' || t === 'traps'))); if (k < 0) k = 0; type = bag.splice(k, 1)[0]; }
     last = type; let w, l;
-    if (type === 'maze') { w = 24; l = 26; } else if (type === 'boss') { w = 30; l = 32; } else if (type === 'traps') { w = 10; l = 30; } else if (type === 'start') { w = 14; l = 16; }
-    else if (type === 'jail' || type === 'hall') { w = 10 + RI(0, 2); l = 24 + RI(0, 2) * 4.6; } else { w = 14 + RI(0, 4); l = 16 + RI(0, 6); }
+    if (type === 'maze') { w = 32; l = 34; } else if (type === 'boss') { w = 38; l = 40; } else if (type === 'traps') { w = 12; l = 38; } else if (type === 'start') { w = 16; l = 18; }
+    else if (type === 'jail' || type === 'hall') { w = 11 + RI(0, 3); l = 30 + RI(0, 3) * 4.55; } else { w = 17 + RI(0, 6); l = 20 + RI(0, 9); }
     if (w / 2 < Math.abs(pdx) + 1.8) w = 2 * (Math.abs(pdx) + 1.8);
     const doorX = ['maze', 'boss', 'traps', 'jail'].includes(type) ? 0 : RI(-1, 1) * Math.floor(w / 4);
     L.push({ i, type, w, l, z0: z, z1: z + l, doorX, pdx, seed: (seed * 31 + i * 977) | 0, built: false, solved: !['lever', 'key', 'plates', 'skel', 'boss'].includes(type) });
@@ -183,7 +183,7 @@ const TYPE_BUILD = {
   start(rm, g) {
     const s = new T.Mesh(new T.PlaneGeometry(6, 1.3), txtMat('🗝️ ' + adT('ZİNDAN') + ' 🗝️', '#ffd166', 'rgba(15,12,10,.9)', 512, 110, .62)); s.position.set(0, 3.7, rm.z0 + .02); g.add(s);
     const s2 = new T.Mesh(new T.PlaneGeometry(6.4, .62), txtMat(adT('🔥 F: çakmak · V: kullan · vur: iskelet'), '#e9e2cf', 'rgba(15,12,10,.8)', 900, 88, .5)); s2.position.set(0, 2.55, rm.z0 + .02); g.add(s2);
-    const s3 = new T.Mesh(new T.PlaneGeometry(6.4, .55), txtMat(adT('25 oda · sonda Kemik Kral seni bekliyor'), '#c9b8ff', 'rgba(15,12,10,.75)', 900, 80, .5)); s3.position.set(0, 1.8, rm.z0 + .02); g.add(s3);
+    const s3 = new T.Mesh(new T.PlaneGeometry(6.4, .55), txtMat(adT(`${NROOM + 1} oda · sonda Kemik Kral seni bekliyor`), '#c9b8ff', 'rgba(15,12,10,.75)', 900, 80, .5)); s3.position.set(0, 1.8, rm.z0 + .02); g.add(s3);
     for (const x of [-4, 4]) { box(g, .7, .7, .7, mats().wood, x, .35, rm.z0 + 4); wallOb(rm, x, rm.z0 + 4, .35, .35, .7); box(g, .5, .5, .5, mats().wood, x + .1, .95, rm.z0 + 4); }
     chain(rm, g, -2, rm.z0 + 8, 10); chain(rm, g, 2.5, rm.z0 + 10, 7); chain(rm, g, 0, rm.z0 + 13, 14);
     skelDecor(g, -6.4, rm.z0 + 7, Math.PI / 2, 'sit');
@@ -197,16 +197,16 @@ const TYPE_BUILD = {
     for (let k = 0; k < 4; k++) chain(rm, g, R(-hw + 3, hw - 3), R(rm.z0 + 2, rm.z1 - 2), RI(4, 10));
     const tb = new T.Group(); tb.position.set(0, 0, rm.z0 + 1.6); g.add(tb); box(tb, 1.4, .08, .7, mats().wood, 0, .8, 0); for (const x of [-.6, .6]) box(tb, .08, .8, .6, mats().wood, x, .4, 0); const kr = new T.Mesh(new T.TorusGeometry(.12, .02, 5, 12), mats().iron); kr.rotation.x = Math.PI / 2; kr.position.set(.3, .86, 0); tb.add(kr); },
   maze(rm, g) {   // 6x6 hücreli labirent (her girişte farklı)
-    const N = 6, C = 4, ox = -N * C / 2, oz = rm.z0 + 1, vis = new Array(N * N).fill(false);
+    const N = 8, C = 4, ox = -N * C / 2, oz = rm.z0 + 1, vis = new Array(N * N).fill(false);
     const H = new Array((N + 1) * N).fill(true), V = new Array(N * (N + 1)).fill(true), st = [[N >> 1, 0]]; vis[N >> 1] = true;
     while (st.length) { const [x, y] = st[st.length - 1], nb = [[x + 1, y, 'v', x + 1, y], [x - 1, y, 'v', x, y], [x, y + 1, 'h', x, y + 1], [x, y - 1, 'h', x, y]].filter(([p, q]) => p >= 0 && q >= 0 && p < N && q < N && !vis[q * N + p]);
       if (!nb.length) { st.pop(); continue; } const [p, q, t, wx, wy] = PICK(nb); if (t === 'v') V[wy * (N + 1) + wx] = false; else H[wy * N + wx] = false; vis[q * N + p] = true; st.push([p, q]); }
-    for (let k = 0; k < 3; k++) { const x = RI(1, N - 1), y = RI(0, N - 1); V[y * (N + 1) + x] = false; }   // birkaç kısa yol
+    for (let k = 0; k < 5; k++) { const x = RI(1, N - 1), y = RI(0, N - 1); V[y * (N + 1) + x] = false; }   // birkaç kısa yol
     const ex = RI(0, N - 1); H[N >> 1] = false; H[N * N + ex] = false; rm.mazeExit = ox + ex * C + C / 2;
     const M = mats(), wh = 3.6;
     for (let y = 0; y <= N; y++) for (let x = 0; x < N; x++) if (H[y * N + x]) { box(g, C + .35, wh, .35, M.wall, ox + x * C + C / 2, wh / 2, oz + y * C, 4); wallOb(rm, ox + x * C + C / 2, oz + y * C, (C + .35) / 2, .18); }
     for (let y = 0; y < N; y++) for (let x = 1; x < N; x++) if (V[y * (N + 1) + x]) { box(g, .35, wh, C + .35, M.wall, ox + x * C, wh / 2, oz + y * C + C / 2, 4); wallOb(rm, ox + x * C, oz + y * C + C / 2, .18, (C + .35) / 2); }
-    for (let k = 0; k < 7; k++) { const x = RI(0, N - 1), y = RI(1, N - 1); if (H[y * N + x]) torch(rm, g, ox + x * C + C / 2, 2.1, oz + y * C - .2, Math.PI); }
+    for (let k = 0; k < 11; k++) { const x = RI(0, N - 1), y = RI(1, N - 1); if (H[y * N + x]) torch(rm, g, ox + x * C + C / 2, 2.1, oz + y * C - .2, Math.PI); }
     for (let k = 0; k < 5; k++) chain(rm, g, ox + RI(0, N - 1) * C + C / 2 + R(-1, 1), oz + RI(0, N - 1) * C + C / 2 + R(-1, 1), RI(5, 12));
     if (RND() < .8) skelDecor(g, ox + RI(0, N - 1) * C + C / 2, oz + RI(1, N - 2) * C + C / 2, R(0, 6), 'lie');
     rm.items.push(fuelItem(g, ox + RI(0, N - 1) * C + C / 2, oz + RI(2, N - 1) * C + C / 2)); },
@@ -222,7 +222,7 @@ const TYPE_BUILD = {
     const s = new T.Mesh(new T.PlaneGeometry(3.4, .5), txtMat('⚠️ ' + adT('Kırmızı = kaç!'), '#ff8a7a', 'rgba(15,12,10,.8)', 512, 76, .55)); s.position.set(rm.pdx, 3.55, rm.z0 + .62); g.add(s); },
   dark(rm, g) {   // 🌑 zifiri karanlık: çakmak lazım; karanlıkta parlayan gözler (yaklaşınca kaybolur)
     const hw = rm.w / 2; rm.eyes = [];
-    for (let k = 0; k < 8; k++) { const x = R(-hw + 1.5, hw - 1.5), z = R(rm.z0 + 3.5, rm.z1 - 3.5); if (Math.abs(x - rm.doorX) < 2 && z > rm.z1 - 5) continue; const sx = R(.8, 1.4), sz = R(.8, 1.4), sy = R(1.2, 3); box(g, sx, sy, sz, mats().wall, x, sy / 2, z, 4); wallOb(rm, x, z, sx / 2, sz / 2, sy); }
+    for (let k = 0; k < 13; k++) { const x = R(-hw + 1.5, hw - 1.5), z = R(rm.z0 + 3.5, rm.z1 - 3.5); if (Math.abs(x - rm.doorX) < 2 && z > rm.z1 - 5) continue; const sx = R(.8, 1.4), sz = R(.8, 1.4), sy = R(1.2, 3); box(g, sx, sy, sz, mats().wall, x, sy / 2, z, 4); wallOb(rm, x, z, sx / 2, sz / 2, sy); }
     for (let k = 0; k < 7; k++) { const e = new T.Group(); e.position.set(R(-hw + .3, hw - .3), R(.8, 3.2), R(rm.z0 + 2, rm.z1 - 1)); for (const s of [-.11, .11]) { const m = new T.Mesh(new T.SphereGeometry(.045, 8, 6), mats().eye); m.position.x = s; e.add(m); } e.rotation.y = R(0, 6); g.add(e); rm.eyes.push(e); }
     for (let k = 0; k < 4; k++) chain(rm, g, R(-hw + 1, hw - 1), R(rm.z0 + 2, rm.z1 - 2), RI(6, 14));
     rm.items.push(fuelItem(g, R(-hw + 1, hw - 1), R(rm.z0 + 4, rm.z1 - 4))); },
@@ -234,7 +234,7 @@ const TYPE_BUILD = {
       const sg = new T.Mesh(new T.PlaneGeometry(.5, .42), txtMat(sym[i], '#4cc9f0', 'rgba(10,10,15,.92)', 128, 104, .7)); sg.position.set(0, .72, .08); L.add(sg);
       const wp = new T.Vector3(0, 0, .7).applyAxisAngle(new T.Vector3(0, 1, 0), ry); rm.levers.push({ i, arm, p: new T.Vector3(A().cx + x + wp.x, 1, A().cz + z + wp.z), on: false }); } },
   key(rm, g) {   // 🗝️ sandıklardan birinde anahtar var
-    const M = mats(), hw = rm.w / 2, n = RI(4, 6), k = RI(0, n - 1); rm.chests = [];
+    const M = mats(), hw = rm.w / 2, n = RI(5, 8), k = RI(0, n - 1); rm.chests = [];
     for (let i = 0; i < n; i++) { const x = (i % 2 ? 1 : -1) * (hw - 1), z = rm.z0 + 3 + i * (rm.l - 6) / Math.max(1, n - 1), c = new T.Group(); c.position.set(x, 0, z); c.rotation.y = x < 0 ? Math.PI / 2 : -Math.PI / 2; g.add(c);
       box(c, 1.1, .6, .7, M.wood, 0, .3, 0); const lid = new T.Group(); lid.position.set(0, .6, -.35); c.add(lid); box(lid, 1.12, .18, .72, M.wood, 0, .09, .35); for (const s of [-.4, .4]) box(c, .06, .62, .74, M.iron, s, .31, 0);
       rm.chests.push({ g: c, lid, key: i === k, open: false, p: new T.Vector3(A().cx + x, 0, A().cz + z) }); wallOb(rm, x, z, .42, .42, .8); }
@@ -243,9 +243,9 @@ const TYPE_BUILD = {
     const hw = rm.w / 2; rm.plates = [];
     for (let i = 0; i < 4; i++) { const x = (i % 2 ? 1 : -1) * (hw * .6), z = rm.z0 + rm.l * (.22 + Math.floor(i / 2) * .5) + (i % 2) * rm.l * .12, pm = new T.MeshStandardMaterial({ color: 0x6b7280, emissive: 0x000000, roughness: .5 }); pm.userData.own = true; const p = box(g, 1.6, .1, 1.6, pm, x, .05, z); rm.plates.push({ m: p, p: new T.Vector3(A().cx + x, 0, A().cz + z), t: 0 }); }
     const s = new T.Mesh(new T.PlaneGeometry(3.4, .5), txtMat('⬜ ' + adT('Dört plaka aynı anda yansın'), '#9be7ff', 'rgba(15,12,10,.8)', 640, 76, .5)); s.position.set(rm.pdx, 3.55, rm.z0 + .62); g.add(s); },
-  skel(rm, g) { rm.skelN = RI(3, 5); rm.graves = []; const hw = rm.w / 2; for (let k = 0; k < rm.skelN; k++) { const gr = new T.Mesh(new T.CircleGeometry(.6, 14).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0x0d0d10 })); gr.material.userData.own = true; const x = R(-hw + 2, hw - 2), z = R(rm.z0 + rm.l * .45, rm.z1 - 2); gr.position.set(x, .02, z); g.add(gr); rm.graves.push([x, z]); }
+  skel(rm, g) { rm.skelN = RI(4, 7); rm.graves = []; const hw = rm.w / 2; for (let k = 0; k < rm.skelN; k++) { const gr = new T.Mesh(new T.CircleGeometry(.6, 14).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0x0d0d10 })); gr.material.userData.own = true; const x = R(-hw + 2, hw - 2), z = R(rm.z0 + rm.l * .45, rm.z1 - 2); gr.position.set(x, .02, z); g.add(gr); rm.graves.push([x, z]); }
     for (let k = 0; k < 3; k++) chain(rm, g, R(-hw + 1, hw - 1), R(rm.z0 + 2, rm.z1 - 2), RI(5, 12)); },
-  boss(rm, g) { const M = mats(); for (const x of [-10, 10]) for (const z of [rm.z0 + 8, rm.z1 - 9]) { cyl(g, .9, WALLH, M.wall, x, WALLH / 2, z, 12); wallOb(rm, x, z, .9, .9); chain(rm, g, x * .6, z, RI(10, 20)); }
+  boss(rm, g) { const M = mats(); for (const x of [-13, 13]) for (const z of [rm.z0 + 8, rm.z0 + rm.l / 2, rm.z1 - 9]) { cyl(g, .9, WALLH, M.wall, x, WALLH / 2, z, 12); wallOb(rm, x, z, .9, .9); chain(rm, g, x * .6, z, RI(10, 20)); }
     const th = new T.Group(); th.position.set(0, 0, rm.z1 - 2.5); g.add(th); box(th, 4, 1, 2, M.wall, 0, .5, 0, 4); box(th, 3, 4, .6, M.wall, 0, 3, -.7, 4); box(th, 2.6, .3, 1.6, M.red, 0, 1.15, 0);
     for (let k = 0; k < 9; k++) { const sk = new T.Mesh(new T.SphereGeometry(.18, 10, 8), MAT_BONE()); sk.position.set(R(-1.8, 1.8), 1.05 + R(0, .2), R(-.8, .9)); th.add(sk); }
     for (const x of [-4, 4]) { const br = new T.Group(); br.position.set(x, 0, rm.z1 - 3); g.add(br); cyl(br, .08, 1.5, M.iron, 0, .75, 0, 6); const bowl = new T.Mesh(new T.CylinderGeometry(.45, .2, .35, 12), M.iron); bowl.position.y = 1.6; br.add(bowl); const f = new T.Mesh(new T.ConeGeometry(.35, .9, 8), M.flame); f.position.y = 2.1; br.add(f); const h = new T.Sprite(M.halo); h.scale.set(2.4, 2.4, 1); h.position.y = 2.1; br.add(h); rm.torches.push({ f, f2: f, h, p: new T.Vector3(A().cx + x, 2.2, A().cz + rm.z1 - 3), ph: Math.random() * 6 }); wallOb(rm, x, rm.z1 - 3, .3, .3, 2); } },

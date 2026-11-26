@@ -1,7 +1,7 @@
 /* 🌊 S.F.T · Atlantis (atlantis.js) — denizin dibindeki dev batık şehir. Macera değil, serbest keşif bölgesi:
    halka halka kanallar ve surlar, ortada kristalli büyük tapınak, saraylar, evler, amfitiyatro, çarşı, su kemerleri, kristal kuleler,
    deniz feneri, dev bekçi heykelleri; dışarıda yosun ormanı, mercan bahçesi, batık gemiler, uçurum ve sıcak su bacaları.
-   Balık sürüleri, parlayan denizanaları, vatozlar, kaplumbağalar, yunuslar, dev balina, yengeçler. 25 inci istiridyesi, batık sandıklar.
+   Konuşan deniz kızları (V), balık sürüleri, parlayan denizanaları, vatozlar, kaplumbağalar, yunuslar, dev balina, yengeçler. 25 inci istiridyesi, batık sandıklar.
    Yüzme: Boşluk yukarı · Q aşağı dalış · E hızlı · Shift ayaklar pervane gibi döner, çok hızlı.
    index.html bunu yükler; oyunun değişkenlerine window.__sftG (G) ile erişir. Tasarımlar bu oyuna özgüdür. */
 (function (G) {
@@ -65,7 +65,7 @@ function causticTex() {   // döşenebilir parlak ağ deseni (su yüzeyinden sü
   const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'), im = g.createImageData(S, S), P = Math.PI * 2 / S;
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const u = x * P, v = y * P; let s = 0; s += Math.sin(u * 3 + Math.sin(v * 2) * 1.5); s += Math.sin(v * 4 + Math.sin(u * 3) * 1.3); s += Math.sin((u + v) * 2 + Math.sin(u * 5 - v * 1) * .9); s += Math.sin((u - v) * 3 + Math.cos(v * 2) * 1.1);
-    let k = 1 - Math.abs(s) / 2.2; k = Math.max(0, k); k = Math.pow(k, 5); const i = (y * S + x) * 4; im.data[i] = im.data[i + 1] = im.data[i + 2] = Math.min(255, k * 330); im.data[i + 3] = 255; }
+    let k = 1 - Math.abs(s) / 2.2; k = Math.max(0, k); k = Math.pow(k, 8); const i = (y * S + x) * 4; im.data[i] = im.data[i + 1] = im.data[i + 2] = Math.min(255, k * 330); im.data[i + 3] = 255; }
   g.putImageData(im, 0, 0); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; return t;
 }
 let MT = null;
@@ -76,7 +76,7 @@ function mats() {
   sand.repeat.set(110, 110);
   const caus = causticTex(); caus.repeat.set(70, 70);
   MT = { sand, caus,
-    floor: new T.MeshStandardMaterial({ map: sand, color: 0xb9d6d2, roughness: 1, emissive: 0x9ff3ff, emissiveMap: caus, emissiveIntensity: .38 }),
+    floor: new T.MeshStandardMaterial({ map: sand, color: 0xb9d6d2, roughness: 1, emissive: 0x9ff3ff, emissiveMap: caus, emissiveIntensity: .17 }),
     marble: M(0xe9e4d4), marble2: M(0xd2cbb6), teal: M(0x6fa7a0), sandst: M(0xc8b28a), roof: M(0x4d8c78), roof2: M(0x7a5a3c), dark: M(0x24343c), pink: M(0xd98a84), bronze: M(0x5f9e8a), wood: M(0x5b4632), wood2: M(0x3f3124), rock: M(0x5d6b70), rock2: M(0x46545a),
     gold: M(0xd4af37, { metalness: .9, roughness: .3, emissive: 0x2a1e00 }),
     crystal: M(0x7ff6ff, { emissive: 0x29d4ff, emissiveIntensity: 1.3, roughness: .2 }), crystal2: M(0xd7a8ff, { emissive: 0x9b4dff, emissiveIntensity: 1.1, roughness: .2 }),
@@ -382,6 +382,143 @@ function buildCreatures() {
     AT.crabs = [...Array(22)].map(() => { const p = scatter(1, (x, z, r) => r > 60)[0]; return { x: p[0], z: p[2], dir: R(0, 6), t: R(0, 6), s: R(.8, 1.6) }; }); }
 }
 
+/* ---------- 🧜‍♀️ konuşan deniz kızları (bu oyuna özgü tasarım) — V ile konuşulur ---------- */
+const MM_SHARED = [
+  'Yunuslar birbirine ıslıkla isim takar. Benim yunus adım: “Fııı-tıt!”',
+  'Deniz atlarında yavruları babalar karnındaki kesede taşır. Ne tatlı, değil mi?',
+  'Soluduğun oksijenin yaklaşık yarısını okyanustaki minicik planktonlar üretir. Onlara bir teşekkür borçlusun!',
+  'Mavi balina dünyadaki en büyük hayvan; kalbi küçük bir araba kadar büyük!',
+  'Denizanalarının beyni yok ama 500 milyon yıldan uzun süredir yüzüyorlar. Demek ki her şey kafada bitmiyor.',
+  'Yukarıdaki uçan adalarda kocaman BRK GAMES yazısı varmış. Bu dünyayı yapanlara benden selam söyle!',
+  'Ejderhaya bindin mi hiç? Biz balinaya biniyoruz… ama sadece doğum günlerinde.',
+  'Sihirli asanla bir balığı büyütürsen bana haber ver, kocaman bir arkadaşım olsun.',
+  'Battle royale’de kazandın mı? Burada kimse kavga etmez, biz sadece yüzeriz.',
+  'Bir dahaki sefere arkadaşlarını da getir! Çok oyunculu modda hep birlikte dalabilirsiniz.',
+  'Okyanusların büyük kısmı hâlâ keşfedilmedi. Belki Atlantis’in yeni bir sokağını sen bulursun.',
+  'Ahtapotların üç kalbi ve mavi kanı var. Benim bir kalbim var ama kocaman!'];
+const MERMAIDS = [
+  { name: 'Marin', at: [9, -246], y: 5, skin: 0xf3cfae, hair: 0xe85d75, tail: [0x2a9d8f, 0x8ce0d0], fin: 0xbff6ee, top: 0xffd166, acc: 'shell', lines: [
+    'Hoş geldin kara insanı! Ben Marin. Atlantis’e köydeki kuyudan mı geldin? O kuyu bizim en sevdiğimiz sır.',
+    'Shift’e basınca bacakların pervane gibi dönüyor, gördüm! Biz kuyrukla yüzüyoruz ama seninki de fena değil.',
+    'Şehirde 25 dev istiridye var. Açıkken yanlarına yüzersen incilerini sana verirler.',
+    'Köyünüzün üstünde uçan adalar varmış… Bulutların üstünde ağaç! Bir gün görmek isterdim.',
+    'Kapının üstündeki ATLANTİS yazısını her sabah balıklar parlatır. Şaka şaka, kristalin ışığı o.'] },
+  { name: 'Derin', at: [0, -40], y: 10, skin: 0xd9a77e, hair: 0x2b4c8c, tail: [0x3a0ca3, 0x7b9cff], fin: 0xc9d6ff, top: 0x9ff3ff, acc: 'crown', lines: [
+    'Tepedeki dev kristal şehrin kalbidir. Etrafında dönen mor taşlar da onun kalp atışı.',
+    'Bu tapınakta yirmi dört sütun var. Her gün sayarım, eksilmesin diye.',
+    'Kristale uzun uzun bakma, sonra gözlerin mavi mavi parlar!',
+    'Atlantis’i ilk Platon adında bir filozof anlatmış, yaklaşık 2400 yıl önce. Biz de ona el sallamıştık.'] },
+  { name: 'İnci', at: [-118, 116], y: 6, skin: 0xffe0c4, hair: 0xf2c14e, tail: [0xd6336c, 0xffa8c5], fin: 0xffd6e6, top: 0x80ed99, acc: 'pearls', lines: [
+    'Çarşımızda istiridye kabuğuyla alışveriş yapılır. Senin altınların burada geçer mi bakalım?',
+    'Kara insanlarının telefon diye bir şeyi varmış. Biz haberleri yunuslardan alırız, onlar daha hızlı.',
+    'Amforaların içinde ne var biliyor musun? Hiçbir şey! Balıklar saklambaç oynuyor.',
+    'Yukarıda bir kıyafet odanız varmış, değil mi? Bana da deniz yosunundan bir elbise lazım.'] },
+  { name: 'Mavi', at: [345, 18], y: 6, skin: 0xc68b67, hair: 0x111111, tail: [0x0077b6, 0x48cae4], fin: 0xade8f4, top: 0xff8fab, acc: 'star', lines: [
+    'Mercanlar aslında hayvandır, bitki değil! Minicik canlılar bir araya gelip bu kayalıkları yapar.',
+    'Şu dev bronz baş kimin, bilmiyoruz. Belki eski bir kral, belki de çok kendini beğenmiş bir heykeltıraş.',
+    'Yengeçler hep yan yan yürür. Onlara düz yürümeyi öğretmeye çalıştım, olmadı.',
+    'Bazı papağan balıkları geceleri kendi salyalarından bir “uyku tulumu” yapıp içinde uyur. Bilim garip ve güzel!'] },
+  { name: 'Nehir', at: [10, 372], y: 7, skin: 0xf0c8a0, hair: 0x6a994e, tail: [0x386641, 0xa7c957], fin: 0xdde5b6, top: 0xf4a261, acc: 'shell', lines: [
+    'Yosun ormanında kaybolursan yukarıdaki ışığa doğru yüz; su yüzü hep oradadır.',
+    'Dev yosunlar bir günde yarım metreye yakın uzayabilir. Benim saçım o kadar hızlı uzamıyor.',
+    'Balinanın şarkısını duydun mu? Dinle… Okyanusta kilometrelerce öteden duyulabilir.',
+    'Yukarıda karanlık bir zindan varmış, Kemik Kral yaşıyormuş. Burası çok daha aydınlık, değil mi?'] },
+  { name: 'Ela', at: [-48, -330], y: 5, skin: 0xe8b894, hair: 0x7f4f24, tail: [0x9d4edd, 0xe0aaff], fin: 0xf3d9ff, top: 0x4cc9f0, acc: 'crown', lines: [
+    'Bu gemiler eski bir fırtınada batmış. İçlerindeki sandıkları V ile açabilirsin, altın çıkıyor!',
+    'Gemilerin direklerinde artık balıklar yaşıyor. En iyi ev, eski evdir!',
+    'Yukarıda araba yarışı yapıyormuşsunuz; drift, nitro… Biz de yunuslarla yarışıyoruz, hep onlar kazanıyor.',
+    'Eski denizciler yıldızlara bakarak yön bulurmuş. Ben de hâlâ öyle yapıyorum, su yüzüne çıkınca.'] },
+  { name: 'Su', at: [158, 162], y: 9, skin: 0xffd9b8, hair: 0xb8c0ff, tail: [0x00a6a6, 0xbbf0f0], fin: 0xffffff, top: 0xe76f51, acc: 'pearls', lines: [
+    'Kristal Fener, sular kararınca yolunu kaybedenlere yön gösterir.',
+    'Senin de el fenerin var mı? K’ya basınca uzun moda geçiyormuş, çok uzağı aydınlatıyormuş!',
+    'Fenerin tepesinden bütün şehri görebilirsin. Yukarı çıkmak için Boşluk yeter.',
+    'Gerçek dünyanın en ünlü feneri İskenderiye Feneri’ymiş; Antik Dünyanın Yedi Harikası’ndan biri.'] },
+  { name: 'Lal', at: [-382, 36], y: 4, skin: 0xb07a55, hair: 0xd00000, tail: [0x7f1d1d, 0xff6b35], fin: 0xffb38a, top: 0xffd60a, acc: 'star', lines: [
+    'Bu uçurum derin ama gerçek dünyadaki Mariana Çukuru’nun yanında minicik kalır; o yaklaşık 11 kilometre!',
+    'Sıcak su bacalarının çevresinde güneşi hiç görmeyen canlılar yaşar.',
+    'Parlayan denizanalarını görüyor musun? Onlar benim gece lambalarım.',
+    'Derin denizdeki bazı balıklar kendi ışıklarını yapar; buna biyolüminesans denir. Ben de kuyruğumu parlatmayı deniyorum!'] }];
+const MM = { list: [], cur: null, t: 0 };
+const vc = (geo, hex) => { const g = geo.index ? geo.toNonIndexed() : geo, n = g.attributes.position.count, c = new T.Color(hex), a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new T.BufferAttribute(a, 3)); return g; };
+let MM_MAT = null;
+function mmMats() { if (MM_MAT) return MM_MAT; MM_MAT = { base: new T.MeshStandardMaterial({ vertexColors: true, roughness: .55 }) }; return MM_MAT; }
+function bendMat(down, amp, freq) {   // kuyruk ve saç: GPU'da dalgalanır (her deniz kızının kendi değerleri)
+  const u = { uAmp: { value: amp }, uFreq: { value: freq }, uPh: { value: Math.random() * 6 }, uTrail: { value: 0 } };
+  const m = new T.MeshStandardMaterial({ vertexColors: true, roughness: .5, side: T.DoubleSide });
+  m.onBeforeCompile = sh => { sh.uniforms.uTime = U.uTime; Object.assign(sh.uniforms, u); sh.vertexShader = 'uniform float uTime, uAmp, uFreq, uPh, uTrail;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    float bY = max(-position.y, 0.0);
+    transformed.z += sin(uTime * uFreq - bY * 2.2 + uPh) * uAmp * pow(bY, 1.25) - uTrail * bY * bY * .35;
+    transformed.x += sin(uTime * uFreq * .7 - bY * 1.6 + uPh * 1.3) * uAmp * .25 * bY;`); };
+  m.customProgramCacheKey = () => 'mmbend'; m.userData.u = u; return m;
+}
+function makeMermaid(o) {
+  const merge = G.mergeGeometries, base = mmMats().base, g = new T.Group(), body = new T.Group(); g.add(body);
+  const tailC = new T.Color(o.tail[0]), tailC2 = new T.Color(o.tail[1]);
+  // gövde: ten, üst, kalça (pullu), kemer, kolye
+  const tp = [vc(new T.CapsuleGeometry(.12, .36, 4, 12).translate(0, .32, 0), o.skin), vc(new T.CylinderGeometry(.152, .14, .15, 16).translate(0, .45, 0), o.top), vc(new T.CylinderGeometry(.155, .155, .03, 16).translate(0, .52, 0), 0xffffff),
+    vc(new T.SphereGeometry(.165, 14, 10).scale(1, .85, .85).translate(0, .02, 0), o.tail[0]), vc(new T.TorusGeometry(.16, .022, 6, 18).rotateX(Math.PI / 2).translate(0, .1, 0), o.tail[1]), vc(new T.CylinderGeometry(.05, .055, .12, 10).translate(0, .62, 0), o.skin)];
+  for (const s of [-1, 1]) tp.push(vc(new T.BoxGeometry(.025, .14, .02).rotateZ(s * .25).translate(s * .08, .56, .07), o.top));
+  if (o.acc === 'pearls') for (let k = 0; k < 9; k++) { const a = (k / 8 - .5) * 2.4; tp.push(vc(new T.SphereGeometry(.018, 6, 5).translate(Math.sin(a) * .07, .6 - Math.cos(a) * .03, Math.cos(a) * .065 + .01), 0xfff8ee)); }
+  body.add(new T.Mesh(merge(tp), base));
+  // baş: yüz, saç, aksesuar
+  const head = new T.Group(); head.position.y = .8; body.add(head);
+  const hp = [vc(new T.SphereGeometry(.17, 18, 14), o.skin), vc(new T.SphereGeometry(.183, 16, 10, 0, Math.PI * 2, 0, Math.PI * .55).rotateX(-.35).translate(0, .01, -.01), o.hair), vc(new T.SphereGeometry(.12, 10, 6).scale(1.25, .45, .7).translate(0, .13, .09), o.hair)];
+  for (const s of [-1, 1]) { hp.push(vc(new T.SphereGeometry(.036, 10, 8).translate(s * .062, .015, .145), 0xffffff), vc(new T.SphereGeometry(.023, 8, 6).translate(s * .062, .012, .172), 0x1b2a4a), vc(new T.SphereGeometry(.008, 5, 4).translate(s * .056, .022, .192), 0xffffff), vc(new T.SphereGeometry(.026, 8, 6).scale(1, .6, .4).translate(s * .095, -.035, .135), 0xff9aa2), vc(new T.BoxGeometry(.05, .009, .01).rotateZ(s * -.15).translate(s * .065, .07, .15), o.hair)); }
+  hp.push(vc(new T.TorusGeometry(.04, .008, 4, 10, Math.PI).rotateZ(Math.PI).translate(0, -.05, .158), 0xc0394b));
+  if (o.acc === 'crown') for (let k = 0; k < 7; k++) { const a = (k - 3) * .32; hp.push(vc(new T.ConeGeometry(.022, .1, 5).translate(Math.sin(a) * .15, .18 + (k === 3 ? .02 : 0), Math.cos(a) * .15 - .02), k % 2 ? 0xffd166 : 0xff8fab)); }
+  else if (o.acc === 'shell') { const sh = new T.SphereGeometry(.06, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, .3, 1).rotateZ(1.2).translate(.16, .1, .03); hp.push(vc(sh, 0xffe5ec)); }
+  else if (o.acc === 'star') { const st = new T.Shape(); for (let i = 0; i <= 10; i++) { const a = i / 10 * Math.PI * 2, r = i % 2 ? .02 : .05; st[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); } hp.push(vc(new T.ExtrudeGeometry(st, { depth: .012, bevelEnabled: false }).rotateY(1.3).translate(.17, .09, .02), 0xffb703)); }
+  head.add(new T.Mesh(merge(hp), base));
+  // saç telleri (dalgalanır)
+  const hs = []; for (let k = 0; k < 11; k++) { const a = Math.PI + (k - 5) * .27, len = .5 + Math.abs(k - 5) * -.02 + Math.random() * .12; hs.push(vc(new T.CapsuleGeometry(.032, len, 3, 6).scale(1.6, 1, .55).rotateY(-a).translate(Math.sin(a) * .15, -len / 2 + .02, Math.cos(a) * .15), k % 3 ? o.hair : new T.Color(o.hair).offsetHSL(0, 0, .12).getHex())); }
+  const hairM = bendMat(true, .06, 1.6); const hair = new T.Mesh(merge(hs), hairM); hair.position.set(0, .02, -.02); head.add(hair);
+  // kollar
+  const arm = s => { const sh = new T.Group(); sh.position.set(s * .17, .55, 0); body.add(sh); sh.add(new T.Mesh(vc(new T.CapsuleGeometry(.038, .24, 3, 8).translate(0, -.15, 0), o.skin), base)); const el = new T.Group(); el.position.y = -.31; sh.add(el);
+    el.add(new T.Mesh(merge([vc(new T.CapsuleGeometry(.034, .22, 3, 8).translate(0, -.14, 0), o.skin), vc(new T.SphereGeometry(.045, 8, 6).scale(.8, 1, .55).translate(0, -.3, 0), o.skin), vc(new T.TorusGeometry(.04, .01, 5, 10).rotateX(Math.PI / 2).translate(0, -.22, 0), o.tail[1])]), base)); return { sh, el }; };
+  const armL = arm(1), armR = arm(-1);
+  // kuyruk + yüzgeç (tek parça, GPU'da dalgalanır)
+  const pts = []; for (let i = 0; i <= 18; i++) { const t = i / 18; pts.push(new T.Vector2(Math.max(.035, .158 + .025 * Math.sin(t * Math.PI * .9) - .12 * Math.pow(t, 1.15)), -t * 2)); }
+  const lathe = new T.LatheGeometry(pts.reverse(), 14).toNonIndexed(), lp = lathe.attributes.position, lc = new Float32Array(lp.count * 3), cc2 = new T.Color();
+  for (let i = 0; i < lp.count; i++) { const t = Math.min(1, -lp.getY(i) / 2); cc2.copy(tailC).lerp(tailC2, t); if (Math.floor(t * 16) % 2) cc2.multiplyScalar(.82); lc[i * 3] = cc2.r; lc[i * 3 + 1] = cc2.g; lc[i * 3 + 2] = cc2.b; } lathe.setAttribute('color', new T.BufferAttribute(lc, 3));
+  const fs = new T.Shape(); fs.moveTo(0, 0); fs.bezierCurveTo(.16, -.08, .5, -.22, .62, -.6); fs.bezierCurveTo(.4, -.48, .18, -.45, 0, -.32); fs.bezierCurveTo(-.18, -.45, -.4, -.48, -.62, -.6); fs.bezierCurveTo(-.5, -.22, -.16, -.08, 0, 0);
+  const fin = vc(new T.ShapeGeometry(fs, 10).translate(0, -1.94, 0), o.fin), sf = [];
+  for (const s of [-1, 1]) { const sh2 = new T.Shape(); sh2.moveTo(0, 0); sh2.quadraticCurveTo(s * .2, -.05, s * .26, -.22); sh2.quadraticCurveTo(s * .1, -.16, 0, -.18); sf.push(vc(new T.ShapeGeometry(sh2, 5).translate(s * .12, -.55, 0), o.fin)); }
+  const tailM = bendMat(false, .12, 4.5), tail = new T.Mesh(merge([lathe, fin, ...sf].map(x => { if (!x.attributes.uv) x.setAttribute('uv', new T.BufferAttribute(new Float32Array(x.attributes.position.count * 2), 2)); return x; })), tailM); body.add(tail);
+  // isim etiketi
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x2 = c.getContext('2d'); x2.fillStyle = 'rgba(5,40,60,.65)'; x2.beginPath(); x2.roundRect ? x2.roundRect(4, 6, 248, 52, 26) : x2.rect(4, 6, 248, 52); x2.fill(); x2.fillStyle = '#fff'; x2.font = 'bold 30px system-ui'; x2.textAlign = 'center'; x2.textBaseline = 'middle'; x2.fillText('🧜‍♀️ ' + o.name, 128, 33);
+  const tx = new T.CanvasTexture(c); tx.colorSpace = T.SRGBColorSpace; const tag = new T.Sprite(new T.SpriteMaterial({ map: tx, transparent: true, depthWrite: false })); tag.scale.set(1.6, .4, 1); tag.position.y = 1.35; g.add(tag);
+  return { g, body, head, hair, hairM, armL, armR, tail, tailM, tag };
+}
+function buildMermaids() {
+  RND = mul32(3131);
+  for (const o of MERMAIDS) { const m = makeMermaid(o); Object.assign(m, { o, hx: o.at[0], hz: o.at[1], hy: floorH(o.at[0], o.at[1]) + o.y, rr: R(5, 9), a: R(0, 6.28), sp: R(1.2, 1.8), tilt: 1.3, ph: R(0, 6), k: 0, said: 0 }); m.g.scale.setScalar(1.15); AT.g.add(m.g); MM.list.push(m); }
+}
+function mmTick(dt, t, lx, ly, lz) {
+  for (const m of MM.list) {
+    const g = m.g, d = Math.hypot(g.position.x - lx, g.position.y - ly, g.position.z - lz), near = d < 10, talking = MM.cur === m, k = 1 - Math.exp(-3 * dt);
+    if (!near) { m.a += dt * m.sp / m.rr; const tx = m.hx + Math.cos(m.a) * m.rr, tz = m.hz + Math.sin(m.a) * m.rr; g.position.x += (tx - g.position.x) * k; g.position.z += (tz - g.position.z) * k; g.rotation.y += G.wrapAng(Math.atan2(-Math.sin(m.a), Math.cos(m.a)) - g.rotation.y) * k; }
+    else g.rotation.y += G.wrapAng(Math.atan2(lx - g.position.x, lz - g.position.z) - g.rotation.y) * Math.min(1, dt * 4);
+    g.position.y += (m.hy + Math.sin(t * .9 + m.ph) * .35 - g.position.y) * k;
+    m.tilt += ((near ? .1 : 1.3) - m.tilt) * Math.min(1, dt * 2.5); m.body.rotation.x = m.tilt;
+    const U2 = m.tailM.userData.u, H2 = m.hairM.userData.u; U2.uAmp.value += ((near ? .07 : .14) - U2.uAmp.value) * k; U2.uFreq.value += ((near ? 2 : 4.6) - U2.uFreq.value) * k; H2.uTrail.value += ((near ? 0 : 1) - H2.uTrail.value) * k; H2.uAmp.value = near ? .05 : .09;
+    const S = (o, ax, v) => { o.rotation[ax] += (v - o.rotation[ax]) * Math.min(1, dt * 6); };
+    if (!near) { S(m.armL.sh, 'x', .15); S(m.armR.sh, 'x', .15); S(m.armL.sh, 'z', .14); S(m.armR.sh, 'z', -.14); S(m.armL.el, 'x', 0); S(m.armR.el, 'x', 0); }
+    else if (talking && m.talkT > 0) { m.talkT -= dt; S(m.armR.sh, 'z', -1.9 + Math.sin(t * 5) * .35); S(m.armR.sh, 'x', -.3); S(m.armR.el, 'x', -.7); S(m.armL.sh, 'z', .45); S(m.armL.sh, 'x', 0); S(m.armL.el, 'x', -1.3); }
+    else { const b = Math.sin(t * 1.3 + m.ph); S(m.armL.sh, 'z', .5 + b * .15); S(m.armR.sh, 'z', -.5 - b * .15); S(m.armL.sh, 'x', -.2); S(m.armR.sh, 'x', -.2); S(m.armL.el, 'x', -.4); S(m.armR.el, 'x', -.4); }
+    m.head.rotation.x = near ? -.1 : -.55; m.tag.visible = d < 32;
+    if (Math.random() < dt * .25) bubble(g.position.x, g.position.y + 1.1, g.position.z, RI(1, 3), .1);
+  }
+  if (MM.cur) { const g = MM.cur.g; MM.t -= dt; if (MM.t <= 0 || Math.hypot(g.position.x - lx, g.position.y - ly, g.position.z - lz) > 8) mmClose(); }
+}
+function mmNear(lx, ly, lz) { let b = null, bd = 4.6; for (const m of MM.list) { const d = Math.hypot(m.g.position.x - lx, m.g.position.y + .6 - ly - 1, m.g.position.z - lz); if (d < bd) { bd = d; b = m; } } return b; }
+function mmTalk(m) {
+  if (MM.cur !== m) { MM.cur = m; }
+  const L = m.o.lines; let line; if (m.said < L.length) line = L[m.said++]; else { const pool = L.concat(MM_SHARED); do { line = pool[Math.floor(Math.random() * pool.length)]; } while (line === m.last && pool.length > 1); }
+  m.last = line; m.talkT = 2.2; MM.t = 16; G.play('talk', { base: 560 + Math.random() * 140 }); bubble(m.g.position.x, m.g.position.y + 1.2, m.g.position.z, 4, .15);
+  $('mmName').textContent = '🧜‍♀️ ' + m.o.name; $('mmText').textContent = adT(line); $('mmBox').style.display = 'block';
+}
+function mmClose() { MM.cur = null; $('mmBox').style.display = 'none'; }
+
 /* ---------- ✨ kabarcık, deniz karı, ışık huzmeleri, su yüzeyi ---------- */
 function buildFx() {
   const NB = 700, bp = new Float32Array(NB * 3).fill(-9999); AT.bubGeo = new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(bp, 3)); AT.bubD = [...Array(NB)].map(() => ({ life: 0, vy: 0, ph: 0 })); AT.bubI = 0;
@@ -408,6 +545,7 @@ function build() {
   try { buildLife(); } catch (e) { console.warn('atlantis yaşam', e); }
   try { buildCreatures(); } catch (e) { console.warn('atlantis canlılar', e); }
   try { buildFx(); } catch (e) { console.warn('atlantis efekt', e); }
+  try { buildMermaids(); } catch (e) { console.warn('atlantis deniz kızları', e); }
   AT.obsW = OBS.map(o => ({ x: CX + o.x, z: CZ + o.z, r: o.r, h: o.top, top: o.top, stand: true, pass: false, atl: true }));
   AT.g.position.set(CX, 0, CZ); AT.g.updateMatrixWorld(true);
   console.log('🌊 Atlantis kuruldu', Math.round(performance.now() - t0) + ' ms', AT.obsW.length + ' engel');
@@ -458,7 +596,7 @@ function tick(dt) {
   cc.copy(C_SH).lerp(C_DP, deep).lerp(C_TR, tr); const F = G.scene.fog; if (F) { F.color.copy(cc); F.near = 3; F.far = 165 - 90 * deep - 30 * tr; } if (G.scene.background && G.scene.background.isColor) G.scene.background.copy(cc);
   if (AT.glowPts) { const u = AT.glowPts.material.uniforms; u.fogColor.value.copy(cc); u.fogNear.value = 3; u.fogFar.value = F ? F.far : 160; }
   if (!AT.sun) AT.sun = G.scene.children.find(o => o.isDirectionalLight) || null; if (AT.sun) AT.sun.intensity = 1.25 * (1 - deep * .65 - tr * .25);
-  const m = mats(); m.caus.offset.set(t * .013, t * .009); m.floor.emissiveIntensity = .38 * (1 - deep * .7); if (AT.surf) AT.surf.material.map.offset.set(t * .006, -t * .004);
+  const m = mats(); m.caus.offset.set(t * .013, t * .009); m.floor.emissiveIntensity = .17 * (1 - deep * .7); if (AT.surf) AT.surf.material.map.offset.set(t * .006, -t * .004);
   // 🏙️ uzak parçaları gizle
   AT.cT = (AT.cT || 0) - dt; if (AT.cT <= 0) { AT.cT = .4; for (const c of AT.chunks) c.visible = Math.hypot(c.userData.c.x - clx, c.userData.c.y - clz) < 240; }
   // 🔮 kristal
@@ -498,6 +636,7 @@ function tick(dt) {
       pp.setXYZ(c.i, px, got || c.open < .3 ? -9999 : c.y + .3, pz);
       if (!got && c.open > .45 && Math.hypot(px - lx, pz - lz) < 2.2 && Math.abs(Pp.y - c.y) < 2.6) takePearl(c, px, c.y, pz); }
     for (const im of [bot, tp, prl]) im.instanceMatrix.needsUpdate = true; pp.needsUpdate = true; }
+  try { mmTick(dt, t, lx, Pp.y, lz); } catch (e) { console.warn('mm', e); }
   for (const ch of AT.chests) ch.lid.rotation.x += ((ch.open ? -1.5 : 0) - ch.lid.rotation.x) * Math.min(1, dt * 4);
   // 🫧 kabarcıklar
   AT.brT = (AT.brT || 1) - dt; if (AT.brT <= 0) { AT.brT = R(1.4, 3); tv.set(0, 1.62, .15); G.playerRig && G.playerRig.head ? G.playerRig.head.getWorldPosition(tv) : tv.set(Pp.x, Pp.y + 1.6, Pp.z); bubble(tv.x - CX, tv.y, tv.z - CZ, RI(2, 5), .12); if (Math.random() < .5) snd('bub', .6); }
@@ -521,6 +660,7 @@ function takePearl(c, x, y, z) {
 }
 function prompt() {
   if (G.curKey !== 'atlantis' || !AT.built) return null; const Pp = P(), tch = G.touchMode ? '👆 ' : 'V — ';
+  const mm = mmNear(Pp.x - CX, Pp.y, Pp.z - CZ); if (mm) return [tch + '🧜‍♀️ ' + (MM.cur === mm ? adT('Devam et') : `${mm.o.name} ${adT('ile konuş')}`), () => mmTalk(mm)];
   for (const ch of AT.chests) if (!ch.open && Math.hypot(CX + ch.p.x - Pp.x, CZ + ch.p.z - Pp.z) < 2.4 && Math.abs(Pp.y - ch.p.y) < 3) return [tch + '💰 ' + adT('Batık sandığı aç'), () => { ch.open = true; snd('chest'); G.play('magic'); G.progAdd(40, Pp); G.showMsg('💰 ' + adT('Batık gemi hazinesi! +40'), 2); bubble(ch.p.x, ch.p.y + .8, ch.p.z, 14, .5); }];
   return null;
 }
@@ -528,9 +668,11 @@ function prompt() {
 /* ---------- 🖥️ arayüz ---------- */
 document.head.insertAdjacentHTML('beforeend', `<style>#atHud{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);z-index:6;display:none;gap:7px;font:700 13px system-ui;color:#fff;pointer-events:none;white-space:nowrap}
 #atHud .pill{background:rgba(5,40,60,.65);border-radius:12px;padding:6px 10px;border:1px solid rgba(160,240,255,.3)}#atExit{pointer-events:auto;cursor:pointer}
+#mmBox{position:fixed;left:50%;bottom:calc(138px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;display:none;width:min(460px,88vw);background:linear-gradient(135deg,rgba(5,45,70,.88),rgba(40,20,80,.85));border:2px solid rgba(160,240,255,.55);border-radius:18px;padding:11px 15px;color:#fff;font:600 15px system-ui;box-shadow:0 6px 22px rgba(0,0,0,.35);pointer-events:none}
+#mmBox .n{font:800 14px system-ui;color:#9ff3ff;margin-bottom:4px}#mmBox .h{font:600 11px system-ui;opacity:.7;margin-top:6px}body.touch #mmBox{bottom:calc(76px + env(safe-area-inset-bottom))}
 #atTouch{position:fixed;right:12px;bottom:calc(205px + env(safe-area-inset-bottom));z-index:7;display:none;flex-direction:column;gap:8px}#atTouch button{width:60px;height:52px;border-radius:16px;border:2px solid rgba(160,240,255,.5);background:rgba(5,40,60,.6);color:#fff;font:800 11px system-ui;line-height:1.1}#atTouch button b{display:block;font-size:20px}#atTouch button.on{background:linear-gradient(135deg,#0096c7,#48cae4);border-color:#fff}</style>`);
 document.body.insertAdjacentHTML('beforeend', `<div id="atHud"><div class="pill">🌊 Atlantis</div><div class="pill" id="atDepth">⬇️ 0 m</div><div class="pill" id="atPearl">🦪 0/${NPEARL}</div><div class="pill" id="atExit">🏳️ ${adT('Çık')}</div></div>
-<div id="atTouch"><button id="atDown"><b>⬇️</b>${adT('Dal')}</button><button id="atFast"><b>💨</b>${adT('Hızlı')}</button><button id="atProp"><b>🌀</b>${adT('Pervane')}</button></div>`);
+<div id="mmBox"><div class="n" id="mmName"></div><div id="mmText"></div><div class="h">${adT('V — devam · uzaklaşınca kapanır')}</div></div><div id="atTouch"><button id="atDown"><b>⬇️</b>${adT('Dal')}</button><button id="atFast"><b>💨</b>${adT('Hızlı')}</button><button id="atProp"><b>🌀</b>${adT('Pervane')}</button></div>`);
 for (const ev of ['pointerdown', 'mousedown', 'touchstart']) for (const id of ['atExit', 'atDown', 'atFast', 'atProp']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
 $('atExit').addEventListener('click', e => { e.stopPropagation(); goHome(); });
 $('atDown').addEventListener('pointerdown', () => { AT.down = true; }); for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) $('atDown').addEventListener(ev, () => { AT.down = false; });
@@ -572,7 +714,7 @@ function area() {
   const p = P(), f = floorH(p.x - CX, p.z - CZ); if (p.y < f + 6) p.y = f + 8; G.vy = 0;
   setTimeout(() => { if (G.curKey === 'atlantis') G.showMsg('🌊 ' + adT(G.touchMode ? 'Atlantis! ⬆️ Zıpla yukarı · ⬇️ Dal · 💨 Hızlı · 🌀 Pervane' : 'Atlantis! Boşluk ↑ · Q ↓ dal · E hızlı · Shift pervane'), 4); }, 900);
 }
-function leave() { if (AT.g.parent) G.scene.remove(AT.g); for (const o of AT.obsW || []) { const i = G.obstacles.indexOf(o); if (i >= 0) G.obstacles.splice(i, 1); } AT.on = false; AT.prop = AT.fast = AT.down = false; amb(false); if (AT.disc) { AT.disc.visible = false; if (AT.disc.parent) AT.disc.parent.remove(AT.disc); } hud(); }
+function leave() { mmClose(); if (AT.g.parent) G.scene.remove(AT.g); for (const o of AT.obsW || []) { const i = G.obstacles.indexOf(o); if (i >= 0) G.obstacles.splice(i, 1); } AT.on = false; AT.prop = AT.fast = AT.down = false; amb(false); if (AT.disc) { AT.disc.visible = false; if (AT.disc.parent) AT.disc.parent.remove(AT.disc); } hud(); }
 function open() { const busy = G.admBusy && G.admBusy(); if (busy) { G.showMsg(busy, 1.8); return; } G.teleportTo('atlantis', CX, CZ - 262, 0, '🌊 ' + adT('Atlantis’e daldın!')); }
 function goHome() { G.teleportTo('hub', WELL.x - 3, WELL.z, -Math.PI / 2, adT('🏡 Köye döndün')); }
 

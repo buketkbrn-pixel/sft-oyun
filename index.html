@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.27</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.28</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -789,7 +789,7 @@ const SFX_DEFS = [
   ['talk', 'Konuşma sesi', 'Sohbet'], ['laugh', 'Gülme', 'Sohbet'],
   ['luna', 'Lunapark müziği', 'Lunapark'], ['ding', 'Güç ölçer zili', 'Lunapark'],
   ['meerkat', 'Mirket cıvıltısı', 'Çöl'], ['desertWind', 'Çöl rüzgârı', 'Çöl'], ['penguin', 'Penguen sesleri', 'Buzullar'], ['seal', 'Fok sesleri', 'Buzullar'], ['iceWind', 'Kutup rüzgârı', 'Buzullar'], ['planeEng', 'Uçak motoru', 'Buzullar'],
-  ['epic', 'Savaş müziği (canavar arenası / battle royale)', 'Müzik'], ['dressMus', 'Kıyafet odası müziği', 'Müzik'], ['birdsAmb', 'Köyde sürekli kuş cıvıltısı', 'Müzik'],
+  ['epic', 'Savaş müziği (canavar arenası / battle royale)', 'Müzik'], ['dressMus', 'Kıyafet odası müziği', 'Müzik'], ['dungeonMus', 'Zindan müziği', 'Müzik'], ['birdsAmb', 'Köyde sürekli kuş cıvıltısı', 'Müzik'],
   ['pour', 'Çay koyma', 'Ev'], ['sip', 'Çay yudumlama', 'Ev'], ['sizzle', 'Yemek pişirme', 'Ev'], ['eat', 'Yemek yeme', 'Ev'], ['sweep', 'Süpürme', 'Ev'], ['doorbell', 'Kapı zili / telefon', 'Ev'], ['sleep', 'Uyku / sabah', 'Ev'],
   ['robostep', 'Robot kol adımları', 'Robotik çanta'], ['robohit', 'Robot kol vuruşu', 'Robotik çanta'], ['laser', 'Lazer', 'Robotik çanta'], ['zap', 'Lazer başlangıcı', 'Robotik çanta'], ['roboarm', 'Kolların açılıp kapanması', 'Robotik çanta'],
   ['throw', 'Fırlatma', 'Eşyalar'], ['boom', 'Patlama', 'Eşyalar'], ['magic', 'Sihir', 'Eşyalar'], ['guitar', 'Gitar', 'Eşyalar'], ['skate', 'Kaykay', 'Eşyalar'],
@@ -1091,10 +1091,11 @@ LOOPS.birdsAmb = (g, ctx) => {
   return loopBuf(g, ctx, buf);
 };
 // Kendi müzik dosyaların: tarayıcıda (IndexedDB) saklanır, açılışta yüklenir
-const MUS_SLOTS = [['epic', '⚔️ Canavar arenası ve battle royale'], ['dressMus', '👗 Kıyafet odası'], ['birdsAmb', '🐦 Köy kuş sesleri']];
+const MUS_SLOTS = [['epic', '⚔️ Canavar arenası ve battle royale'], ['dressMus', '👗 Kıyafet odası'], ['dungeonMus', '🗝️ Zindan'], ['birdsAmb', '🐦 Köy kuş sesleri']];
+LOOPS.dungeonMus = (g, ctx) => { const s = noiseLoop(ctx), f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 260; const k = ctx.createGain(); k.gain.value = .6; s.connect(f).connect(k).connect(g); for (const fr of [55, 82.4]) { const o = ctx.createOscillator(); o.frequency.value = fr; const og = ctx.createGain(); og.gain.value = .12; o.connect(og).connect(g); o.start(); } return s; };   // dosya yoksa: koyu uğultu
 AU.userName = {}; AU.builtin = {};
 // Oyunla gelen ses dosyaları (köy kuşları; internetsiz sürümde savaş ve kıyafet odası müzikleri de gömülü)
-const MUS_BUILTIN = Object.assign({ birdsAmb: 'audio/kuslar.mp3' }, window.SFT_MUSIC || {});
+const MUS_BUILTIN = Object.assign({ birdsAmb: 'audio/kuslar.mp3', dungeonMus: 'audio/zindan.mp3' }, window.SFT_MUSIC || {});
 async function musLoadBuiltin() {
   await Promise.all(Object.entries(MUS_BUILTIN).map(async ([id, url]) => {
     try { let ab; if (url.startsWith('data:')) { const bin = atob(url.slice(url.indexOf(',') + 1)), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); ab = u.buffer; } else { const r = await fetch(url); if (!r.ok) return; ab = await r.arrayBuffer(); } AU.builtin[id] = await AU.ctx.decodeAudioData(ab); if (!AU.user[id]) musReset(id); musUI(); } catch (e) {}
@@ -3717,7 +3718,7 @@ const ITEMS = [
   { id: 'rifle', name: 'Taramalı', icon: '🔫', kind: 'gun', rate: .075, spread: .026, snd: 'rifle', desc: 'Basılı tut: seri atış' },
   { id: 'sword', name: 'Kılıç', icon: '🗡️', kind: 'swing', T: .42, hitT: .17, reach: 2.5, arc: 75, push: 1.4, up: 1, dmg: 45, desc: 'Geniş savurma, uzağa erişir' },
   { id: 'bat', name: 'Beyzbol sopası', icon: '🏏', kind: 'swing', T: .58, hitT: .25, reach: 2.2, arc: 70, push: 2.6, up: 2.6, dmg: 35, desc: 'Vurduğunu uçurur' },
-  { id: 'torch', name: 'El feneri', icon: '🔦', kind: 'toggle', desc: 'Aç / kapat: geceyi aydınlat' },
+  { id: 'torch', name: 'El feneri', icon: '🔦', kind: 'toggle', desc: 'Aç / kapat: geceyi aydınlat · K (telefonda 🔦 düğmesi): uzun / normal mod' },
   { id: 'bino', name: 'Dürbün', icon: '🔭', kind: 'hold', desc: 'Basılı tut: uzağa yakınlaş' },
   { id: 'umbrella', name: 'Şemsiye', icon: '☂️', kind: 'toggle', desc: 'Aç: yüksekten yavaşça süzül' },
   { id: 'balloon', name: 'Balon', icon: '🎈', kind: 'toggle', desc: 'Elindeyken hafif zıplarsın · bırak: uçup gider' },
@@ -3753,7 +3754,8 @@ const BAL = { obj: new THREE.Group(), pos: new THREE.Vector3(), vel: new THREE.V
   BAL.line = new THREE.Line(lg, new THREE.LineBasicMaterial({ color: 0xf1f1f1 })); BAL.line.frustumCulled = false; BAL.line.visible = false; scene.add(BAL.line);
 }
 // El feneri ışığı: sahnede baştan beri var (sonradan eklenirse tüm malzemeler yeniden derlenir ve oyun takılır)
-const TORCH = { light: new THREE.SpotLight(0xfff1d6, 0, 48, .4, .5, 1.25), beam: null, v: new THREE.Vector3(), d: new THREE.Vector3() };
+const TORCH = { light: new THREE.SpotLight(0xfff1d6, 0, 60, .42, .5, 1.25), beam: null, v: new THREE.Vector3(), d: new THREE.Vector3(), long: false };
+try { TORCH.long = localStorage.getItem('sftFenerUzun') === '1'; } catch (e) {}
 TORCH.light.castShadow = false; scene.add(TORCH.light, TORCH.light.target);
 {
   const c = document.createElement('canvas'); c.width = 4; c.height = 128; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 128);
@@ -3842,9 +3844,11 @@ function updateItems(dt, show, aiming) {
     w.localToWorld(TORCH.v.set(0, .24, 0)); TORCH.d.set(0, 1, 0).transformDirection(w.matrixWorld);
     TORCH.light.position.copy(TORCH.v); TORCH.light.target.position.copy(TORCH.v).addScaledVector(TORCH.d, 10); TORCH.light.target.updateMatrixWorld();
   }
-  TORCH.light.intensity = THREE.MathUtils.lerp(TORCH.light.intensity, tOn ? 55 : 0, 1 - Math.exp(-14 * dt));
-  TORCH.light.visible = TORCH.light.intensity > .3;
-  TORCH.beam.visible = tOn && DAY.N > .05 && fpBlend < .5; TORCH.beam.material.opacity = .2 * DAY.N;
+  const tL = TORCH.long, L = TORCH.light;   // 🔦 normal: daha parlak · uzun mod: çok uzağa ve geniş aydınlatır
+  L.intensity = THREE.MathUtils.lerp(L.intensity, tOn ? (tL ? 230 : 115) : 0, 1 - Math.exp(-14 * dt)); L.distance = tL ? 160 : 60; L.angle = tL ? .64 : .42; L.penumbra = tL ? .38 : .5; L.decay = tL ? 1 : 1.25;
+  L.visible = L.intensity > .3;
+  const tDark = Math.max(DAY.N, inDungeon ? .8 : inAtl ? .45 : inHome || inHouse ? .25 : 0), bs = tL ? 1.75 : 1;
+  TORCH.beam.visible = tOn && tDark > .05 && fpBlend < .5; TORCH.beam.material.opacity = (tL ? .2 : .22) * tDark; TORCH.beam.scale.set(bs, tL ? 3.4 : 1, bs);
   const lens = slotHolders.torch[0].userData.ph && slotHolders.torch[0].userData.ph.userData.lens;
   if (lens) lens.material.color.setHex(tOn ? 0xfff4d6 : 0x9aa0a8);
   // balon
@@ -3865,6 +3869,10 @@ function updateItems(dt, show, aiming) {
     BAL.obj.position.copy(BAL.pos); BAL.obj.scale.setScalar(giantS);
     if (BAL.line.visible) { const a = BAL.line.geometry.attributes.position; a.setXYZ(0, BAL.hand.x, BAL.hand.y, BAL.hand.z); a.setXYZ(1, BAL.pos.x, BAL.pos.y - .34 * giantS, BAL.pos.z); a.needsUpdate = true; }
   }
+}
+function torchMode() {   // 🔦 uzun / normal mod (robot kolları kapatır gibi: K ya da düğme)
+  if (INV.eq !== 'torch') return; TORCH.long = !TORCH.long; if (!INV.torch) INV.torch = true; play('torch', { on: true }); touchUIState = '';
+  try { localStorage.setItem('sftFenerUzun', TORCH.long ? '1' : '0'); } catch (e) {} showMsg(TORCH.long ? '🔦 ' + adT('Uzun mod: çok uzağa ve geniş aydınlatır') : '🔦 ' + adT('Normal mod'), 1.4);
 }
 function useToggle() {   // el feneri / şemsiye / balon: tek dokunuş
   const id = INV.eq;
@@ -8099,7 +8107,7 @@ const ADV_TRIPS = [
   { key: 'luna', icon: '🎡', name: 'Lunapark', desc: 'Dönme dolap, atlıkarınca, güç ölçer, pamuk şeker', say: 'Lunaparka gidiyoruz! Dönme dolabın tepesinden köy çok güzel görünür.' },
   { key: 'royale', icon: '🪂', name: 'Battle royale', desc: 'Büyük ada, 30 kişi (29 bot), son kalan kazanır', say: 'Zepline bin, istediğin yerde atla, en son ayakta kalan sen ol!' },
   { key: 'race', icon: '🏎️', name: 'Yarış', desc: 'Drift, nitro, güç kutuları ve özel güçlerle araba yarışı', say: 'Kemerini bağla! Drift yap, nitroyu doldur, kutulardan güç topla!' },
-  { key: 'dungeon', icon: '🗝️', name: 'Zindan', desc: '25 oda: labirent, tuzaklar, bulmacalar, iskeletler, Kemik Kral', say: 'Zindan karanlıktır. Çakmağını unutma, zincir seslerinden korkma!' },
+  { key: 'dungeon', icon: '🗝️', name: 'Zindan', desc: '40 oda: labirent, tuzaklar, bulmacalar, iskeletler, Kemik Kral', say: 'Zindan karanlıktır. Çakmağını unutma, zincir seslerinden korkma!' },
 ];
 const ADV_HELLO = ['Selam yolcu! Bugün nereye gidiyoruz?', 'Ooo, macera arıyorsun galiba. Seç bakalım!', 'Haritamda dokuz yer var. Hangisi?', 'Çantamı hazırladım bile. Nereye?'];
 function advOpen() {
@@ -8919,7 +8927,7 @@ function keyAction(code) {
   if (code === 'KeyF') toggleFullscreen();
   if (code === 'KeyN') dayToggle();
   if (code === 'KeyI') openInv();
-  if (code === 'KeyK') { if (INV.eq === 'speaker') spkPlaceToggle(); else toggleRobo(); }
+  if (code === 'KeyK') { if (INV.eq === 'speaker') spkPlaceToggle(); else if (INV.eq === 'torch') torchMode(); else toggleRobo(); }
   if (code === 'KeyO' && INV.eq === 'speaker') spkPlayPause();
   if (code === 'KeyU' && INV.eq === 'speaker') spkLoopToggle();
 }
@@ -9345,7 +9353,7 @@ for (const b of document.querySelectorAll('#touchUI .tb:not(.jstick)')) {
     if (key) { keys[key] = true; keyAction(key); }
     if (tap) keyAction(tap);
     if (act === 'act') { if (giant) leftReq = true; else if (gunMode) mouseHeld = true; else punchReq = true; }
-    if (act === 'arms') { if (INV.eq === 'speaker') spkPlaceToggle(); else toggleRobo(); }
+    if (act === 'arms') { if (INV.eq === 'speaker') spkPlaceToggle(); else if (INV.eq === 'torch') torchMode(); else toggleRobo(); }
     if (act === 'run') setRunToggle(!runToggle);
     if (act === 'kick') superDown('kick');
     if (act === 'hado') superDown('hado');
@@ -9495,12 +9503,12 @@ let touchUIState = '';
 function updateTouchUI(flying) {
   const hh = inHome ? homeH() : null, teaOk = (!!sitting && teaReady()) || !!hh, invOk = inviteAvailable() || (inHome && ['off', 'sit', 'walk'].includes(HGUEST.state));
   const tvOk = inHome && homeFloor(player.position.y) === 0 && !TET.open;
-  const st = [giant, flying, boostMode, gunMode, INV.eq, ROBO.open, ROBO.ultra, HERO.on, SPK.placed, !!carried, teaOk, invOk, runToggle, walkSquash, hh && hh[0], HGUEST.state, tvOk, TET.open, GT.near, !!GT.obj, !!ROBO.volt, !!ROBO.titan, !!ROBO.ultra, ROBO.open].join();
+  const st = [giant, flying, boostMode, gunMode, INV.eq, ROBO.open, ROBO.ultra, HERO.on, SPK.placed, !!carried, teaOk, invOk, runToggle, walkSquash, hh && hh[0], HGUEST.state, tvOk, TET.open, GT.near, !!GT.obj, !!ROBO.volt, !!ROBO.titan, !!ROBO.ultra, ROBO.open, TORCH.long].join();
   if (st === touchUIState) return;
   touchUIState = st;
   const show = (id, on) => $(id).classList.toggle('hide', !on);
   for (const id of ['tbJump', 'tbFly', 'tbSlide', 'tbRun', 'tbShield']) show(id, !giant);
-  show('tbMode', !giant && (INV.eq === 'robo' || INV.eq === 'speaker'));
+  show('tbMode', !giant && (INV.eq === 'robo' || INV.eq === 'speaker' || INV.eq === 'torch'));
   show('tbUltra', false); show('tbVolt', false); { const rm = !giant && !HERO.on && INV.eq === 'robo'; show('tbModes', rm); $('tbModes').classList.toggle('on', !!(ROBO.ultra || ROBO.volt || ROBO.titan) && ROBO.open); if (!rm) rmClose(); } $('tbUltra').classList.toggle('on', ROBO.ultra && ROBO.open);
   show('tbBoost', flying && !boostMode); show('tbGrab', giant || GT.near || !!GT.obj); show('tbTea', teaOk); show('tbInvite', invOk);
   show('tbStomp', giant); show('tbWalkSq', giant); show('tbLie', giant); $('tbWalkSq').classList.toggle('on', walkSquash);
@@ -9508,7 +9516,7 @@ function updateTouchUI(flying) {
   $('tbTea').innerHTML = hh ? (hh[0] === 'Ye' ? '🍽️' : hh[0].startsWith('Çay') ? '☕' : hh[0].includes('TV') || hh[0].includes('video') ? '📺' : '🎮') + '<small>' + hh[0].split(' ')[0] + '</small>' : '☕<small>Çay iç</small>';
   $('tbInvite').innerHTML = inHome ? (HGUEST.state === 'off' ? '📞<small>Davet</small>' : '👋<small>Uğurla</small>') : '📞<small>Davet</small>';
   $('tbAct').firstChild.textContent = giant ? '💥' : INV.eq === 'robo' && ROBO.open ? '🦾' : INV.eq === 'superfight' ? '👊' : curItem().icon;
-  $('tbMode').innerHTML = INV.eq === 'speaker' ? (SPK.placed ? '✋<small>Al</small>' : '📦<small>Koy</small>') : ROBO.open ? '🦾<small>Kapat</small>' : '🦾<small>Kollar</small>'; $('tbMode').classList.toggle('on', INV.eq === 'robo' && ROBO.open);
+  $('tbMode').innerHTML = INV.eq === 'speaker' ? (SPK.placed ? '✋<small>Al</small>' : '📦<small>Koy</small>') : INV.eq === 'torch' ? (TORCH.long ? '🔦<small>Uzun</small>' : '🔦<small>Normal</small>') : ROBO.open ? '🦾<small>Kapat</small>' : '🦾<small>Kollar</small>'; $('tbMode').classList.toggle('on', (INV.eq === 'robo' && ROBO.open) || (INV.eq === 'torch' && TORCH.long));
   document.body.classList.toggle('robosplit', INV.eq === 'robo' && ROBO.open && !giant);
   document.body.classList.toggle('supersplit', INV.eq === 'superfight' && !giant);
   { const b = $('tbShield'); if (b) b.firstChild.textContent = INV.eq === 'superfight' ? '💠' : '🛡️'; const sm = b && b.querySelector('small'); if (sm) sm.textContent = INV.eq === 'superfight' ? 'Alan' : 'Kalkan'; }
@@ -12254,6 +12262,7 @@ function updateAmbience(dt, hubNow) {
   setLoop('mall', inMall ? .35 : 0);
   setLoop('epic', inArena ? .42 : inRoyale ? .36 : ADM.m_every && !DRESS.open ? .42 : 0);   // admin: arena şarkısı her yerde
   setLoop('dressMus', DRESS.open ? .45 : 0);
+  setLoop('dungeonMus', inDungeon && !DRESS.open ? .2 : 0);   // 🗝️ zindan müziği (kısık, döngülü)
   setLoop('iceWind', inIce && !FLY.on ? .3 : 0); setLoop('desertWind', inDesert && !FLY.on ? .28 : 0); setLoop('planeEng', FLY.on ? FLY.eng : 0);
   setLoop('birdsAmb', hubNow && !DRESS.open && !ADM.m_every ? .3 * (1 - N) * (1 - WX.k * .85) : 0);
   const sd = Math.hypot(P.x - STADIUM.x, P.z - STADIUM.z);
@@ -18299,7 +18308,7 @@ Object.assign(SFX, {
 ADM_EXCL.push(['m_fast', 'm_slow'], ['skyPink', 'skyAlien', 'skyGold', 'skyMars'], ['iceGround', 'lavaGround', 'rainbowGrass'], ['balloonBody', 'noodleBody', 'pancakeBody'], ['blinkJump', 'frogJump'], ['parachute', 'balloonFly']);
 const admGround = (x, z) => curArea === AREAS.hub ? terrH(x, z) : player.position.y;
 // 🎵 müzik
-const musCurId = () => inArena || inRoyale || ADM.m_every ? 'epic' : DRESS.open ? 'dressMus' : 'birdsAmb';
+const musCurId = () => inArena || inRoyale || ADM.m_every ? 'epic' : DRESS.open ? 'dressMus' : inDungeon ? 'dungeonMus' : 'birdsAmb';
 function admMus(fn) { const M = MUSE[musCurId()]; if (!M) return adT('🎵 Burada çalan kendi şarkın yok (Ayarlar → Sesler → Kendi müziğin)'); return fn(M) || ''; }
 function admMusRestart() { return admMus(M => { try { M.el.currentTime = 0; } catch (e) {} M.ended = false; M.el.play().catch(() => {}); return '🔁 ' + M.name; }); }
 function admMusSkip() { return admMus(M => { const d = M.el.duration; try { M.el.currentTime = isFinite(d) ? Math.min(d - .5, M.el.currentTime + 10) : M.el.currentTime + 10; } catch (e) {} return '⏩ +10 sn'; }); }
