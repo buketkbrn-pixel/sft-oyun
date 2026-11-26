@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.26</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.27</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -8875,6 +8875,7 @@ const isLocked = () => document.pointerLockElement === canvas;
 
 function keyAction(code) {
   if (inDungeon && window.__dg && __dg.key(code)) return;   // 🗝️ zindan: F çakmak
+  if (inAtl && window.__atl && __atl.key(code)) return;   // 🌊 Atlantis: Q dalış, E hızlı yüzme
   if (HR.on && hrKey(code)) return;   // 🖐️ el ragdoll
   if (curKey === 'paint' && code === 'KeyE') { if (PAINT.draw) paintStand(); else paintSit(paintNearSeat()); return; }   // 🎨 otur / kalk
   if (curKey === 'uni' && code === 'KeyE') { uniSit(!UNI.seat); return; }
@@ -9668,6 +9669,7 @@ function groundAt(x, z, y) {   // her eşyanın üstünde durulabilir (ağaçlar
   if (inRoyale && BR.builds.length) g = brRampAt(x, z, y, g);
   if (ADM.brb && ADM.brb.length) g = admRampAt(x, z, y, g);
   if (inMaker && window.__mk) g = __mk.ramp(x, z, y, g);
+  if (inAtl && window.__atl) g = __atl.ground(x, z, y, g);   // 🌊 deniz tabanı
   if (inRace && window.__race) g = __race.ground(x, z, y, g);   // 🏎️ pist yüksekliği   // 🗺️ harita rampaları / merdivenleri
   return g;
 }
@@ -10087,7 +10089,7 @@ function teleportTo(key, x, z, face, msg, onArrive) {
     if (PARTS[curKey] && curKey !== key) scene.remove(PARTS[curKey]);   // çıktığımız iç mekân sahneden ayrılır
     if (PARTS[key]) scene.add(PARTS[key]);                                // girdiğimiz iç mekân yüklenir
     curKey = key;
-    curArea = AREAS[key]; inArena = key === 'arena'; inHouse = key === 'house'; inMall = key === 'mall'; inCloset = key === 'closet'; inHome = key === 'home'; inParkour = key === 'parkour'; inRoyale = key === 'royale'; inIce = key === 'ice'; inDesert = key === 'desert'; inQuest = key === 'quest'; inBlank = key === 'blank'; inCity = key === 'city'; inMaker = key === 'maker'; inRace = key === 'race'; inDungeon = key === 'dungeon'; applyArea(curArea);
+    curArea = AREAS[key]; inArena = key === 'arena'; inHouse = key === 'house'; inMall = key === 'mall'; inCloset = key === 'closet'; inHome = key === 'home'; inParkour = key === 'parkour'; inRoyale = key === 'royale'; inIce = key === 'ice'; inDesert = key === 'desert'; inQuest = key === 'quest'; inBlank = key === 'blank'; inCity = key === 'city'; inMaker = key === 'maker'; inRace = key === 'race'; inDungeon = key === 'dungeon'; inAtl = key === 'atlantis'; applyArea(curArea);
     if (!inMall && !inCloset && !inHome && !inParkour) objEl.style.display = 'none';
     for (const l of HOME.lights) l.visible = inHome;
     if (!inHome) { if (HOME.video && !HOME.video.paused) HOME.video.pause(); if (TET.open) closeTetris(); HOME.act = null; HOME.sleep = null; $('sleepFx').classList.remove('on', 'day'); HOME.broom.visible = HOME.pan.visible = false; }
@@ -10100,7 +10102,7 @@ function teleportTo(key, x, z, face, msg, onArrive) {
     camBase.copy(player.position).y += 1.5;
     if (inArena) { kills = 0; $('kills').textContent = `Yenilen ${killNoun()}: 0`; }
     if (inParkour || inRoyale) { giant = false; ROBO.open = false; }
-    brArea(); iceArea(); desertArea(); questArea(); blankArea(); cityArea(); try { deskArea(); } catch (e) { sftErr(e); } try { if (window.__mk) __mk.area(); } catch (e) { sftErr(e); } try { if (window.__race) __race.area(); } catch (e) { sftErr(e); } try { if (window.__dg) __dg.area(); } catch (e) { sftErr(e); }
+    brArea(); iceArea(); desertArea(); questArea(); blankArea(); cityArea(); try { deskArea(); } catch (e) { sftErr(e); } try { if (window.__mk) __mk.area(); } catch (e) { sftErr(e); } try { if (window.__race) __race.area(); } catch (e) { sftErr(e); } try { if (window.__dg) __dg.area(); } catch (e) { sftErr(e); } try { if (window.__atl) __atl.area(); } catch (e) { sftErr(e); }
     $('hpWrap').style.display = $('kills').style.display = inArena ? 'block' : 'none';
     if (onArrive) onArrive();
     if (!inHouse && !inMall && !inCloset && !inHome && !inParkour) for (let i = 0; i < 20; i++) spawnDust(x, 0, z, 1.5, 2, 0, 0, 0xc9a2ff);
@@ -10852,7 +10854,7 @@ function update(dt) {
   }
 
   if (!canAct) boostMode = false;
-  const flying = canAct && !slide && !giant && !sitting && !HERO.on && !inRoyale && (HR.on || boostMode || (!!(keys.ShiftLeft || keys.ShiftRight) && !shiftBlock));
+  const flying = canAct && !slide && !giant && !sitting && !HERO.on && !inRoyale && !inAtl && (HR.on || boostMode || (!!(keys.ShiftLeft || keys.ShiftRight) && !shiftBlock));
   if (boostReq) {
     boostReq = false;
     if (flying && !boostMode) {
@@ -10978,6 +10980,8 @@ function update(dt) {
       spawnDust(pos.x + slide.dir.x * .5, pos.y, pos.z + slide.dir.z * .5, .5, .9, -slide.dir.x * sp * .15, -slide.dir.z * sp * .15, groundDust());
     }
     if (p >= 1 || !onGround) { slide = null; slideCooldown = .25; }
+  } else if (inAtl && window.__atl && __atl.swimOn()) {   // 🌊 Atlantis: yüzme
+    __atl.swim(dt, moving, ix, iz, right);
   } else if (flying) {
     // Uçuş: W/A/S/D ile kameranın baktığı yöne (yukarı/aşağı dahil), tuşsuz ise yerinde yükselme
     const fast = keys.KeyE || runToggle, sp = (boostMode ? (fast ? FLY_HYPER : FLY_BOOST) : FLY_SPEED * (fast ? 1.7 : 1)) * ((ROBO.ultra || ROBO.volt || ROBO.titan) && ROBO.open && INV.eq === 'robo' ? (ROBO.titan ? 2.5 : ROBO.volt ? 2.1 : 1.8) : 1), kf = 1 - Math.exp(-4 * dt);
@@ -11002,12 +11006,13 @@ function update(dt) {
   else if (giant) { collideHit = null; collideObstacles(pos, .24 * giantS, .84 * giantS); }   // dev küçük şeylerin üstünden geçer; büyüdükçe evlerin de
   else if (ADM.noclip || ADM.ncfly) collideHit = null;   // admin: duvarlardan geç
   else { collideHit = null; collideObstacles(pos); }
-  climbUpdate(dt, dir, moving, canAct && !flying && (!giant || inCity) && !slide && !sitting && !HERO.on && !RIDE.on && !gSit && !CINE, pos);
+  if (inAtl && window.__atl && !noclipOn()) __atl.collide(pos);   // 🌊 Atlantis surları
+  climbUpdate(dt, dir, moving, canAct && !flying && !inAtl && (!giant || inCity) && !slide && !sitting && !HERO.on && !RIDE.on && !gSit && !CINE, pos);
 
   // Dikey hareket: zıplama, uçuş, yerçekimi, kaya tepesine konma
   if (HERO.on) heroVertical(dt, pos, canAct);
   const admSp = !!keys.Space && !ADM.spPrev, admG = onGround; ADM.spPrev = !!keys.Space;
-  if (canAct && keys.Space && onGround && !slide && !shielding && !flying && !giant && !RIDE.on && !HERO.on && !RACE_LOCK) { vy = (ROBO.active ? (ROBO.titan ? 21 : ROBO.volt ? 18 : ROBO.ultra ? 15 : 10.5) : 7.2) * (ADM.jump3 ? 3.5 : ADM.jump ? 2.1 : 1) * CHEAT.jmp * (giantS >= 1 ? Math.sqrt(giantS) : Math.pow(giantS, .3)); onGround = false; play('jump'); }
+  if (canAct && keys.Space && onGround && !slide && !shielding && !flying && !giant && !RIDE.on && !HERO.on && !RACE_LOCK && !inAtl) { vy = (ROBO.active ? (ROBO.titan ? 21 : ROBO.volt ? 18 : ROBO.ultra ? 15 : 10.5) : 7.2) * (ADM.jump3 ? 3.5 : ADM.jump ? 2.1 : 1) * CHEAT.jmp * (giantS >= 1 ? Math.sqrt(giantS) : Math.pow(giantS, .3)); onGround = false; play('jump'); }
   else if (ADM.airJump && admSp && !admG && canAct && !flying && !giant && !HERO.on && !CLIMB.on && !RIDE.on) { vy = 7.2 * (ADM.jump ? 1.6 : 1); play('jump'); for (let i = 0; i < 10; i++) spawnDust(pos.x, pos.y, pos.z, .35, .5, 0, 0, 0xffffff); }   // admin: havada tekrar zıpla
   let g = giant && !inCity ? terrH(pos.x, pos.z) : groundAt(pos.x, pos.z, pos.y);
   if (!giant && !inArena && !inHouse && !inMall && !inCloset) {   // iris çukur: çerçevenin üstü biraz yüksek, açıkken ortası boşluk
@@ -11020,6 +11025,7 @@ function update(dt) {
     else if (pr < PIT.OUT - .2 && pos.y > PIT.y - .05) g = Math.max(g, PIT.y + (pr < PIT.R ? (PIT.k > .8 ? .2 : .12) : .2));
   }
   if (CLIMB.on) { pos.y += (ADM.fastClimb ? 10 : giant ? 2.4 * giantS : inCity ? 6 : 3) * dt; vy = 0; onGround = false; }
+  else if (inAtl && window.__atl && __atl.swimOn()) { pos.y += vy * dt; onGround = false; const tp = __atl.top(); if (pos.y > tp) { pos.y = tp; vy = Math.min(vy, 0); } }   // 🌊 su altında süzül
   else if (flying) {
     if (!wasFlying && pos.y - g < .3) for (let i = 0; i < 18; i++) spawnDust(pos.x, pos.y, pos.z, .9, 1.6, 0, 0, groundDust());
     pos.y += vy * dt; onGround = false;
@@ -11039,7 +11045,7 @@ function update(dt) {
     }
   }
   if (pos.y <= g) {
-    if (!onGround && vy < -4 && !flying) play('land', { k: vy < -12 ? 1 : .45, gap: .15 });
+    if (!onGround && vy < -4 && !flying && !inAtl) play('land', { k: vy < -12 ? 1 : .45, gap: .15 });
     if (!onGround && vy < -12) { for (let i = 0; i < 20; i++) spawnDust(pos.x, g, pos.z, 1, 1.4, 0, 0, groundDust()); shake = Math.max(shake, .2); }
     const admImp = onGround ? 0 : vy;
     pos.y = g; vy = 0; onGround = true;
@@ -11067,6 +11073,7 @@ function update(dt) {
   const flyMode = flying ? (moving && !gunMode && !HR.on ? 'super' : 'hover') : null;
   let tiltT = 0;
   if (flyMode === 'super') tiltT = THREE.MathUtils.clamp(Math.PI / 2 - Math.atan2(vy, Math.hypot(vel.x, vel.z)), .3, 2.6);
+  else if (inAtl && window.__atl && __atl.swimOn()) tiltT = __atl.tilt();   // 🌊 yüzerken gövde yatar
   flyTilt = dead ? 0 : THREE.MathUtils.lerp(flyTilt, tiltT, 1 - Math.exp(-6 * dt));
   if (!dead) {
     charHolder.rotation.x = flyTilt;
@@ -11125,6 +11132,7 @@ function update(dt) {
                                                   : !shielding && !slide && !sitting && !gSit && !carried && !dead && !giant && !reachK ? itemArms(THREE.MathUtils.clamp(pitch * .8 - .05, -1, 1)) : null });
   }
   if (!charRig) sigmaPost(dt);   // 🗿 Sigma katmanı (kasılmış yürüyüş, sinematik poz)
+  if (!charRig && inAtl && window.__atl) try { __atl.pose(playerRig, dt); } catch (e) {}   // 🌊 yüzme pozu (pervane bacaklar)
   if (CLIMB.on && !charRig) climbPose();
   if (!charRig) animeAnimate(dt);
   animeUpdate(dt, speed / giantS);
@@ -11167,13 +11175,13 @@ function update(dt) {
 
   // Dünya: köyde NPC'ler, çocuklar ve çalılar; arenada canavarlar; evde içerideki NPC
   if (!inHouse && !inMall && !inHome && !COMP.active) chatAnsEl.style.display = 'none';
-  if (COMP.active && !inHouse && !inArena && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !inMaker && !inRace && !inDungeon) updateCompanion(dt);
+  if (COMP.active && !inHouse && !inArena && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !inMaker && !inRace && !inDungeon && !inAtl) updateCompanion(dt);
   if (inMall) updateMall(dt);
   if (inCloset) updateCloset(dt);
   if (inHome) updateHome(dt);
   if (TET.open) tetrisTick(dt);
   if (tvReq) { tvReq = false; if (inHome) tvMain(); }
-  if (!inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'desk' && curKey !== 'school' && curKey !== 'uni' && !inMaker && !inRace && !inDungeon) updatePit(dt);
+  if (!inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'desk' && curKey !== 'school' && curKey !== 'uni' && !inMaker && !inRace && !inDungeon && !inAtl) updatePit(dt);
   if (DRESS.poseT > 0) DRESS.poseT -= dt;
   if (inHouse) { updateHouseNpc(wdt); placeTeaProps(wdt); }
   else if (!inArena) {
@@ -11218,7 +11226,7 @@ function update(dt) {
   }
   // Stadyum 7/24: maç her zaman sürer; yakındaysak oyuncular, seyirciler ve teknik direktörler görünür ve canlanır
   {
-    const inHub = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !inMaker && !inRace && !inDungeon, sd = Math.hypot(pos.x - STADIUM.x, pos.z - STADIUM.z), near = inHub && sd < 115;   // stadyum: oyuncular, taraftarlar, hocalar yaklaşınca yüklenir
+    const inHub = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !inMaker && !inRace && !inDungeon && !inAtl, sd = Math.hypot(pos.x - STADIUM.x, pos.z - STADIUM.z), near = inHub && sd < 115;   // stadyum: oyuncular, taraftarlar, hocalar yaklaşınca yüklenir
     for (const k of STADIUM_FIELD.kids) k.holder.visible = near;
     STADIUM_FIELD.ball.holder.visible = near;
     if (near) updateField(STADIUM_FIELD, ADM.npcStop ? 0 : wdt);   // maç yakındayken oynanır
@@ -11235,13 +11243,13 @@ function update(dt) {
   updateCyclists(ADM.npcStop ? 0 : wdt);
   updateSquash(wdt);
   {
-    const hubNow = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni' && !inMaker && !inRace && !inDungeon;
+    const hubNow = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inRoyale && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni' && !inMaker && !inRace && !inDungeon && !inAtl;
     for (const fl of flocks) for (const b of fl.birds) b.obj.visible = hubNow && !DAY.night && Math.abs(b.pos.x - pos.x) + Math.abs(b.pos.z - pos.z) < 115;
     if (!hubNow) for (const k of birdKids) k.holder.visible = false;
     updateHoods(ADM.npcStop ? 0 : wdt, hubNow); updateAmbience(wdt, hubNow); updateAdventurer(wdt, hubNow); updateLife(wdt, hubNow); updateLuna(wdt, hubNow); updateRoyale(dt); updateFlight(dt); updateIce(wdt); updateDesert(wdt); questUpdate(wdt); cityUpdate(wdt); updateDetail(wdt, hubNow);
     for (const g of SIGNS) g.visible = hubNow && Math.abs(g.position.x - pos.x) + Math.abs(g.position.z - pos.z) < 140;
   }
-  grass.visible = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni' && !inMaker && !inRace && !inDungeon;
+  grass.visible = !inArena && !inHouse && !inMall && !inCloset && !inHome && !inParkour && !inIce && !inDesert && !inQuest && !inBlank && !inCity && !ankIn() && curKey !== 'school' && curKey !== 'desk' && curKey !== 'paint' && curKey !== 'gallery' && curKey !== 'uni' && !inMaker && !inRace && !inDungeon && !inAtl;
   grassMat.uniforms.uWalk.value = onGround && !flying ? 1 : 0;
   {   // çimen alanı kameranın baktığı yöne kaydırılır: arkada boşa çimen çizilmez, önde daha uzağa kadar çimen olur
     const U = grassMat.uniforms, fx = -Math.sin(yaw), fz = -Math.cos(yaw), sh = GRASS_S * .19;
@@ -11268,6 +11276,7 @@ function update(dt) {
     else if (!flying && (VEH.p = vehPrompt(pos))) { promptText = VEH.p[0]; vAction = VEH.p[1]; }
     else if (inRoyale && BR.prompt) { promptText = BR.prompt[0]; vAction = BR.prompt[1]; }
     else if (inDungeon && window.__dg && (__dg.P = __dg.prompt())) { promptText = __dg.P[0]; vAction = __dg.P[1]; }   // 🗝️ kol / sandık
+    else if (inAtl && window.__atl && (__atl.P = __atl.prompt())) { promptText = __atl.P[0]; vAction = __atl.P[1]; }   // 🌊 batık sandık
     else if (!flying && (AIRP.p = airPrompt())) { promptText = AIRP.p[0]; vAction = AIRP.p[1]; }
     else if (portalDist < 3.6) { if (ARENA.theme === 'all') { promptText = adT('V — Görev dünyasına dön 🗺️'); vAction = () => questReturn(); } else { promptText = 'V — Köye dön'; vAction = () => teleport(false); } }
     else if (inQuest && !flying && (QW.p = questPrompt(pos))) { promptText = QW.p[0]; vAction = QW.p[1]; }
@@ -11365,7 +11374,8 @@ function update(dt) {
     if (!hmOverOp(c.x - A.cx, c.z - A.cz)) { if (pos.y < HM.FH * .6) c.y = Math.min(c.y, HM_SL - .25); else c.y = Math.max(c.y, HM.FH + .35); }
     c.y = THREE.MathUtils.clamp(c.y, .3, HM.RF - .3);
   }
-  if (inDungeon && window.__dg) try { __dg.cam(camTarget, camera.position); } catch (e) {}   // 🗝️ kamera duvarın arkasına geçmesin
+  if (inDungeon && window.__dg) try { __dg.cam(camTarget, camera.position); } catch (e) {}
+  if (inAtl && window.__atl) try { __atl.cam(camTarget, camera.position); } catch (e) {}   // 🌊 kamera tabanın altına / yüzeyin üstüne çıkmasın   // 🗝️ kamera duvarın arkasına geçmesin
   if (inCloset) {   // giyinme odası: yuvarlak duvarın içinde, tavanın altında
     const R = AREAS.closet, c = camera.position, dx = c.x - R.cx, dz = c.z - R.cz, r = Math.hypot(dx, dz);
     if (r > 6.9) { c.x = R.cx + dx / r * 6.9; c.z = R.cz + dz / r * 6.9; }
@@ -26330,7 +26340,7 @@ function crigUI() {
    · Admin panelinde yapılan her şey odadaki herkese de uygulanır · odada GLB (kendi modelim) yasak
    ===================================================================== */
 const MP_MAX = 5, MP_PFX = 'sftbrk-oda-', MP_COLORS = [0xe53935, 0x1e88e5, 0x43a047, 0xfdd835, 0x8e24aa], MP_VER = 1;
-const MP_REGIONS = { hub: '🏡 Köy', city: '🏙️ Şehir', ankara: '🗺️ Ankara', miami: '🌴 Miami', paint: '🎨 Resim odası', gallery: '🖼️ Sergi', uni: '🎓 Üniversite', arena: '👹 Canavar dünyası', parkour: '🏃 Parkur', royale: '🔫 Battle royale', dungeon: '🗝️ Zindan', race: '🏎️ Yarış', ice: '🧊 Buzullar', desert: '🏜️ Çöl', quest: '🧭 Görev dünyası', blank: '⬜ Boş arazi' };
+const MP_REGIONS = { hub: '🏡 Köy', city: '🏙️ Şehir', ankara: '🗺️ Ankara', miami: '🌴 Miami', paint: '🎨 Resim odası', gallery: '🖼️ Sergi', uni: '🎓 Üniversite', arena: '👹 Canavar dünyası', parkour: '🏃 Parkur', royale: '🔫 Battle royale', atlantis: '🌊 Atlantis', dungeon: '🗝️ Zindan', race: '🏎️ Yarış', ice: '🧊 Buzullar', desert: '🏜️ Çöl', quest: '🧭 Görev dünyası', blank: '⬜ Boş arazi' };
 const MP = { on: false, host: false, code: '', peer: null, conns: {}, hc: null, me: { id: '', name: '', slot: 0 }, players: {}, started: false, region: 'hub', regHint: null,
   allowTp: false, allowKey: null, hint: null, vote: null, myVote: null, pend: null, sendT: 0, npcT: 0, spec: null, ctlBy: null, ctlTgt: null, ctlKeys: {}, locked: false, plock: false,
   heldBy: null, heldP: null, holding: null, follow: null, muteMe: false, mutes: {}, perm: {}, houses: [], myHouse: '', houseLock: false, set: { collide: true, pvp: false, ownerKick: true, protect: {}, grab: true },
@@ -30541,7 +30551,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
    dokununca dalga (ripple), basınca küçülür; ayarlar, oylama ve bildirimler de aynı dilde.
    ===================================================================== */
 const A12 = { on: true };
-const TP_LIST = [['hub', '🏡', 'Köy'], ['city', '🏙️', 'Şehir'], ['miami', '🌴', 'Miami'], ['ankara', '🗺️', 'Ankara'], ['paint', '🎨', 'Resim odası'], ['gallery', '🖼️', 'Sergi'], ['uni', '🎓', 'Üniversite'], ['race', '🏎️', 'Yarış pisti'], ['dungeon', '🗝️', 'Zindan'], ['sky', '☁️', 'Uçan adalar'], ['blank', '⬜', 'Boş arazi']];   // maceracı yerleri (canavar, parkur, battle royale, buzul, çöl, görev) sadece admin ve maceracıda
+const TP_LIST = [['hub', '🏡', 'Köy'], ['city', '🏙️', 'Şehir'], ['miami', '🌴', 'Miami'], ['ankara', '🗺️', 'Ankara'], ['paint', '🎨', 'Resim odası'], ['gallery', '🖼️', 'Sergi'], ['uni', '🎓', 'Üniversite'], ['race', '🏎️', 'Yarış pisti'], ['atlantis', '🌊', 'Atlantis'], ['dungeon', '🗝️', 'Zindan'], ['sky', '☁️', 'Uçan adalar'], ['blank', '⬜', 'Boş arazi']];   // maceracı yerleri (canavar, parkur, battle royale, buzul, çöl, görev) sadece admin ve maceracıda
 function tpGo(k) {
   setTimeout(() => {
     if (k === curKey && k !== 'ankara' && k !== 'miami') { showMsg('📍 ' + adT('Zaten buradasın'), 1.4); return; }
@@ -30551,6 +30561,7 @@ function tpGo(k) {
     if (k === 'race' && window.__race) return __race.open();
     if (k === 'sky') return islGo();
     if (k === 'dungeon' && window.__dg) return __dg.open();
+    if (k === 'atlantis' && window.__atl) return __atl.open();
     const A = AREAS[k]; if (!A) return; const msg = adT(MP_REGIONS[k] || k);
     if (k === 'parkour') return teleportTo(k, A.cx, A.cz + 7, 0, msg, () => pkReset(true));
     if (k === 'royale') return teleportTo(k, A.cx, A.cz + 7, 0, msg, brStart);
@@ -31113,7 +31124,7 @@ function updateRTree() {
 }
 
 /* 🗺️ Harita oluşturucu: maker.js ayrı dosyadır (sayfa boyutu sınırı). Oyunun içindeki değişkenlere bu G tablosuyla erişir. */
-var inMaker = false, inRace = false, inDungeon = false, RACE_LOCK = false;   // 🏎️ yarış: arabadayken oyuncunun kendi hareketleri kapalı
+var inMaker = false, inRace = false, inDungeon = false, inAtl = false, RACE_LOCK = false;   // 🏎️ yarış: arabadayken oyuncunun kendi hareketleri kapalı
 window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G, k, st ? { get: g, set: st, enumerable: true } : { get: g, enumerable: true });
   d('$', () => $); d('ADM', () => ADM); d('ADM_UNLOCK', () => ADM_UNLOCK); d('RACE_LOCK', () => RACE_LOCK, v => { RACE_LOCK = !!v; }); d('keys', () => keys); d('joy', () => joy); d('charHolder', () => charHolder); d('playerRig', () => playerRig); d('spawnTracer', () => spawnTracer); d('GLTFLoader', () => GLTFLoader); d('ADM_LIST', () => ADM_LIST); d('ADM_F', () => ADM_F); d('MP', () => MP); d('mpSend', () => mpSend); d('AREAS', () => AREAS); d('BAKED_BUSH', () => BAKED_BUSH);
   d('BAKED_TREE', () => BAKED_TREE); d('BENCHES', () => BENCHES); d('CLOSET', () => CLOSET); d('DAY', () => DAY);
@@ -31134,11 +31145,12 @@ window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G
   d('separate', () => separate); d('shake', () => shake, v => { shake = v; }); d('showMsg', () => showMsg); d('spawnDust', () => spawnDust);
   d('speckleTexture', () => speckleTexture); d('started', () => started, v => { started = v; }); d('staticPH', () => staticPH); d('teleportTo', () => teleportTo);
   d('teleporting', () => teleporting, v => { teleporting = v; }); d('touchMode', () => touchMode, v => { touchMode = v; }); d('tryLock', () => tryLock); d('vel', () => vel);
-  d('vy', () => vy, v => { vy = v; }); d('wrapAng', () => wrapAng); d('yaw', () => yaw, v => { yaw = v; });
+  d('vy', () => vy, v => { vy = v; }); d('mergeGeometries', () => mergeGeometries); d('wrapAng', () => wrapAng); d('yaw', () => yaw, v => { yaw = v; });
   return G; })();
 { const s = document.createElement('script'), ms = document.getElementById('sftMakerSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'maker.js'; s.onerror = () => console.warn('🗺️ maker.js yüklenemedi'); document.head.appendChild(s); }
 { const s = document.createElement('script'), ms = document.getElementById('sftRaceSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'race.js'; s.onerror = () => console.warn('🗺️ race.js yüklenemedi'); document.head.appendChild(s); }   // 🏎️ yarış
 { const s = document.createElement('script'), ms = document.getElementById('sftDungeonSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'dungeon.js'; s.onerror = () => console.warn('🗺️ dungeon.js yüklenemedi'); document.head.appendChild(s); }   // 🗝️ zindan
+{ const s = document.createElement('script'), ms = document.getElementById('sftAtlantisSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'atlantis.js'; s.onerror = () => console.warn('🗺️ atlantis.js yüklenemedi'); document.head.appendChild(s); }   // 🌊 Atlantis
 
 renderer.setAnimationLoop(() => {
   try {   // bir alt sistem hata verse bile oyun donmasın: hata ekranda gösterilir, çizim sürer
@@ -31160,6 +31172,7 @@ renderer.setAnimationLoop(() => {
   try { if (window.__mk) __mk.tick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }
   try { if (window.__race) __race.tick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🏎️ yarış
   try { if (window.__dg) __dg.tick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🗝️ zindan
+  try { if (window.__atl) __atl.tick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🌊 Atlantis (köydeki kuyu da)
   try { islTick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // ☁️ uçan adalar   // 🗺️ harita oluşturucu
   updateDay(paused || photoMode || ADM.freeze ? 0 : dt * (ADM.daySpeed ? 40 : 1));
   updateWeather(paused || photoMode || ADM.freeze ? 0 : dt);
