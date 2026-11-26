@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.29</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.30</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -3954,6 +3954,7 @@ ITEMS.splice(ITEMS.findIndex(i => i.id === 'torch'), 0,
 ITEMS.push({ id: 'skate', name: 'Kaykay', icon: '🛹', kind: 'toggle', desc: 'Bin / in: çok hızlı kayarsın' },
   { id: 'guitar', name: 'Gitar', icon: '🎸', kind: 'play', desc: 'Çal: her basışta yeni akor' },
   { id: 'apple', name: 'Elma', icon: '🍎', kind: 'eat', desc: 'Ye: canın dolar' });
+ITEMS.splice(1, 0, { id: 'cosmic', name: 'Kozmik küre', icon: '🔮', kind: 'cosmic', desc: 'V: küre içine girer, kozmik mod: mor lazer, 60 kol, gökten saldırı (X) · K: küreyi çıkar' });   // 🔮 en başta
 for (const it of ITEMS) ITEM_BY[it.id] = it;
 try { const s = localStorage.getItem('copAdamEsya'); if (s && ITEM_BY[s]) INV.eq = s; } catch (e) {}
 Object.assign(ITEM_BY.sword, { reach: 3.0, arc: 85 }); Object.assign(ITEM_BY.bat, { reach: 2.7, arc: 80 });   // daha geniş vuruş alanı
@@ -8882,6 +8883,7 @@ let started = false, lockWorked = false, lockFailed = false, mouseX = innerWidth
 const isLocked = () => document.pointerLockElement === canvas;
 
 function keyAction(code) {
+  if (window.__cos && __cos.on() && __cos.key(code)) return;   // 🔮 K: küreyi çıkar · X: gökten saldırı
   if (inDungeon && window.__dg && __dg.key(code)) return;   // 🗝️ zindan: F çakmak
   if (inAtl && window.__atl && __atl.key(code)) return;   // 🌊 Atlantis: Q dalış, E hızlı yüzme
   if (HR.on && hrKey(code)) return;   // 🖐️ el ragdoll
@@ -8962,7 +8964,6 @@ addEventListener('keydown', e => {
   if (INV.open) { if (e.code === 'KeyI' || e.code === 'Escape') closeInv(); return; }
   if (paused) { if (e.code === 'KeyF') toggleFullscreen(); return; }
   if (RACE_LOCK) { if (window.__race) __race.key(e.code); return; }   // 🏎️ yarışta tuşlar arabaya
-  if (inSpace) { if (window.__spc) __spc.key(e.code); return; }   // 🌌 uzayda hiçbir kontrol yok (yalnızca Çık)
   keyAction(e.code);
 });
 addEventListener('keyup', e => { if (TET.open) tetrisKey(e, false); keyRelease(e.code); });
@@ -9007,8 +9008,7 @@ canvas.addEventListener('mousedown', e => {
   dragging = true;
   if (paused || CINE || DRESS.open || TET.open || !(isLocked() || lockFailed)) return;
   if (RACE_LOCK) { if (e.button === 0 && window.__race) __race.key('Mouse0'); return; }
-  if (inSpace) return;   // 🌌
-  if (e.button === 2) { if (HR.on) { hrRelease(true); return; } if (inRoyale) { BR.zoom = true; return; } if (!giant && INV.eq === 'superfight') { superDown('kick'); return; } if (!giant && INV.eq === 'robo' && ROBO.open) laserHeld = true; else grabReq = true; return; }
+  if (e.button === 2) { if (HR.on) { hrRelease(true); return; } if (inRoyale) { BR.zoom = true; return; } if (!giant && INV.eq === 'superfight') { superDown('kick'); return; } if (!giant && ((INV.eq === 'robo' && ROBO.open) || (INV.eq === 'cosmic' && window.__cos && __cos.on()))) laserHeld = true; else grabReq = true; return; }
   if (e.button === 1 && !giant && INV.eq === 'superfight') { e.preventDefault(); superDown('hado'); return; }   // sağ tık: robot kollarla lazer / (devken) al-bırak
   if (e.button !== 0) return;
   if (giant) { leftReq = true; return; }                    // devken sol tık: yere vur / fırlat
@@ -9355,7 +9355,7 @@ for (const b of document.querySelectorAll('#touchUI .tb:not(.jstick)')) {
     if (key) { keys[key] = true; keyAction(key); }
     if (tap) keyAction(tap);
     if (act === 'act') { if (giant) leftReq = true; else if (gunMode) mouseHeld = true; else punchReq = true; }
-    if (act === 'arms') { if (INV.eq === 'speaker') spkPlaceToggle(); else if (INV.eq === 'torch') torchMode(); else toggleRobo(); }
+    if (act === 'arms') { if (INV.eq === 'speaker') spkPlaceToggle(); else if (INV.eq === 'torch') torchMode(); else if (INV.eq === 'cosmic' && window.__cos) __cos.toggle(); else toggleRobo(); }
     if (act === 'run') setRunToggle(!runToggle);
     if (act === 'kick') superDown('kick');
     if (act === 'hado') superDown('hado');
@@ -9505,12 +9505,12 @@ let touchUIState = '';
 function updateTouchUI(flying) {
   const hh = inHome ? homeH() : null, teaOk = (!!sitting && teaReady()) || !!hh, invOk = inviteAvailable() || (inHome && ['off', 'sit', 'walk'].includes(HGUEST.state));
   const tvOk = inHome && homeFloor(player.position.y) === 0 && !TET.open;
-  const st = [giant, flying, boostMode, gunMode, INV.eq, ROBO.open, ROBO.ultra, HERO.on, SPK.placed, !!carried, teaOk, invOk, runToggle, walkSquash, hh && hh[0], HGUEST.state, tvOk, TET.open, GT.near, !!GT.obj, !!ROBO.volt, !!ROBO.titan, !!ROBO.ultra, ROBO.open, TORCH.long].join();
+  const st = [giant, flying, boostMode, gunMode, INV.eq, ROBO.open, ROBO.ultra, HERO.on, SPK.placed, !!carried, teaOk, invOk, runToggle, walkSquash, hh && hh[0], HGUEST.state, tvOk, TET.open, GT.near, !!GT.obj, !!ROBO.volt, !!ROBO.titan, !!ROBO.ultra, ROBO.open, TORCH.long, !!(window.__cos && __cos.on())].join();
   if (st === touchUIState) return;
   touchUIState = st;
   const show = (id, on) => $(id).classList.toggle('hide', !on);
   for (const id of ['tbJump', 'tbFly', 'tbSlide', 'tbRun', 'tbShield']) show(id, !giant);
-  show('tbMode', !giant && (INV.eq === 'robo' || INV.eq === 'speaker' || INV.eq === 'torch'));
+  show('tbMode', !giant && (INV.eq === 'robo' || INV.eq === 'speaker' || INV.eq === 'torch' || INV.eq === 'cosmic'));
   show('tbUltra', false); show('tbVolt', false); { const rm = !giant && !HERO.on && INV.eq === 'robo'; show('tbModes', rm); $('tbModes').classList.toggle('on', !!(ROBO.ultra || ROBO.volt || ROBO.titan) && ROBO.open); if (!rm) rmClose(); } $('tbUltra').classList.toggle('on', ROBO.ultra && ROBO.open);
   show('tbBoost', flying && !boostMode); show('tbGrab', giant || GT.near || !!GT.obj); show('tbTea', teaOk); show('tbInvite', invOk);
   show('tbStomp', giant); show('tbWalkSq', giant); show('tbLie', giant); $('tbWalkSq').classList.toggle('on', walkSquash);
@@ -9518,8 +9518,8 @@ function updateTouchUI(flying) {
   $('tbTea').innerHTML = hh ? (hh[0] === 'Ye' ? '🍽️' : hh[0].startsWith('Çay') ? '☕' : hh[0].includes('TV') || hh[0].includes('video') ? '📺' : '🎮') + '<small>' + hh[0].split(' ')[0] + '</small>' : '☕<small>Çay iç</small>';
   $('tbInvite').innerHTML = inHome ? (HGUEST.state === 'off' ? '📞<small>Davet</small>' : '👋<small>Uğurla</small>') : '📞<small>Davet</small>';
   $('tbAct').firstChild.textContent = giant ? '💥' : INV.eq === 'robo' && ROBO.open ? '🦾' : INV.eq === 'superfight' ? '👊' : curItem().icon;
-  $('tbMode').innerHTML = INV.eq === 'speaker' ? (SPK.placed ? '✋<small>Al</small>' : '📦<small>Koy</small>') : INV.eq === 'torch' ? (TORCH.long ? '🔦<small>Uzun</small>' : '🔦<small>Normal</small>') : ROBO.open ? '🦾<small>Kapat</small>' : '🦾<small>Kollar</small>'; $('tbMode').classList.toggle('on', (INV.eq === 'robo' && ROBO.open) || (INV.eq === 'torch' && TORCH.long));
-  document.body.classList.toggle('robosplit', INV.eq === 'robo' && ROBO.open && !giant);
+  $('tbMode').innerHTML = INV.eq === 'speaker' ? (SPK.placed ? '✋<small>Al</small>' : '📦<small>Koy</small>') : INV.eq === 'torch' ? (TORCH.long ? '🔦<small>Uzun</small>' : '🔦<small>Normal</small>') : INV.eq === 'cosmic' ? (window.__cos && __cos.on() ? '🔮<small>Kapat</small>' : '🔮<small>Kullan</small>') : ROBO.open ? '🦾<small>Kapat</small>' : '🦾<small>Kollar</small>'; $('tbMode').classList.toggle('on', (INV.eq === 'robo' && ROBO.open) || (INV.eq === 'torch' && TORCH.long));
+  document.body.classList.toggle('robosplit', ((INV.eq === 'robo' && ROBO.open) || (INV.eq === 'cosmic' && window.__cos && __cos.on())) && !giant);
   document.body.classList.toggle('supersplit', INV.eq === 'superfight' && !giant);
   { const b = $('tbShield'); if (b) b.firstChild.textContent = INV.eq === 'superfight' ? '💠' : '🛡️'; const sm = b && b.querySelector('small'); if (sm) sm.textContent = INV.eq === 'superfight' ? 'Alan' : 'Kalkan'; }
   $('tbFly').firstChild.textContent = boostMode ? '🛑' : '🕊️'; $('tbFly').lastChild.textContent = boostMode ? 'İn' : 'Uç';
@@ -9680,7 +9680,7 @@ function groundAt(x, z, y) {   // her eşyanın üstünde durulabilir (ağaçlar
   if (ADM.brb && ADM.brb.length) g = admRampAt(x, z, y, g);
   if (inMaker && window.__mk) g = __mk.ramp(x, z, y, g);
   if (inAtl && window.__atl) g = __atl.ground(x, z, y, g);   // 🌊 deniz tabanı
-  if (inSpace) g = -9999;   // 🌌 uzayda zemin yok
+  if (inSpace && window.__spc) g = __spc.ground(x, z, y, g);   // 🌌 uzayda zemin yok, yalnızca kayalar
   if (inRace && window.__race) g = __race.ground(x, z, y, g);   // 🏎️ pist yüksekliği   // 🗺️ harita rampaları / merdivenleri
   return g;
 }
@@ -10065,6 +10065,7 @@ function showMsg(text, dur = 1.6) {
   clearTimeout(showMsg.t); showMsg.t = setTimeout(() => { el.style.display = 'none'; }, dur * 1000);
 }
 function damagePlayer(dmg, dir) {
+  if (window.__cos && __cos.blocks()) return;   // 🔮 kozmik kalkan (kendi ya da arkadaşının)
   if (dead || ADM.god || ADM.bubbleShield || window.__rcSafe > elapsed) return;   // 📞 hava desteği sırasında zarar yok   // admin: ölümsüzlük / baloncuk kalkanı
   if (HR.on && HR.shield) { hrShieldHit(); return; }   // 🛡️ el kalkanı
   if (ADM.ch_reflect) { dmg *= .5; const Q = player.position; nvBlast(Q.x, Q.y, Q.z, 3.5, 30 + dmg * 4, 0, 7); }
@@ -10142,9 +10143,20 @@ function exitHouse() {
   else teleport(false);
 }
 
+function cosTargets() {   // 🔮 kozmik mod: her bölgeden vurulabilir düşmanlar (köylüler hariç)
+  const L = [];
+  if (inArena) for (const m of monsters) if (monAlive(m)) L.push({ p: m.holder.position, h: 2.2, r: .9, hit: (d, dir, k) => { damageMonster(m, d, dir); if (k && m.vel) m.vel.addScaledVector(dir, k); } });
+  if (inRoyale) for (const b of BR.bots) if (b.alive && b.holder.visible) L.push({ p: b.pos, h: 1.9, r: .5, hit: (d, dir, k) => { brHurtBot(b, Math.round(d), 'player'); if (k && b.vel) b.vel.addScaledVector(dir, k); } });
+  try { if (bossAlive()) L.push({ p: new THREE.Vector3(BOSS.x, BOSS.y, BOSS.z), h: BOSS.H, r: BOSS.R, hit: d => bossDamage(d, new THREE.Vector3(BOSS.x, BOSS.y + BOSS.H * .5, BOSS.z)) }); } catch (e) {}
+  try { if (inDungeon && window.__dg && __dg.targets) L.push(...__dg.targets()); } catch (e) {}
+  try { if (inSpace && window.__spc && __spc.targets) L.push(...__spc.targets()); } catch (e) {}
+  return L;
+}
 function doPunchHit(dir) {
+  if (window.__cos && __cos.on()) { __cos.punch(dir); return; }   // 🔮 kozmik yumruk
   if (inMaker && window.__mk) __mk.punch(dir);   // 🗺️ haritadaki canavarlar / NPC'ler
   if (inDungeon && window.__dg) { __dg.attack(dir); return; }   // 🗝️ zindan iskeletleri
+  if (inSpace && window.__spc) { __spc.attack(dir); return; }   // 🌌 mikroplar, kozmik yaratıklar
   if (inRoyale) { brMelee(dir, { reach: 1.7, arc: 60, dmg: 10 }); return; }
   if (BOSS.on) bossMelee(dir, 2.4 * Math.max(1, giantS), 30 * (ADM.superPunch ? 4 : 1) * (INV.eq === 'superfight' ? 1.6 : 1));
   const P = player.position;
@@ -10206,6 +10218,7 @@ function shoot() {
   if (ADM5 && ADM5.targets.length) nvTargetShot(shotO, shotD, best);
   if (BOSS.on) { const tb = bossRay(shotO, shotD); if (tb !== null && tb < best) { best = tb; kind = 'boss'; shotP.copy(shotO).addScaledVector(shotD, best); } }
   if (inDungeon && window.__dg) { const td = __dg.ray(shotO, shotD, best, BULLET_DMG * 2); if (td !== null) { best = td; kind = 'dg'; shotP.copy(shotO).addScaledVector(shotD, best); hitMarkT = .08; } }   // 🗝️ iskelet
+  if (inSpace && window.__spc) { const td = __spc.ray(shotO, shotD, best, BULLET_DMG * 2); if (td !== null) { best = td; kind = 'spc'; shotP.copy(shotO).addScaledVector(shotD, best); hitMarkT = .08; } }   // 🌌 uzay canavarı
   (gi.id === 'rifle' ? rifleMuzzle : muzzle).getWorldPosition(muzzleW);
   spawnTracer(muzzleW, shotP);
   flash.position.copy(muzzleW); const fs = .35 + Math.random() * .2; flash.scale.set(fs, fs, 1);
@@ -10819,7 +10832,7 @@ function update(dt) {
   const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
   if (CINE) updateCine(dt);
   updateParkour(dt);
-  const ctl = canAct && !CINE && !DRESS.open && !grabAct && !stomp && !TET.open && !HOME.act && !HOME.sleep && !RACE_LOCK && !inSpace;
+  const ctl = canAct && !CINE && !DRESS.open && !grabAct && !stomp && !TET.open && !HOME.act && !HOME.sleep && !RACE_LOCK;
   let ix = ctl ? (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) : 0;
   let iz = ctl ? (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) : 0;
   if (ADM.autoRun && ctl && !ix && !iz) iz = 1;   // admin: otomatik yürü
@@ -10865,7 +10878,7 @@ function update(dt) {
   }
 
   if (!canAct) boostMode = false;
-  const flying = canAct && !slide && !giant && !sitting && !HERO.on && !inRoyale && !inAtl && !inSpace && (HR.on || boostMode || (!!(keys.ShiftLeft || keys.ShiftRight) && !shiftBlock));
+  const flying = canAct && !slide && !giant && !sitting && !HERO.on && !inRoyale && !inAtl && (HR.on || boostMode || (!!(keys.ShiftLeft || keys.ShiftRight) && !shiftBlock));
   if (boostReq) {
     boostReq = false;
     if (flying && !boostMode) {
@@ -10980,8 +10993,9 @@ function update(dt) {
   if (HR.on && flying) hrFly(dt, moving, ix, iz, right);   // 🖐️ el ragdoll: hep süzülür
   else if (slide) {
     slide.t += dt;
-    const p = Math.min(1, slide.t / SLIDE_TIME);
-    const sp = THREE.MathUtils.lerp(SLIDE_START, SLIDE_END, p * p);
+    const cosK = window.__cos && __cos.on();   // 🔮 kozmik kayma: daha uzun ve hızlı
+    const p = Math.min(1, slide.t / (SLIDE_TIME * (cosK ? 1.7 : 1)));
+    const sp = THREE.MathUtils.lerp(SLIDE_START, SLIDE_END, p * p) * (cosK ? 1.75 : 1);
     if (moving) slide.dir.lerp(dir, 1.5 * dt).normalize(); // hafif yönlendirme
     vel.set(slide.dir.x * sp, 0, slide.dir.z * sp);
     // Ayakların altından toz
@@ -10991,13 +11005,11 @@ function update(dt) {
       spawnDust(pos.x + slide.dir.x * .5, pos.y, pos.z + slide.dir.z * .5, .5, .9, -slide.dir.x * sp * .15, -slide.dir.z * sp * .15, groundDust());
     }
     if (p >= 1 || !onGround) { slide = null; slideCooldown = .25; }
-  } else if (inSpace && window.__spc) {   // 🌌 uzay: kontrol yok, yerinde süzülme
-    __spc.drift();
   } else if (inAtl && window.__atl && __atl.swimOn()) {   // 🌊 Atlantis: yüzme
     __atl.swim(dt, moving, ix, iz, right);
   } else if (flying) {
     // Uçuş: W/A/S/D ile kameranın baktığı yöne (yukarı/aşağı dahil), tuşsuz ise yerinde yükselme
-    const fast = keys.KeyE || runToggle, sp = (boostMode ? (fast ? FLY_HYPER : FLY_BOOST) : FLY_SPEED * (fast ? 1.7 : 1)) * ((ROBO.ultra || ROBO.volt || ROBO.titan) && ROBO.open && INV.eq === 'robo' ? (ROBO.titan ? 2.5 : ROBO.volt ? 2.1 : 1.8) : 1), kf = 1 - Math.exp(-4 * dt);
+    const fast = keys.KeyE || runToggle, sp = (boostMode ? (fast ? FLY_HYPER : FLY_BOOST) : FLY_SPEED * (fast ? 1.7 : 1)) * ((ROBO.ultra || ROBO.volt || ROBO.titan) && ROBO.open && INV.eq === 'robo' ? (ROBO.titan ? 2.5 : ROBO.volt ? 2.1 : 1.8) : 1) * (window.__cos && __cos.on() ? (boostMode ? 1.7 : 1.8) : 1), kf = 1 - Math.exp(-4 * dt);   // 🔮 kozmik uçuş daha hızlı
     // Normal uçuşta tuşsuz kalınca yükselir; hızlanma modunda havada durur, Boşluk ile yükselir
     let vyT = boostMode ? (keys.Space ? FLY_RISE * 1.6 : 0) : FLY_RISE;
     if (moving) {
@@ -11020,12 +11032,12 @@ function update(dt) {
   else if (ADM.noclip || ADM.ncfly) collideHit = null;   // admin: duvarlardan geç
   else { collideHit = null; collideObstacles(pos); }
   if (inAtl && window.__atl && !noclipOn()) __atl.collide(pos);   // 🌊 Atlantis surları
-  climbUpdate(dt, dir, moving, canAct && !flying && !inAtl && !inSpace && (!giant || inCity) && !slide && !sitting && !HERO.on && !RIDE.on && !gSit && !CINE, pos);
+  climbUpdate(dt, dir, moving, canAct && !flying && !inAtl && (!giant || inCity) && !slide && !sitting && !HERO.on && !RIDE.on && !gSit && !CINE, pos);
 
   // Dikey hareket: zıplama, uçuş, yerçekimi, kaya tepesine konma
   if (HERO.on) heroVertical(dt, pos, canAct);
   const admSp = !!keys.Space && !ADM.spPrev, admG = onGround; ADM.spPrev = !!keys.Space;
-  if (canAct && keys.Space && onGround && !slide && !shielding && !flying && !giant && !RIDE.on && !HERO.on && !RACE_LOCK && !inAtl && !inSpace) { vy = (ROBO.active ? (ROBO.titan ? 21 : ROBO.volt ? 18 : ROBO.ultra ? 15 : 10.5) : 7.2) * (ADM.jump3 ? 3.5 : ADM.jump ? 2.1 : 1) * CHEAT.jmp * (giantS >= 1 ? Math.sqrt(giantS) : Math.pow(giantS, .3)); onGround = false; play('jump'); }
+  if (canAct && keys.Space && onGround && !slide && !shielding && !flying && !giant && !RIDE.on && !HERO.on && !RACE_LOCK && !inAtl) { vy = (ROBO.active ? (ROBO.titan ? 21 : ROBO.volt ? 18 : ROBO.ultra ? 15 : 10.5) : 7.2) * (ADM.jump3 ? 3.5 : ADM.jump ? 2.1 : 1) * CHEAT.jmp * (giantS >= 1 ? Math.sqrt(giantS) : Math.pow(giantS, .3)) * (inSpace ? 2.1 : 1); onGround = false; play('jump'); }   // 🌌 uzayda daha yüksek ve hızlı zıplama
   else if (ADM.airJump && admSp && !admG && canAct && !flying && !giant && !HERO.on && !CLIMB.on && !RIDE.on) { vy = 7.2 * (ADM.jump ? 1.6 : 1); play('jump'); for (let i = 0; i < 10; i++) spawnDust(pos.x, pos.y, pos.z, .35, .5, 0, 0, 0xffffff); }   // admin: havada tekrar zıpla
   let g = giant && !inCity ? terrH(pos.x, pos.z) : groundAt(pos.x, pos.z, pos.y);
   if (!giant && !inArena && !inHouse && !inMall && !inCloset) {   // iris çukur: çerçevenin üstü biraz yüksek, açıkken ortası boşluk
@@ -11038,7 +11050,6 @@ function update(dt) {
     else if (pr < PIT.OUT - .2 && pos.y > PIT.y - .05) g = Math.max(g, PIT.y + (pr < PIT.R ? (PIT.k > .8 ? .2 : .12) : .2));
   }
   if (CLIMB.on) { pos.y += (ADM.fastClimb ? 10 : giant ? 2.4 * giantS : inCity ? 6 : 3) * dt; vy = 0; onGround = false; }
-  else if (inSpace && window.__spc) { pos.y = __spc.Y(); vy = 0; onGround = false; }   // 🌌 boşlukta asılı
   else if (inAtl && window.__atl && __atl.swimOn()) { pos.y += vy * dt; onGround = false; const tp = __atl.top(); if (pos.y > tp) { pos.y = tp; vy = Math.min(vy, 0); } }   // 🌊 su altında süzül
   else if (flying) {
     if (!wasFlying && pos.y - g < .3) for (let i = 0; i < 18; i++) spawnDust(pos.x, pos.y, pos.z, .9, 1.6, 0, 0, groundDust());
@@ -11052,7 +11063,7 @@ function update(dt) {
       const light = INV.eq === 'balloon' && !BAL.free && !giant, umb = INV.eq === 'umbrella' && INV.umb && !giant;
       if (ADM.hover) vy = keys.Space ? 4.5 : keys.KeyC ? -4.5 : vy * Math.exp(-6 * dt);   // admin: havada süzül
       if (ADM.ncfly) vy = ncFlyVy();   // 👻 noclip: baktığın yöne uç (Boşluk yukarı, C aşağı)
-      vy = Math.max(vy - (HERO.on ? heroGrav() : light ? 8.5 : umb && vy < 0 ? 4 : 20) * (ADM.hover || ADM.ncfly ? 0 : ADM.gravFlip ? -.35 : ADM.zeroG ? .05 : ADM.moon ? .28 : ADM.heavyG ? 2.2 : 1) * CHEAT.grav * dt, inRoyale && BR.drop === 'fall' ? -40 : -32);
+      vy = Math.max(vy - (HERO.on ? heroGrav() : light ? 8.5 : umb && vy < 0 ? 4 : 20) * (ADM.hover || ADM.ncfly ? 0 : ADM.gravFlip ? -.35 : ADM.zeroG ? .05 : ADM.moon ? .28 : ADM.heavyG ? 2.2 : 1) * CHEAT.grav * (inSpace ? 1.35 : 1) * dt, inRoyale && BR.drop === 'fall' ? -40 : -32);
       if (inRoyale && BR.drop === 'glide') vy = THREE.MathUtils.lerp(vy, -5.5, 1 - Math.exp(-3 * dt));
       if (umb && vy < -2) vy = THREE.MathUtils.lerp(vy, -2, 1 - Math.exp(-7 * dt));   // şemsiye: yavaşça süzül
       pos.y += vy * dt;
@@ -11088,7 +11099,6 @@ function update(dt) {
   let tiltT = 0;
   if (flyMode === 'super') tiltT = THREE.MathUtils.clamp(Math.PI / 2 - Math.atan2(vy, Math.hypot(vel.x, vel.z)), .3, 2.6);
   else if (inAtl && window.__atl && __atl.swimOn()) tiltT = __atl.tilt();   // 🌊 yüzerken gövde yatar
-  else if (inSpace) tiltT = 0;
   flyTilt = dead ? 0 : THREE.MathUtils.lerp(flyTilt, tiltT, 1 - Math.exp(-6 * dt));
   if (!dead) {
     charHolder.rotation.x = flyTilt;
@@ -11148,7 +11158,7 @@ function update(dt) {
   }
   if (!charRig) sigmaPost(dt);   // 🗿 Sigma katmanı (kasılmış yürüyüş, sinematik poz)
   if (!charRig && inAtl && window.__atl) try { __atl.pose(playerRig, dt); } catch (e) {}   // 🌊 yüzme pozu (pervane bacaklar)
-  if (inSpace && window.__spc) try { __spc.pose(playerRig, dt, !!charRig); } catch (e) {}   // 🌌 boşlukta yavaşça dönerek süzülme
+  if (!charRig && window.__cos) try { __cos.pose(playerRig, dt); } catch (e) {}   // 🔮 kozmik el kol hareketleri
   if (CLIMB.on && !charRig) climbPose();
   if (!charRig) animeAnimate(dt);
   animeUpdate(dt, speed / giantS);
@@ -11290,10 +11300,11 @@ function update(dt) {
     else if (nvIs(RIDE.on)) { promptText = nvHud(); vAction = rideExit; }
     else if (RIDE.on) { promptText = 'V — İn'; vAction = rideExit; }
     else if (!flying && (VEH.p = vehPrompt(pos))) { promptText = VEH.p[0]; vAction = VEH.p[1]; }
+    else if (INV.eq === 'cosmic' && window.__cos && (__cos.P = __cos.prompt())) { promptText = __cos.P[0]; vAction = __cos.P[1]; }   // 🔮 küreyi kullan
     else if (inRoyale && BR.prompt) { promptText = BR.prompt[0]; vAction = BR.prompt[1]; }
     else if (inDungeon && window.__dg && (__dg.P = __dg.prompt())) { promptText = __dg.P[0]; vAction = __dg.P[1]; }   // 🗝️ kol / sandık
     else if (inAtl && window.__atl && (__atl.P = __atl.prompt())) { promptText = __atl.P[0]; vAction = __atl.P[1]; }   // 🌊 batık sandık
-    else if (curArea === AREAS.hub && window.__spc && (__spc.P = __spc.prompt())) { promptText = __spc.P[0]; vAction = __spc.P[1]; }   // 🚀 AVM'nin arkasındaki uzay düğmesi
+    else if (curArea === AREAS.hub && window.__spc && (__spc.P = __spc.prompt())) { promptText = __spc.P[0]; vAction = __spc.P[1]; }   // 🚀 köy meydanındaki uzay düğmesi
     else if (!flying && (AIRP.p = airPrompt())) { promptText = AIRP.p[0]; vAction = AIRP.p[1]; }
     else if (portalDist < 3.6) { if (ARENA.theme === 'all') { promptText = adT('V — Görev dünyasına dön 🗺️'); vAction = () => questReturn(); } else { promptText = 'V — Köye dön'; vAction = () => teleport(false); } }
     else if (inQuest && !flying && (QW.p = questPrompt(pos))) { promptText = QW.p[0]; vAction = QW.p[1]; }
@@ -11328,7 +11339,7 @@ function update(dt) {
     else if (!giant && !HERO.on && onGround && !flying && !inHouse && !inCloset && !sitting && !slide) { vAction = toggleGroundSit; if (stillT > 1.3) promptText = 'V — Yere otur  ·  L — Uzan'; }
   }
   const promptEl = $('prompt');
-  if (RACE_LOCK || inSpace) { promptText = ''; vAction = null; }   // 🏎️ yarışta ipucu yazısı yok
+  if (RACE_LOCK) { promptText = ''; vAction = null; }   // 🏎️ yarışta ipucu yazısı yok
   promptEl.style.display = promptText ? 'block' : 'none';
   if (promptText) promptEl.textContent = touchMode ? promptText.replace('V — ', '👆 ').replace('H — ', inHome ? '✋ ' : '☕ ').replace('J — ', '⚽ ').replace('L — ', '🛌 ') : promptText;
   if (touchMode) updateTouchUI(flying);
@@ -26494,6 +26505,7 @@ function mpOnMsg(m) {
     case 'note': mpNote(m.text, 3); break;
     case 'spl': try { spellNet(m); } catch (e) { console.warn('spl', e); } break;   // 🪄 arkadaşın büyüsü
     case 'dgs': try { if (window.__dg) __dg.net(m); } catch (e) { console.warn('dg', e); } break;   // 🗝️ zindan kapıları
+    case 'cosh': try { if (window.__cos) __cos.net(m); } catch (e) {} break;   // 🔮 arkadaşın kozmik kalkanı
     case 'rcar': case 'rgo': case 'rq': case 'rst': case 'rbt': case 'rfx': try { if (window.__race) __race.net(m); } catch (e) { console.warn('race', e); } break;   // 🏎️ yarış
     case 'brrv': case 'brp': case 'brkn': case 'brl': case 'brlr': try { if (inRoyale && BR.state !== 'off') brTeamNet(m); } catch (e) { console.warn('br', e); } break;
     case 'brs': case 'brb': case 'brh': case 'brd': case 'brk': case 'brc': case 'brq': try { brNet(m); } catch (e) { console.warn('br', e); } break;   // 🤝 ortak battle royale
@@ -31164,13 +31176,15 @@ window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G
   d('separate', () => separate); d('shake', () => shake, v => { shake = v; }); d('showMsg', () => showMsg); d('spawnDust', () => spawnDust);
   d('speckleTexture', () => speckleTexture); d('started', () => started, v => { started = v; }); d('staticPH', () => staticPH); d('teleportTo', () => teleportTo);
   d('teleporting', () => teleporting, v => { teleporting = v; }); d('touchMode', () => touchMode, v => { touchMode = v; }); d('tryLock', () => tryLock); d('vel', () => vel);
-  d('vy', () => vy, v => { vy = v; }); d('mergeGeometries', () => mergeGeometries); d('wrapAng', () => wrapAng); d('yaw', () => yaw, v => { yaw = v; });
+  d('vy', () => vy, v => { vy = v; }); d('mergeGeometries', () => mergeGeometries);
+  d('INV', () => INV); d('equip', () => equip); d('HAND', () => HAND); d('roboRay', () => roboRay); d('laserHeld', () => laserHeld); d('shielding', () => shielding); d('slideObj', () => slide); d('boostMode', () => boostMode); d('flyingNow', () => flyingNow); d('cosTargets', () => cosTargets);   // 🔮 d('wrapAng', () => wrapAng); d('yaw', () => yaw, v => { yaw = v; });
   return G; })();
 { const s = document.createElement('script'), ms = document.getElementById('sftMakerSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'maker.js'; s.onerror = () => console.warn('🗺️ maker.js yüklenemedi'); document.head.appendChild(s); }
 { const s = document.createElement('script'), ms = document.getElementById('sftRaceSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'race.js'; s.onerror = () => console.warn('🗺️ race.js yüklenemedi'); document.head.appendChild(s); }   // 🏎️ yarış
 { const s = document.createElement('script'), ms = document.getElementById('sftDungeonSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'dungeon.js'; s.onerror = () => console.warn('🗺️ dungeon.js yüklenemedi'); document.head.appendChild(s); }   // 🗝️ zindan
 { const s = document.createElement('script'), ms = document.getElementById('sftAtlantisSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'atlantis.js'; s.onerror = () => console.warn('🗺️ atlantis.js yüklenemedi'); document.head.appendChild(s); }   // 🌊 Atlantis
 { const s = document.createElement('script'), ms = document.getElementById('sftSpaceSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'space.js'; s.onerror = () => console.warn('🗺️ space.js yüklenemedi'); document.head.appendChild(s); }   // 🌌 uzay
+{ const s = document.createElement('script'), ms = document.getElementById('sftCosmicSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'cosmic.js'; s.onerror = () => console.warn('🗺️ cosmic.js yüklenemedi'); document.head.appendChild(s); }   // 🔮 kozmik küre
 
 renderer.setAnimationLoop(() => {
   try {   // bir alt sistem hata verse bile oyun donmasın: hata ekranda gösterilir, çizim sürer
@@ -31202,6 +31216,7 @@ renderer.setAnimationLoop(() => {
   if (BODYPREV.on) bodyPreviewCam(dt);
   updateSunFx(dt);
   updateSky(); updateMountains();
+  try { if (window.__cos) __cos.late(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🔮 kozmik mod
   } catch (e) { sftErr(e); }
   try { renderFrame(); } catch (e) { sftErr(e); }
 });

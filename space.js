@@ -1,26 +1,31 @@
-/* 🌌 S.F.T · Uzay (space.js) — köyde AVM'nin arkasındaki düğmeye basınca uzaya çıkılır.
-   Kozmik desenler, bulutsular, gezegenler, sarmal gökada, dönen geometrik ışık desenleri, asteroitler, kayan yıldızlar.
-   Oyuncu hiçbir kontrol olmadan boşlukta süzülür ve yavaşça döner. Tek düğme: Çık. Alttaki kutuya yazdığın yazı uzaya yazılır.
+/* 🌌 S.F.T · Uzay (space.js) — köy meydanındaki düğmeye basınca uzay bölümüne çıkılır.
+   Kozmik desenler, bulutsular, gezegenler, sarmal gökada, dönen geometrik ışık desenleri, kayan yıldızlar.
+   Havada asılı dev kayaların üstünde yürü, tırman, yüksek ve hızlı zıpla; mikroplar ve kozmik yaratıklarla dövüş. Tek düğme: Çık.
    index.html bunu yükler; oyunun değişkenlerine window.__sftG (G) ile erişir. Tasarımlar bu oyuna özgüdür. */
 (function (G) {
 'use strict';
 const T = G.THREE, $ = id => document.getElementById(id), adT = s => G.adT(s);
 const CX = -45000, CZ = -45000, Y0 = 60;
-G.AREAS.space = { cx: CX, cz: CZ, r: 60, bg: 0x03020c, fog: [8000, 9000], sky: 0x7a6ad8, gnd: 0x1a1430, sunC: 0xfff0e0, sunI: 1.6 };
+G.AREAS.space = { cx: CX, cz: CZ, r: 400, bg: 0x03020c, fog: [8000, 9000], sky: 0x7a6ad8, gnd: 0x1a1430, sunC: 0xfff0e0, sunI: 1.6 };
 G.LOAD_NAMES.space = 'Uzay';
-const SP = { g: new T.Group(), built: false, on: false, flow: new T.Vector3(2.2, .3, .8), ax: 0, ay: 0, az: 0, off: new T.Vector3(), texts: [], typ: null, sky: null };
+const SP = { g: new T.Group(), built: false, on: false, flow: new T.Vector3(.5, .06, .2), sky: null, rocks: [], obs: [], mobs: [], shots: [], kills: 0, lastHit: -9, inv: 0, top0: 40 };
 SP.g.name = 'spaceRoot';
 const U = { uTime: { value: 0 } };
 const R = (a, b) => a + Math.random() * (b - a);
 const tv = new T.Vector3(), tq = new T.Quaternion(), dmy = new T.Object3D();
 function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; return t; }
 
-/* ---------- 🔊 uzay sesleri: derin uğultu, yazı tıkırtısı, kayan yıldız ---------- */
+/* ---------- 🔊 uzay sesleri: derin uğultu, dövüş, kayan yıldız ---------- */
 function ac() { if (!SP.ac) { try { SP.ac = new (window.AudioContext || window.webkitAudioContext)(); SP.out = SP.ac.createGain(); SP.out.gain.value = .5; SP.out.connect(SP.ac.destination); } catch (e) { return null; } } if (SP.ac.state === 'suspended') SP.ac.resume().catch(() => {}); return SP.ac; }
 for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, () => { if (SP.ac && SP.ac.state === 'suspended') SP.ac.resume().catch(() => {}); }, { passive: true });
 function snd(kind, vol = 1) {
   const c = ac(); if (!c || c.state !== 'running' || !SP.on) return; const t = c.currentTime, g = c.createGain(); g.connect(SP.out);
-  if (kind === 'key') { const o = c.createOscillator(); o.type = 'square'; o.frequency.value = 900 + Math.random() * 300; const f = c.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 600; g.gain.setValueAtTime(.06 * vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + .04); o.connect(f).connect(g); o.start(t); o.stop(t + .05); }
+  const tone = (type, f0, f1, d, v) => { const o = c.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + d); const gg = c.createGain(); gg.gain.setValueAtTime(v * vol, t); gg.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(gg).connect(g); o.start(t); o.stop(t + d + .02); };
+  if (kind === 'pop') tone('sine', 500, 1400, .09, .18);
+  else if (kind === 'splat') { tone('sawtooth', 300, 60, .25, .16); tone('sine', 900, 200, .15, .12); }
+  else if (kind === 'bite') tone('square', 220, 90, .12, .12);
+  else if (kind === 'zap') tone('sawtooth', 1200, 300, .3, .08);
+  else if (kind === 'boom') { tone('sine', 140, 35, .6, .3); tone('sawtooth', 600, 80, .4, .1); }
   else if (kind === 'star') { const o = c.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(1800, t); o.frequency.exponentialRampToValueAtTime(500, t + .9); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.05 * vol, t + .05); g.gain.exponentialRampToValueAtTime(.0001, t + 1); o.connect(g); o.start(t); o.stop(t + 1.05); }
 }
 function hum(on) {
@@ -105,75 +110,136 @@ function build() {
   for (let i = 0; i < 3; i++) { const m = new T.Mesh(new T.PlaneGeometry(40, .8), new T.MeshBasicMaterial({ map: stt, transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, fog: false })); m.visible = false; SP.g.add(m); SP.shoot.push({ m, t: 0, v: new T.Vector3() }); }
 }
 
-/* ---------- 🧑‍🚀 süzülme: kontrol yok, oyuncu yerinde yavaşça döner, evren akar ---------- */
+/* ---------- 🪨 havada asılı dev kayalar (üstünde yürünür, tırmanılır) ---------- */
 function on() { return G.curKey === 'space'; }
-function Y() { return Y0 + SP.off.y; }
-function drift() { G.vel.set(0, 0, 0); const p = G.player.position; p.x = CX + SP.off.x; p.z = CZ + SP.off.z; }
-function pose(r, dt, custom) {
-  if (!on()) return; const ch = G.charHolder, t = G.elapsed;
-  SP.ax += dt * .32; SP.ay += dt * .11; SP.az += dt * .19;
-  ch.rotation.set(SP.ax, G.facing + SP.ay, SP.az, 'YXZ'); tv.set(0, 1, 0).applyEuler(ch.rotation); ch.position.set(-tv.x, 1 - tv.y, -tv.z);
-  if (custom || !r) return; const k = 1 - Math.exp(-4 * dt), S = (o, ax, v) => { o.rotation[ax] += (v - o.rotation[ax]) * k; }, a = Math.sin(t * .9), b = Math.sin(t * .7 + 1);
-  S(r.armL.sh, 'z', 1.15 + a * .25); S(r.armR.sh, 'z', -1.05 - b * .3); S(r.armL.sh, 'x', -.3 + b * .2); S(r.armR.sh, 'x', .2 + a * .2); S(r.armL.el, 'x', -.5 - a * .2); S(r.armR.el, 'x', -.3 + b * .2);
-  S(r.legL.hip, 'x', -.5 + a * .2); S(r.legR.hip, 'x', .15 - b * .2); S(r.legL.hip, 'z', .25); S(r.legR.hip, 'z', -.15); S(r.legL.kn, 'x', .9 + b * .2); S(r.legR.kn, 'x', .35 + a * .2);
-  S(r.torso, 'x', .1); S(r.neck, 'x', -.2 + a * .1); r.hips.position.y += (1 - r.hips.position.y) * k;
+let RS = 7; const RR = () => { RS = (RS * 16807) % 2147483647; return RS / 2147483647; }, RRr = (a, b) => a + RR() * (b - a);
+function rockGeo(r, h) {   // üstü düz, altı sivri, pürüzlü kaya
+  const g = new T.IcosahedronGeometry(1, 2), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { let x = p.getX(i), y = p.getY(i), z = p.getZ(i); const n = 1 + Math.sin(x * 5.1 + z * 3.3) * .08 + Math.sin(y * 7.3 + x * 2.1) * .06;
+    x *= r * n; z *= r * n; y = y > .25 ? h * .5 : y > -.2 ? y * h * .9 + h * .3 : y * h * 1.6; p.setXYZ(i, x, y, z); }
+  g.computeVertexNormals(); return g;
 }
-function resetHolder() { const ch = G.charHolder; if (!ch) return; ch.rotation.order = 'XYZ'; ch.rotation.z = 0; }
+function buildRocks() {
+  RS = 7; const mat = new T.MeshStandardMaterial({ color: 0x5b5470, roughness: .95, flatShading: true, fog: false }), cry = new T.MeshStandardMaterial({ color: 0xb98cff, emissive: 0x8a4dff, emissiveIntensity: 1.1, roughness: .3, fog: false });
+  const L = [[0, 0, SP.top0, 20, 7]];   // ana kaya: başlangıç
+  let prev = L[0];
+  for (let k = 0; k < 46; k++) {   // zıplanarak geçilen kaya zincirleri (kenarlar arası 2–5 m, yükseklik farkı ≤ 3.5 m)
+    if (k % 9 === 8) prev = L[Math.floor(RR() * L.length)];
+    for (let tries = 0; tries < 10; tries++) { const r = RRr(3.5, 9), a = RRr(0, Math.PI * 2), d = prev[3] + r + RRr(2, 5), x = prev[0] + Math.cos(a) * d, z = prev[1] + Math.sin(a) * d;
+      if (Math.hypot(x, z) > 175 || L.some(o => Math.hypot(o[0] - x, o[1] - z) < o[3] + r + 1.5)) continue;
+      const y = Math.max(SP.top0 - 14, Math.min(SP.top0 + 30, prev[2] + RRr(-2.5, 3.4))), n = [x, z, y, r, RRr(3, 7)]; L.push(n); prev = n; break; } }
+  for (let k = 0; k < 10; k++) { const a = RRr(0, 6.28), d = RRr(30, 90); L.push([Math.cos(a) * d, Math.sin(a) * d, SP.top0 + RRr(-6, 20), RRr(2.5, 4.5), RRr(2, 4)]); }
+  for (const [x, z, y, r, h] of L) { const m = new T.Mesh(rockGeo(r, h), mat); m.position.set(x, y - h * .5, z); m.castShadow = m.receiveShadow = true; SP.g.add(m);
+    for (let c = 0; c < Math.round(r / 2.5); c++) { const a = RRr(0, 6.28), rr = RRr(.2, .85) * r, cs = RRr(.25, .7), cm = new T.Mesh(new T.OctahedronGeometry(cs, 0), cry); cm.scale.y = RRr(1.6, 3); cm.position.set(x + Math.cos(a) * rr, y + cs * cm.scale.y * .5, z + Math.sin(a) * rr); cm.rotation.set(RRr(-.3, .3), RRr(0, 3), RRr(-.3, .3)); SP.g.add(cm); }
+    SP.rocks.push({ x, z, y, r }); SP.obs.push({ x: CX + x, z: CZ + z, r: r * .95, h: y, top: y, y0: y - h * 1.6, stand: true, pass: false, spc: true }); }
+}
+const groundHere = (x, z, y = 1e9) => { let best = -9999; for (const r of SP.rocks) if (r.y <= y + .6 && Math.hypot(r.x - x, r.z - z) < r.r * .95) best = Math.max(best, r.y); return best; };
+function ground(x, z, y, g) { return groundHere(x - CX, z - CZ, y); }
 
-/* ---------- ✏️ uzaya yazı ---------- */
-function textSprite(s) {
-  const f = 64, c = document.createElement('canvas'), g0 = c.getContext('2d'); g0.font = `bold ${f}px system-ui, sans-serif`; const w = Math.min(2048, Math.ceil(g0.measureText(s).width) + 80); c.width = w; c.height = 128;
-  const g = c.getContext('2d'); g.font = `bold ${f}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = '#b39dff'; g.shadowBlur = 24; g.fillStyle = '#ffffff'; g.fillText(s, w / 2, 66); g.shadowBlur = 8; g.fillText(s, w / 2, 66);
-  const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; const sp = new T.Sprite(new T.SpriteMaterial({ map: t, transparent: true, depthWrite: false, fog: false })); sp.scale.set(w / 128 * 3, 3, 1); return sp;
+/* ---------- 🦠 mikroplar ve 👁️ kozmik yaratıklar ---------- */
+function mobMesh(kind) {
+  const g = new T.Group(), M = (c, o = {}) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: .4, fog: false }, o));
+  if (kind === 'germ') { const col = [0x7cff6b, 0xc77dff, 0x4cc9f0, 0xff7ad9][Math.random() * 4 | 0], body = new T.Mesh(new T.SphereGeometry(1, 18, 14), M(col, { transparent: true, opacity: .62, emissive: col, emissiveIntensity: .25 })); g.add(body);
+    const nuc = new T.Mesh(new T.SphereGeometry(.42, 12, 10), M(0x2d1b4e, { emissive: 0x3a1066, emissiveIntensity: .4 })); nuc.position.set(.15, -.1, -.1); g.add(nuc);
+    const cil = new T.Mesh(G.mergeGeometries([...Array(26)].map(() => { const v = new T.Vector3(R(-1, 1), R(-1, 1), R(-1, 1)).normalize(); return new T.ConeGeometry(.06, .55, 4).translate(0, 1.15, 0).applyQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), v)); })), M(col, { emissive: col, emissiveIntensity: .35 })); g.add(cil);
+    for (const s of [-1, 1]) { const e = new T.Mesh(new T.SphereGeometry(.22, 10, 8), M(0xffffff)); e.position.set(s * .3, .3, .82); g.add(e); const pu = new T.Mesh(new T.SphereGeometry(.11, 8, 6), M(0x111111)); pu.position.set(s * .3, .3, 1.02); g.add(pu); }
+    const mouth = new T.Mesh(new T.TorusGeometry(.22, .05, 5, 10, Math.PI), M(0x220022)); mouth.rotation.z = Math.PI; mouth.position.set(0, -.2, .92); g.add(mouth); g.userData.spin = cil; }
+  else { const body = new T.Mesh(new T.SphereGeometry(1.5, 22, 16), M(0x1b0f3a, { emissive: 0x2a0f5c, emissiveIntensity: .5, metalness: .3 })); g.add(body);
+    const dots = new T.Points(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array([...Array(60)].flatMap(() => { const v = new T.Vector3(R(-1, 1), R(-1, 1), R(-1, 1)).normalize().multiplyScalar(1.52); return [v.x, v.y, v.z]; })), 3)), new T.PointsMaterial({ size: .16, color: 0xfff2b3, fog: false })); g.add(dots);
+    const eye = new T.Mesh(new T.SphereGeometry(.62, 16, 12), M(0xfff0ff, { emissive: 0xffd6ff, emissiveIntensity: .4 })); eye.position.z = 1.1; g.add(eye); const iris = new T.Mesh(new T.SphereGeometry(.34, 12, 10), M(0xff2bd6, { emissive: 0xff2bd6, emissiveIntensity: 1 })); iris.position.z = 1.55; g.add(iris);
+    const ring = new T.Mesh(new T.TorusGeometry(2.1, .08, 8, 40), M(0xb98cff, { emissive: 0x8a4dff, emissiveIntensity: 1.2 })); ring.rotation.x = Math.PI / 2; g.add(ring); g.userData.ring = ring; g.userData.tent = [];
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2, tg = new T.Group(); tg.position.set(Math.cos(a) * .9, -1, Math.sin(a) * .9); g.add(tg); const t = new T.Mesh(new T.ConeGeometry(.22, 2.6, 6).translate(0, -1.3, 0), M(0x3a1d7a, { emissive: 0x5b2bbf, emissiveIntensity: .5 })); tg.add(t); g.userData.tent.push(tg); } }
+  const hb = new T.Sprite(new T.SpriteMaterial({ color: 0xff4d6d, fog: false, depthTest: false })); hb.scale.set(1.6, .14, 1); hb.position.y = kind === 'germ' ? 1.8 : 3; hb.renderOrder = 5; g.add(hb); g.userData.hb = hb;
+  return g;
 }
-function writeText(s) {
-  s = String(s || '').trim().slice(0, 80); if (!s) return; try { localStorage.setItem('sftUzayYazi', s); } catch (e) {}
-  typeText(s);
-  const sp = textSprite(s), cam = G.camera; cam.getWorldDirection(tv); sp.position.copy(cam.position).addScaledVector(tv, 26).sub(SP.g.position); SP.g.add(sp); SP.texts.push({ sp, t: 0 });
-  while (SP.texts.length > 12) { const o = SP.texts.shift(); SP.g.remove(o.sp); o.sp.material.map.dispose(); o.sp.material.dispose(); }
+function spawnMob(kind, near, small) {
+  const P = G.player.position, a = R(0, 6.28), d = near ? R(4, 8) : R(22, 38), g = mobMesh(kind), lx = (near ? near.x : P.x - CX) + Math.cos(a) * d, lz = (near ? near.z : P.z - CZ) + Math.sin(a) * d;
+  g.position.set(lx, (near ? near.y : P.y) + R(1, 6), lz); const sc = kind === 'germ' ? (small ? R(.45, .6) : R(.8, 1.3)) : R(1, 1.25); g.scale.setScalar(sc); SP.g.add(g);
+  const hp = kind === 'germ' ? (small ? 18 : 40) : 130; SP.mobs.push({ kind, g, hp, max: hp, sc, small, cd: R(1, 3), ph: R(0, 6), vel: new T.Vector3(), hurt: 0 });
 }
-function typeText(s) { SP.typ = { s, i: 0, t: 0, hold: 0 }; const el = $('spType'); el.textContent = ''; el.style.opacity = 1; el.style.display = 'block'; }
+function mobTick(dt, t) {
+  const P = G.player.position, lp = tv.set(P.x - CX, P.y + 1.1, P.z - CZ);
+  const nG = SP.mobs.filter(m => m.kind === 'germ').length, nC = SP.mobs.length - nG; SP.spT = (SP.spT || 0) - dt;
+  if (SP.spT <= 0) { SP.spT = .8; if (nG < 8) spawnMob('germ'); else if (nC < 3) spawnMob('beast'); }
+  for (let i = SP.mobs.length - 1; i >= 0; i--) { const m = SP.mobs[i], g = m.g, q = g.position;
+    if (m.dead) { m.dead += dt; g.scale.multiplyScalar(1 + dt * 3); g.traverse(o => { if (o.material && 'opacity' in o.material) { o.material.transparent = true; o.material.opacity = Math.max(0, 1 - m.dead * 2.5); } }); if (m.dead > .45) { SP.g.remove(g); SP.mobs.splice(i, 1); } continue; }
+    const dx = lp.x - q.x, dy = lp.y - q.y, dz = lp.z - q.z, d = Math.hypot(dx, dy, dz) || 1, sp = m.kind === 'germ' ? (m.small ? 4.6 : 3.4) : 2.2, want = m.kind === 'germ' ? .9 : 9;
+    if (d > want) m.vel.lerp(new T.Vector3(dx / d * sp, dy / d * sp, dz / d * sp), Math.min(1, dt * 1.8)); else m.vel.multiplyScalar(Math.exp(-3 * dt));
+    for (const o of SP.mobs) if (o !== m && !o.dead) { const ox = q.x - o.g.position.x, oy = q.y - o.g.position.y, oz = q.z - o.g.position.z, od = Math.hypot(ox, oy, oz); if (od < 2.4 && od > .01) m.vel.add(new T.Vector3(ox, oy, oz).multiplyScalar(dt * 6 / od)); }
+    q.addScaledVector(m.vel, dt); if (d > 140) { q.set(lp.x + R(-30, 30), lp.y + R(2, 8), lp.z + R(-30, 30)); }
+    g.lookAt(CX + lp.x, lp.y, CZ + lp.z); g.rotation.z += Math.sin(t * 3 + m.ph) * .002; m.hurt = Math.max(0, m.hurt - dt);
+    const wob = 1 + Math.sin(t * 6 + m.ph) * .06; g.scale.set(m.sc * wob, m.sc / wob, m.sc * wob); if (m.hurt > 0) g.position.x += Math.sin(t * 60) * .05;
+    if (g.userData.spin) g.userData.spin.rotation.y += dt * 2; if (g.userData.ring) { g.userData.ring.rotation.z += dt * 1.5; g.userData.tent.forEach((tg, k) => { tg.rotation.x = Math.sin(t * 2.5 + k) * .45; tg.rotation.z = Math.cos(t * 2 + k * 1.3) * .3; }); }
+    g.userData.hb.scale.x = 1.6 * Math.max(0, m.hp / m.max) / m.sc; g.userData.hb.visible = m.hp < m.max;
+    m.cd -= dt;
+    if (m.kind === 'germ' && d < 1.8 * m.sc + .6 && m.cd <= 0) { m.cd = 1.1; dmg(m.small ? 4 : 7); snd('bite'); }
+    if (m.kind === 'beast' && d < 32 && m.cd <= 0) { m.cd = R(2.2, 3.4); const o = q.clone(), v = new T.Vector3(dx, dy, dz).normalize().multiplyScalar(13); const b = new T.Mesh(new T.SphereGeometry(.42, 12, 10), new T.MeshBasicMaterial({ color: 0xff4df0, fog: false })); b.position.copy(o).addScaledVector(v, .14); SP.g.add(b);
+      const gl = new T.Sprite(new T.SpriteMaterial({ map: glowTex('rgba(255,140,255,1)', 'rgba(200,60,255,.4)'), transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false })); gl.scale.set(2.4, 2.4, 1); b.add(gl); SP.shots.push({ m: b, v, t: 0 }); snd('zap'); }
+  }
+  for (let i = SP.shots.length - 1; i >= 0; i--) { const s = SP.shots[i]; s.t += dt; s.m.position.addScaledVector(s.v, dt); if (s.m.position.distanceTo(lp) < 1.1) { dmg(10); s.t = 9; } if (s.t > 4) { SP.g.remove(s.m); SP.shots.splice(i, 1); } }
+}
+function hurtMob(m, v, dir, knock) {
+  if (m.dead) return; m.hp -= v; m.hurt = .2; if (dir) m.vel.addScaledVector(dir, (knock || 3) / (m.kind === 'germ' ? 1 : 2.5)); snd('pop', .5);
+  for (let k = 0; k < 6; k++) G.spawnDust(CX + m.g.position.x, m.g.position.y, CZ + m.g.position.z, .5, 1.2, 0, 0, m.kind === 'germ' ? 0x9dff8a : 0xd59bff);
+  if (m.hp <= 0) { m.dead = .001; SP.kills++; G.progAdd(m.kind === 'germ' ? (m.small ? 1 : 3) : 10, new T.Vector3(CX + m.g.position.x, m.g.position.y, CZ + m.g.position.z)); snd(m.kind === 'germ' ? 'splat' : 'boom');
+    if (m.kind === 'germ' && !m.small) for (let k = 0; k < 2; k++) spawnMob('germ', m.g.position, true);   // büyük mikrop ikiye bölünür
+    for (let k = 0; k < 16; k++) G.spawnDust(CX + m.g.position.x, m.g.position.y, CZ + m.g.position.z, 1.2, 2.2, 0, 0, m.kind === 'germ' ? 0x7cff6b : 0xffe066); }
+}
+function alive() { return SP.mobs.filter(m => !m.dead); }
+function attack(dir) {   // 👊 yumruk / tekme
+  if (!on()) return false; const P = G.player.position; let hit = false;
+  for (const m of alive()) { const q = m.g.position, dx = q.x - (P.x - CX), dy = q.y - (P.y + 1.1), dz = q.z - (P.z - CZ), d = Math.hypot(dx, dy, dz); if (d > 2.4 + m.sc * 1.2) continue; if (Math.hypot(dx, dz) > 1 && (dx * dir.x + dz * dir.z) / Math.hypot(dx, dz) < .3) continue;
+    hurtMob(m, G.giant ? 999 : 22, new T.Vector3(dx, dy * .3, dz).normalize(), 6); hit = true; }
+  return hit;
+}
+function ray(o, d, best, v) {   // 🔫 mermi
+  let bt = null, bm = null; for (const m of alive()) { const c = tv.set(CX + m.g.position.x, m.g.position.y, CZ + m.g.position.z), oc = new T.Vector3().subVectors(o, c), b = oc.dot(d), r = (m.kind === 'germ' ? 1.1 : 1.7) * m.sc, cc = oc.lengthSq() - r * r, D = b * b - cc; if (D < 0) continue; const t = -b - Math.sqrt(D); if (t < 0 || t >= best || (bt !== null && t >= bt)) continue; bt = t; bm = m; }
+  if (!bm) return null; hurtMob(bm, v, d.clone().setY(0).normalize(), 2); return bt;
+}
+function targets() { return alive().map(m => ({ p: new T.Vector3(CX + m.g.position.x, m.g.position.y - 1 * m.sc, CZ + m.g.position.z), h: 2 * m.sc, r: (m.kind === 'germ' ? 1.1 : 1.7) * m.sc, hit: (v, dir, k) => hurtMob(m, v, dir, k) })); }
+
+/* ---------- ❤️ hasar: canın biterse ana kayada uyanırsın ---------- */
+function dmg(v) {
+  if (G.dead || G.teleporting || SP.inv > 0 || G.elapsed - SP.lastHit < .5) return; if (G.ADM && (G.ADM.god || G.ADM.bubbleShield)) return; if (window.__cos && __cos.blocks && __cos.blocks()) return;
+  SP.lastHit = G.elapsed; G.hurtFlash = .8; G.shake = Math.max(G.shake, .2); G.play('hit'); const hp = G.hp - v; if (hp > 0) { G.hp = hp; return; }
+  G.hp = Math.round(G.HPMAX * .6); SP.inv = 2.5; respawn(); G.showMsg('💫 ' + adT('Bayıldın! Ana kayada uyandın'), 2.2);
+}
+function respawn() { const p = G.player.position; p.set(CX + R(-3, 3), SP.top0 + .2, CZ + R(-3, 3)); G.vel.set(0, 0, 0); G.vy = 0; }
 
 /* ---------- ⏱️ her kare ---------- */
 function tick(dt) {
   btnTick(dt);
   if (!on()) { if (SP.on) leave(); return; }
   if (!SP.built) return; ui(); if (!dt) return;
-  const t = G.elapsed, cam = G.camera.position, lc = tv.copy(cam).sub(SP.g.position); U.uTime.value = t;
-  SP.sky.position.copy(lc);
-  const F = SP.flow;
-  // evren akar (oyuncu süzülüyormuş gibi)
-  { const p = SP.stars.geometry.attributes.position; for (let i = 0; i < p.count; i++) { let x = p.getX(i) - F.x * dt * .35, y = p.getY(i) - F.y * dt * .35, z = p.getZ(i) - F.z * dt * .35; if (x * x + y * y + z * z > 420 * 420) { x = -x * .98; y = -y * .98; z = -z * .98; } p.setXYZ(i, x, y, z); } p.needsUpdate = true; SP.stars.position.copy(lc); }
-  { const p = SP.dust.geometry.attributes.position; for (let i = 0; i < p.count; i++) { let x = p.getX(i) - F.x * dt, y = p.getY(i) - F.y * dt, z = p.getZ(i) - F.z * dt; x = ((x + 40) % 80 + 80) % 80 - 40; y = ((y + 40) % 80 + 80) % 80 - 40; z = ((z + 40) % 80 + 80) % 80 - 40; p.setXYZ(i, x, y, z); } p.needsUpdate = true; SP.dust.position.copy(lc); }
-  SP.astD.forEach((a, i) => { a.p.addScaledVector(F, -dt * a.v); for (const k of ['x', 'y', 'z']) { const L = k === 'y' ? 60 : 120; if (a.p[k] < -L) a.p[k] += 2 * L; else if (a.p[k] > L) a.p[k] -= 2 * L; } a.r.x += a.w.x * dt; a.r.y += a.w.y * dt; a.r.z += a.w.z * dt;
-    dmy.position.copy(a.p).add(lc); if (dmy.position.distanceTo(lc) < 6 + a.s) dmy.position.addScaledVector(a.p.clone().normalize(), 8); dmy.rotation.copy(a.r); dmy.scale.setScalar(a.s); dmy.updateMatrix(); SP.ast.setMatrixAt(i, dmy.matrix); }); SP.ast.instanceMatrix.needsUpdate = true;
-  for (const o of SP.texts) { o.t += dt; o.sp.position.addScaledVector(F, -dt * .8); o.sp.material.opacity = Math.max(0, Math.min(1, (120 - o.t) / 20)); }
-  // gezegenler ve desenler döner
-  SP.pm.rotation.y += dt * .03; SP.bp.rotation.y += dt * .05; SP.moon.position.set(-300 + Math.cos(t * .05) * 60, -60 + Math.sin(t * .03) * 12, 220 + Math.sin(t * .05) * 60); SP.gal.rotateZ(dt * .01);
+  const t = G.elapsed, cam = G.camera.position, lc = tv.copy(cam).sub(SP.g.position), lcx = lc.x, lcy = lc.y, lcz = lc.z; U.uTime.value = t;
+  SP.sky.position.copy(lc); const F = SP.flow; SP.inv = Math.max(0, SP.inv - dt);
+  { const p = SP.stars.geometry.attributes.position; for (let i = 0; i < p.count; i++) { let x = p.getX(i) - F.x * dt * .35, y = p.getY(i) - F.y * dt * .35, z = p.getZ(i) - F.z * dt * .35; if (x * x + y * y + z * z > 420 * 420) { x = -x * .98; y = -y * .98; z = -z * .98; } p.setXYZ(i, x, y, z); } p.needsUpdate = true; SP.stars.position.set(lcx, lcy, lcz); }
+  { const p = SP.dust.geometry.attributes.position; for (let i = 0; i < p.count; i++) { let x = p.getX(i) - F.x * dt, y = p.getY(i) - F.y * dt, z = p.getZ(i) - F.z * dt; x = ((x + 40) % 80 + 80) % 80 - 40; y = ((y + 40) % 80 + 80) % 80 - 40; z = ((z + 40) % 80 + 80) % 80 - 40; p.setXYZ(i, x, y, z); } p.needsUpdate = true; SP.dust.position.set(lcx, lcy, lcz); }
+  SP.astD.forEach((a, i) => { a.p.addScaledVector(F, -dt * a.v); for (const k of ['x', 'y', 'z']) { const L = k === 'y' ? 120 : 260; if (a.p[k] < -L) a.p[k] += 2 * L; else if (a.p[k] > L) a.p[k] -= 2 * L; } a.r.x += a.w.x * dt; a.r.y += a.w.y * dt; a.r.z += a.w.z * dt;
+    dmy.position.copy(a.p); if (Math.hypot(a.p.x, a.p.z) < 190 && Math.abs(a.p.y - SP.top0) < 40) dmy.position.y = SP.top0 + (a.p.y > SP.top0 ? 60 : -60) + a.p.y * .2; dmy.rotation.copy(a.r); dmy.scale.setScalar(a.s); dmy.updateMatrix(); SP.ast.setMatrixAt(i, dmy.matrix); }); SP.ast.instanceMatrix.needsUpdate = true;
+  SP.pm.rotation.y += dt * .03; SP.bp.rotation.y += dt * .05; SP.gal.rotateZ(dt * .01);
   for (const m of SP.mand) m.rotateZ(dt * .04); for (const w of SP.wire) { w.rotation.x += dt * w.userData.s; w.rotation.y += dt * w.userData.s * .7; }
   for (const o of [SP.planet, SP.bp, SP.moon, SP.gal, SP.far[0], ...SP.mand, ...SP.wire]) { if (!o.userData.base) o.userData.base = o.position.clone(); }
-  for (const o of [SP.planet, SP.bp, SP.gal, SP.far[0], ...SP.mand, ...SP.wire]) o.position.copy(o.userData.base).add(lc);
-  SP.moon.position.add(lc);
-  // 🌠 kayan yıldız
-  SP.stT = (SP.stT || 3) - dt; if (SP.stT <= 0) { SP.stT = R(2.5, 7); const s = SP.shoot.find(x => !x.m.visible); if (s) { const a = R(0, 6.28), e = R(.2, .9); s.p0 = new T.Vector3(Math.cos(a) * 200, R(40, 140), Math.sin(a) * 200); s.v.set(-Math.cos(a) * R(140, 220), -R(20, 60), -Math.sin(a) * R(140, 220) + R(-60, 60)); s.t = 0; s.m.visible = true; snd('star', .7); } }
-  for (const s of SP.shoot) if (s.m.visible) { s.t += dt; s.m.position.copy(s.p0).addScaledVector(s.v, s.t).add(lc); s.m.lookAt(G.camera.position); s.m.rotateZ(Math.atan2(-s.v.y, Math.hypot(s.v.x, s.v.z))); s.m.material.opacity = Math.max(0, 1 - s.t / 1.4); if (s.t > 1.4) s.m.visible = false; }
-  // ⌨️ daktilo yazısı
-  const ty = SP.typ; if (ty) { ty.t += dt; const el = $('spType'); if (ty.i < ty.s.length) { while (ty.t > .055 && ty.i < ty.s.length) { ty.t -= .055; ty.i++; if (ty.s[ty.i - 1] !== ' ') snd('key'); } el.textContent = ty.s.slice(0, ty.i); } else { ty.hold += dt; if (ty.hold > 5) el.style.opacity = Math.max(0, 1 - (ty.hold - 5) / 1.5); if (ty.hold > 6.6) { el.style.display = 'none'; SP.typ = null; } } }
+  for (const o of [SP.planet, SP.bp, SP.gal, SP.far[0], ...SP.mand, ...SP.wire]) o.position.set(o.userData.base.x + lcx, o.userData.base.y + lcy, o.userData.base.z + lcz);
+  SP.moon.position.set(-300 + Math.cos(t * .05) * 60 + lcx, -60 + Math.sin(t * .03) * 12 + lcy, 220 + Math.sin(t * .05) * 60 + lcz);
+  SP.stT = (SP.stT || 3) - dt; if (SP.stT <= 0) { SP.stT = R(2.5, 7); const s = SP.shoot.find(x => !x.m.visible); if (s) { const a = R(0, 6.28); s.p0 = new T.Vector3(Math.cos(a) * 200, R(40, 140), Math.sin(a) * 200); s.v.set(-Math.cos(a) * R(140, 220), -R(20, 60), -Math.sin(a) * R(140, 220) + R(-60, 60)); s.t = 0; s.m.visible = true; snd('star', .7); } }
+  for (const s of SP.shoot) if (s.m.visible) { s.t += dt; s.m.position.set(s.p0.x + s.v.x * s.t + lcx, s.p0.y + s.v.y * s.t + lcy, s.p0.z + s.v.z * s.t + lcz); s.m.lookAt(G.camera.position); s.m.rotateZ(Math.atan2(-s.v.y, Math.hypot(s.v.x, s.v.z))); s.m.material.opacity = Math.max(0, 1 - s.t / 1.4); if (s.t > 1.4) s.m.visible = false; }
+  mobTick(dt, t);
+  const P = G.player.position; if (P.y < SP.top0 - 70) { respawn(); G.showMsg('🌌 ' + adT('Boşluğa düştün! Ana kayaya döndün'), 2); }
+  if (G.elapsed - SP.lastHit > 6 && G.hp < G.HPMAX && !G.dead) G.hp = Math.min(G.HPMAX, G.hp + dt * 3);
 }
 
-/* ---------- 🖥️ arayüz: tek düğme Çık + yazı kutusu ---------- */
-document.head.insertAdjacentHTML('beforeend', `<style>#spExit{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top));transform:translateX(-50%);z-index:8;display:none;padding:10px 22px;border-radius:16px;border:2px solid rgba(190,170,255,.6);background:rgba(20,10,45,.7);color:#fff;font:800 15px system-ui;cursor:pointer;backdrop-filter:blur(4px)}
-#spIn{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:8;display:none;width:min(420px,82vw);padding:12px 16px;border-radius:16px;border:2px solid rgba(190,170,255,.5);background:rgba(15,8,35,.7);color:#fff;font:600 15px system-ui;outline:none;text-align:center}
-#spIn::placeholder{color:rgba(220,210,255,.65)}#spType{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:7;display:none;max-width:88vw;color:#fff;font:700 clamp(20px,4.2vw,38px) system-ui;text-align:center;text-shadow:0 0 18px rgba(170,140,255,.9),0 2px 6px #000;pointer-events:none;letter-spacing:.5px;white-space:pre-wrap}</style>`);
-document.body.insertAdjacentHTML('beforeend', `<button id="spExit">🚪 ${adT('Çık')}</button><input id="spIn" maxlength="80" enterkeyhint="send" autocomplete="off" placeholder="✏️ ${adT('Uzaya bir şey yaz, Enter’a bas')}"><div id="spType"></div>`);
-for (const ev of ['pointerdown', 'mousedown', 'touchstart']) for (const id of ['spExit', 'spIn']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
-for (const ev of ['keydown', 'keyup', 'keypress']) $('spIn').addEventListener(ev, e => { e.stopPropagation(); if (ev === 'keydown' && e.key === 'Enter') { writeText($('spIn').value); $('spIn').value = ''; if (G.touchMode) $('spIn').blur(); } if (ev === 'keydown' && e.key === 'Escape') $('spIn').blur(); });
+/* ---------- 🖥️ arayüz: tek düğme Çık ---------- */
+document.head.insertAdjacentHTML('beforeend', `<style>#spHud{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);z-index:8;display:none;gap:7px;align-items:center;font:700 13px system-ui;color:#fff;white-space:nowrap}
+#spHud .pill{background:rgba(20,10,45,.7);border-radius:12px;padding:6px 10px;border:1px solid rgba(190,170,255,.4)}#spHud .bar{width:70px;height:8px;border-radius:5px;background:rgba(255,255,255,.15);display:inline-block;vertical-align:middle;margin-left:6px;overflow:hidden}#spHud .bar i{display:block;height:100%;background:linear-gradient(90deg,#d62828,#ff6b6b)}
+#spExit{padding:7px 16px;border-radius:14px;border:2px solid rgba(190,170,255,.6);background:rgba(20,10,45,.75);color:#fff;font:800 14px system-ui;cursor:pointer}</style>`);
+document.body.insertAdjacentHTML('beforeend', `<div id="spHud"><div class="pill">🌌 ${adT('Uzay')}</div><div class="pill">❤️<span class="bar"><i id="spHp"></i></span></div><div class="pill" id="spKills">👾 0</div><button id="spExit">🚪 ${adT('Çık')}</button></div>`);
+for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $('spExit').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 $('spExit').addEventListener('click', e => { e.stopPropagation(); goHome(); });
-function ui() { const s = on() && !G.paused && !G.photoMode; $('spExit').style.display = s ? 'block' : 'none'; $('spIn').style.display = s ? 'block' : 'none'; if (!s) $('spType').style.display = 'none'; }
-function key(code) { return on(); }   // uzayda tuşlar çalışmaz (yalnızca Çık düğmesi ve yazı kutusu)
+function ui() { const s = on() && !G.paused && !G.photoMode; $('spHud').style.display = s ? 'flex' : 'none'; if (!s) return; $('spHp').style.width = Math.max(0, Math.min(100, G.hp / G.HPMAX * 100)) + '%'; $('spKills').textContent = `👾 ${SP.kills}`; }
 
-/* ---------- 🔴 köyde AVM'nin arkasındaki uzay düğmesi ---------- */
-const BTN = { x: 8, z: -210.2, y: null, g: null };
+/* ---------- 🔴 köy meydanındaki uzay düğmesi ---------- */
+const BTN = { x: -13, z: 0, y: null, g: null };
 function btnBuild() {
   const g = new T.Group(); BTN.g = g; G.scene.add(g); let y = 0;
   try { const rc = new T.Raycaster(new T.Vector3(BTN.x, 200, BTN.z), new T.Vector3(0, -1, 0)); const h = G.ground && rc.intersectObject(G.ground, true)[0]; if (h) y = h.point.y; } catch (e) {} BTN.y = y; g.position.set(BTN.x, y, BTN.z);
@@ -186,7 +252,7 @@ function btnBuild() {
   BTN.glow = new T.Sprite(new T.SpriteMaterial({ map: glowTex('rgba(255,120,200,1)', 'rgba(160,120,255,.35)'), transparent: true, depthWrite: false, blending: T.AdditiveBlending })); BTN.glow.scale.set(2.6, 2.6, 1); BTN.glow.position.y = 1.75; g.add(BTN.glow);
   const sc = canvasTex(512, 160, (c, W, H) => { const gr = c.createLinearGradient(0, 0, W, H); gr.addColorStop(0, '#1b1046'); gr.addColorStop(1, '#3b1d6e'); c.fillStyle = gr; c.fillRect(0, 0, W, H); for (let i = 0; i < 70; i++) { c.fillStyle = `rgba(255,255,255,${Math.random()})`; c.fillRect(Math.random() * W, Math.random() * H, 2, 2); } c.strokeStyle = '#b39dff'; c.lineWidth = 8; c.strokeRect(4, 4, W - 8, H - 8); c.fillStyle = '#fff'; c.font = 'bold 72px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('🚀 UZAY', W / 2, H / 2 + 4); });
   for (const s of [-1, 1]) { const p = new T.Mesh(new T.BoxGeometry(.14, 3, .14), metal); p.position.set(s * 1.3, 1.5, -.9); g.add(p); }
-  const sign = new T.Mesh(new T.PlaneGeometry(2.6, .8), new T.MeshBasicMaterial({ map: sc })); sign.position.set(0, 2.85, -.88); g.add(sign); const sign2 = sign.clone(); sign2.rotation.y = Math.PI; sign2.position.z = -.92; g.add(sign2);
+  const sign = new T.Mesh(new T.PlaneGeometry(2.6, .8), new T.MeshBasicMaterial({ map: sc })); sign.position.set(0, 2.85, -.88); g.add(sign); const sign2 = sign.clone(); sign2.rotation.y = Math.PI; sign2.position.z = -.92; g.add(sign2); g.rotation.y = -Math.PI / 2;
   G.obstacles.push({ x: BTN.x, z: BTN.z, r: .7, h: 1.6, top: 1.6, stand: false, pass: false });
 }
 function btnTick(dt) {
@@ -203,27 +269,24 @@ function prompt() {
 /* ---------- 🗺️ giriş / çıkış ---------- */
 function area() {
   if (!on()) { leave(); return; }
-  build(); if (!SP.g.parent) G.scene.add(SP.g); SP.g.position.set(CX, 0, CZ);
-  SP.off.set(R(-5, 5), R(-3, 3), R(-5, 5)); SP.ax = R(0, 1); SP.az = R(0, 1); SP.ay = 0;
-  const p = G.player.position; p.set(CX + SP.off.x, Y(), CZ + SP.off.z); G.vy = 0; SP.on = true; hum(true);
-  try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) {}
-  let last = ''; try { last = localStorage.getItem('sftUzayYazi') || ''; } catch (e) {}
-  setTimeout(() => { if (on()) typeText(adT('Uzayın sessizliğinde süzülüyorsun…')); }, 1200);
-  if (last) setTimeout(() => { if (on()) { const sp = textSprite(last); sp.position.set(R(-20, 20), Y0 + R(5, 15), -40); SP.g.add(sp); SP.texts.push({ sp, t: 0 }); } }, 1500);
+  build(); if (!SP.rocks.length) buildRocks(); if (!SP.g.parent) G.scene.add(SP.g); SP.g.position.set(CX, 0, CZ);
+  for (const o of SP.obs) if (!G.obstacles.includes(o)) G.obstacles.push(o);
+  respawn(); SP.on = true; hum(true); SP.spT = 2;
+  setTimeout(() => { if (on()) G.showMsg('🌌 ' + adT('Uzaydasın! Kayalarda zıpla, mikropları ve kozmik yaratıkları yen'), 3.5); }, 900);
 }
-function leave() { if (SP.g.parent) G.scene.remove(SP.g); if (SP.on) resetHolder(); SP.on = false; hum(false); ui(); $('spType').style.display = 'none'; SP.typ = null; }
+function leave() { if (SP.g.parent) G.scene.remove(SP.g); for (const o of SP.obs) { const i = G.obstacles.indexOf(o); if (i >= 0) G.obstacles.splice(i, 1); } for (const m of SP.mobs) SP.g.remove(m.g); SP.mobs = []; for (const s of SP.shots) SP.g.remove(s.m); SP.shots = []; SP.on = false; hum(false); ui(); }
 function open() { const busy = G.admBusy && G.admBusy(); if (busy) { G.showMsg(busy, 1.8); return; } G.teleportTo('space', CX, CZ, 0, '🌌 ' + adT('Uzaya çıktın!')); }
-function goHome() { G.teleportTo('hub', BTN.x, BTN.z - 2.8, 0, adT('🏡 Köye döndün')); }
+function goHome() { G.teleportTo('hub', BTN.x + 2.6, BTN.z, Math.PI / 2, adT('🏡 Köye döndün')); }
 
 /* ---------- 🛠️ admin ---------- */
 try {
   const cat = ['🌌 Uzay', '🌌 Space', [
     ['spc_go', '🚀', 'Uzaya git', 'Go to space', () => { open(); return '🚀'; }],
-    ['spc_fast', '💫', 'Daha hızlı süzül', 'Drift faster', () => { SP.flow.multiplyScalar(1.6); return '💫'; }],
-    ['spc_slow', '🐢', 'Daha yavaş süzül', 'Drift slower', () => { SP.flow.multiplyScalar(.6); return '🐢'; }],
+    ['spc_clear', '💥', 'Uzay canavarlarını yok et', 'Clear space monsters', () => { for (const m of alive()) hurtMob(m, 9999); return '💥'; }],
+    ['spc_beast', '👁️', 'Kozmik yaratık çağır', 'Spawn cosmic beast', () => { if (!on()) return adT('🌌 Önce uzaya git'); spawnMob('beast'); return '👁️'; }],
   ]];
   if (G.ADM_LIST && G.ADM_F) { G.ADM_LIST.splice(1, 0, cat); for (const [id, ic, tr, en, fn] of cat[2]) G.ADM_F[id] = { id, ic, tr, en, fn }; }
 } catch (e) { console.warn('uzay admin', e); }
 
-window.__spc = { tick, area, open, key, prompt, drift, pose, Y, SP, writeText, BTN };
+window.__spc = { tick, area, open, prompt, attack, ray, targets, skyMat, ground, SP, BTN, groundHere };
 })(window.__sftG);
