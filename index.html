@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.30</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.31</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -3954,7 +3954,7 @@ ITEMS.splice(ITEMS.findIndex(i => i.id === 'torch'), 0,
 ITEMS.push({ id: 'skate', name: 'Kaykay', icon: '🛹', kind: 'toggle', desc: 'Bin / in: çok hızlı kayarsın' },
   { id: 'guitar', name: 'Gitar', icon: '🎸', kind: 'play', desc: 'Çal: her basışta yeni akor' },
   { id: 'apple', name: 'Elma', icon: '🍎', kind: 'eat', desc: 'Ye: canın dolar' });
-ITEMS.splice(1, 0, { id: 'cosmic', name: 'Kozmik küre', icon: '🔮', kind: 'cosmic', desc: 'V: küre içine girer, kozmik mod: mor lazer, 60 kol, gökten saldırı (X) · K: küreyi çıkar' });   // 🔮 en başta
+ITEMS.splice(1, 0, { id: 'cosmic', name: 'Kozmik küre', icon: '🔮', kind: 'cosmic', desc: 'V: küre içine girer, can iki katı · mor lazer, 60 kol, X gökten saldırı, C 6 mor gölge, Z kılıç · K: küreyi çıkar' });   // 🔮 en başta
 for (const it of ITEMS) ITEM_BY[it.id] = it;
 try { const s = localStorage.getItem('copAdamEsya'); if (s && ITEM_BY[s]) INV.eq = s; } catch (e) {}
 Object.assign(ITEM_BY.sword, { reach: 3.0, arc: 85 }); Object.assign(ITEM_BY.bat, { reach: 2.7, arc: 80 });   // daha geniş vuruş alanı
@@ -10145,9 +10145,9 @@ function exitHouse() {
 
 function cosTargets() {   // 🔮 kozmik mod: her bölgeden vurulabilir düşmanlar (köylüler hariç)
   const L = [];
-  if (inArena) for (const m of monsters) if (monAlive(m)) L.push({ p: m.holder.position, h: 2.2, r: .9, hit: (d, dir, k) => { damageMonster(m, d, dir); if (k && m.vel) m.vel.addScaledVector(dir, k); } });
-  if (inRoyale) for (const b of BR.bots) if (b.alive && b.holder.visible) L.push({ p: b.pos, h: 1.9, r: .5, hit: (d, dir, k) => { brHurtBot(b, Math.round(d), 'player'); if (k && b.vel) b.vel.addScaledVector(dir, k); } });
-  try { if (bossAlive()) L.push({ p: new THREE.Vector3(BOSS.x, BOSS.y, BOSS.z), h: BOSS.H, r: BOSS.R, hit: d => bossDamage(d, new THREE.Vector3(BOSS.x, BOSS.y + BOSS.H * .5, BOSS.z)) }); } catch (e) {}
+  if (inArena) for (const m of monsters) if (monAlive(m)) L.push({ id: m, p: m.holder.position, h: 2.2, r: .9, hit: (d, dir, k) => { damageMonster(m, d, dir); if (k && m.vel) m.vel.addScaledVector(dir, k); } });
+  if (inRoyale) for (const b of BR.bots) if (b.alive && b.holder.visible) L.push({ id: b, p: b.pos, h: 1.9, r: .5, hit: (d, dir, k) => { brHurtBot(b, Math.round(d), 'player'); if (k && b.vel) b.vel.addScaledVector(dir, k); } });
+  try { if (bossAlive()) L.push({ id: BOSS, p: new THREE.Vector3(BOSS.x, BOSS.y, BOSS.z), h: BOSS.H, r: BOSS.R, hit: d => bossDamage(d, new THREE.Vector3(BOSS.x, BOSS.y + BOSS.H * .5, BOSS.z)) }); } catch (e) {}
   try { if (inDungeon && window.__dg && __dg.targets) L.push(...__dg.targets()); } catch (e) {}
   try { if (inSpace && window.__spc && __spc.targets) L.push(...__spc.targets()); } catch (e) {}
   return L;
@@ -31177,7 +31177,8 @@ window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G
   d('speckleTexture', () => speckleTexture); d('started', () => started, v => { started = v; }); d('staticPH', () => staticPH); d('teleportTo', () => teleportTo);
   d('teleporting', () => teleporting, v => { teleporting = v; }); d('touchMode', () => touchMode, v => { touchMode = v; }); d('tryLock', () => tryLock); d('vel', () => vel);
   d('vy', () => vy, v => { vy = v; }); d('mergeGeometries', () => mergeGeometries);
-  d('INV', () => INV); d('equip', () => equip); d('HAND', () => HAND); d('roboRay', () => roboRay); d('laserHeld', () => laserHeld); d('shielding', () => shielding); d('slideObj', () => slide); d('boostMode', () => boostMode); d('flyingNow', () => flyingNow); d('cosTargets', () => cosTargets);   // 🔮 d('wrapAng', () => wrapAng); d('yaw', () => yaw, v => { yaw = v; });
+  d('INV', () => INV); d('equip', () => equip); d('HAND', () => HAND); d('roboRay', () => roboRay); d('laserHeld', () => laserHeld); d('shielding', () => shielding); d('slideObj', () => slide); d('boostMode', () => boostMode); d('flyingNow', () => flyingNow); d('cosTargets', () => cosTargets);   // 🔮
+  d('wrapAng', () => wrapAng); d('yaw', () => yaw, v => { yaw = v; });
   return G; })();
 { const s = document.createElement('script'), ms = document.getElementById('sftMakerSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'maker.js'; s.onerror = () => console.warn('🗺️ maker.js yüklenemedi'); document.head.appendChild(s); }
 { const s = document.createElement('script'), ms = document.getElementById('sftRaceSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'race.js'; s.onerror = () => console.warn('🗺️ race.js yüklenemedi'); document.head.appendChild(s); }   // 🏎️ yarış

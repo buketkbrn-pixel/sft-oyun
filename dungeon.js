@@ -282,7 +282,7 @@ function hurtSkel(s, v, ux, uz) {
   if (s.hp <= 0 && s.st !== 'dead') { s.st = 'dead'; s.t = 0; G.progAdd(s.big ? 60 : 3, q); if (s.big) bossDown(s.rm, true); }
 }
 function alive(s) { return s.st !== 'dead' && s.st !== 'rise' && !s.gone; }
-function targets() { const L = []; for (const rm of DG.rooms) for (const s of rm.skels || []) if (alive(s)) { const sc = s.big ? 2.6 : 1; L.push({ p: s.h.position, h: 2 * sc, r: .45 * sc, hit: (v, dir, k) => { hurtSkel(s, v, dir ? dir.x : 0, dir ? dir.z : 0); if (k && !s.big && dir) { s.h.position.x += dir.x * k * .12; s.h.position.z += dir.z * k * .12; } } }); } return L; }
+function targets() { const L = []; for (const rm of DG.rooms) for (const s of rm.skels || []) if (alive(s)) { const sc = s.big ? 2.6 : 1; L.push({ id: s, p: s.h.position, h: 2 * sc, r: .45 * sc, hit: (v, dir, k) => { hurtSkel(s, v, dir ? dir.x : 0, dir ? dir.z : 0); if (k && !s.big && dir) { s.h.position.x += dir.x * k * .12; s.h.position.z += dir.z * k * .12; } } }); } return L; }
 function attack(dir) {   // 👊 yumruk / tekme
   if (G.curKey !== 'dungeon') return false; const P = G.player.position; let hit = false;
   for (const rm of DG.rooms) for (const s of rm.skels || []) { if (!alive(s)) continue; const q = s.h.position, dx = q.x - P.x, dz = q.z - P.z, d = Math.hypot(dx, dz) || .01, sc = s.big ? 2.6 : 1;

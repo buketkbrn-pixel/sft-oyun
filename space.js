@@ -196,7 +196,7 @@ function ray(o, d, best, v) {   // 🔫 mermi
   let bt = null, bm = null; for (const m of alive()) { const c = tv.set(CX + m.g.position.x, m.g.position.y, CZ + m.g.position.z), oc = new T.Vector3().subVectors(o, c), b = oc.dot(d), r = (m.kind === 'germ' ? 1.1 : 1.7) * m.sc, cc = oc.lengthSq() - r * r, D = b * b - cc; if (D < 0) continue; const t = -b - Math.sqrt(D); if (t < 0 || t >= best || (bt !== null && t >= bt)) continue; bt = t; bm = m; }
   if (!bm) return null; hurtMob(bm, v, d.clone().setY(0).normalize(), 2); return bt;
 }
-function targets() { return alive().map(m => ({ p: new T.Vector3(CX + m.g.position.x, m.g.position.y - 1 * m.sc, CZ + m.g.position.z), h: 2 * m.sc, r: (m.kind === 'germ' ? 1.1 : 1.7) * m.sc, hit: (v, dir, k) => hurtMob(m, v, dir, k) })); }
+function targets() { return alive().map(m => ({ id: m, p: new T.Vector3(CX + m.g.position.x, m.g.position.y - 1 * m.sc, CZ + m.g.position.z), h: 2 * m.sc, r: (m.kind === 'germ' ? 1.1 : 1.7) * m.sc, hit: (v, dir, k) => hurtMob(m, v, dir, k) })); }
 
 /* ---------- ❤️ hasar: canın biterse ana kayada uyanırsın ---------- */
 function dmg(v) {
