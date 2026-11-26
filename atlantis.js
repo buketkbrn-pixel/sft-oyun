@@ -109,25 +109,61 @@ function column(g, x, z, y0, h, r, m, broken) {
   if (!broken) box(g, r * 2.8, .45, r * 2.8, M.marble2, x, y0 + .4 + hh + .22, z); return hh + .85;
 }
 function sub(g, x, z, ry, y) { const s = new T.Group(); s.position.set(x, y, z); s.rotation.y = ry; g.add(s); return s; }
-function villa(g, x, z, ry, y, s) {   // sütunlu saray
-  const M = mats(), b = sub(g, x, z, ry, y), w = 12 * s, d = 9 * s, h = 6.5 * s, wm = PICK([M.marble, M.marble, M.sandst, M.teal]);
-  box(b, w + 3, 1.2, d + 4, M.marble2, 0, .6, 0); box(b, w * .5, .6, 1.4, M.marble, 0, .3, d / 2 + 2.6);
+function windowAt(b, x, y, z, ry, wm, round) {   // çerçeveli pencere + denizlik (+ bazen kepenk)
+  const M = mats(), w = sub(b, x, z, ry, y), tr = wm === M.marble ? M.teal : M.marble;
+  if (round) { add(w, new T.CylinderGeometry(.52, .52, .1, 14).rotateX(Math.PI / 2), tr, 0, 0, .02); add(w, new T.CylinderGeometry(.38, .38, .12, 14).rotateX(Math.PI / 2), M.dark, 0, 0, .04); box(w, .06, .76, .14, tr, 0, 0, .06); box(w, .76, .06, .14, tr, 0, 0, .06); return; }
+  box(w, 1.12, 1.36, .1, tr, 0, 0, .02); box(w, .8, 1.04, .12, M.dark, 0, 0, .04); add(w, new T.CylinderGeometry(.4, .4, .12, 10, 1, false, Math.PI / 2, Math.PI).rotateX(Math.PI / 2), M.dark, 0, .52, .04); add(w, new T.TorusGeometry(.48, .06, 4, 10, Math.PI), tr, 0, .52, .05);
+  box(w, 1.35, .12, .34, tr, 0, -.72, .14); box(w, .06, 1.04, .14, tr, 0, 0, .07);
+  if (RND() < .35) for (const sx of [-1, 1]) box(w, .42, 1.2, .07, PICK([M.teal, M.roof2, M.roof]), sx * .8, 0, .08);
+  if (RND() < .25) { box(w, 1, .26, .3, M.roof2, 0, -.55, .3); for (let k = 0; k < 3; k++) add(w, new T.IcosahedronGeometry(.13, 0), PICK([M.pink, M.teal]), -.3 + k * .3, -.36, .3); }
+}
+function balustrade(b, x, y, z, len, ry) { const M = mats(), r = sub(b, x, z, ry, y); box(r, len, .12, .2, M.marble, 0, .95, 0); box(r, len, .1, .24, M.marble2, 0, .05, 0); const n = Math.max(2, Math.round(len / .42)); for (let k = 0; k <= n; k++) cyl(r, .06, .08, .85, M.marble, -len / 2 + k * len / n, .5, 0, 6); }
+function villa(g, x, z, ry, y, s) {   // sütunlu saray (frizli, akroterli, havuzlu)
+  const M = mats(), b = sub(g, x, z, ry, y), w = 12 * s, d = 9 * s, h = 6.5 * s, wm = PICK([M.marble, M.marble, M.sandst, M.teal]), tr = wm === M.marble ? M.teal : M.marble;
+  box(b, w + 3, 1.2, d + 4, M.marble2, 0, .6, 0); for (let k = 0; k < 3; k++) box(b, w * .5 + k * .6, .4, .7, M.marble, 0, .2 + k * .4, d / 2 + 2.9 - k * .5);
   box(b, w, h, .7, wm, 0, 1.2 + h / 2, -d / 2); box(b, .7, h, d, wm, -w / 2, 1.2 + h / 2, 0); box(b, .7, h, d, wm, w / 2, 1.2 + h / 2, 0);
   const dw = 2.4 * s; box(b, (w - dw) / 2, h, .7, wm, -(w + dw) / 4, 1.2 + h / 2, d / 2); box(b, (w - dw) / 2, h, .7, wm, (w + dw) / 4, 1.2 + h / 2, d / 2); box(b, dw, h * .35, .7, wm, 0, 1.2 + h * .825, d / 2);
-  box(b, dw * .9, h * .62, .2, M.dark, 0, 1.2 + h * .31, d / 2 - .3);
+  box(b, dw * .9, h * .62, .2, M.dark, 0, 1.2 + h * .31, d / 2 - .3); add(b, new T.TorusGeometry(dw * .5, .12, 5, 14, Math.PI), M.gold, 0, 1.2 + h * .62, d / 2 + .38);
+  for (const sx of [-1, 1]) { windowAt(b, sx * (w / 2 + .36), 1.2 + h * .55, 0, sx * Math.PI / 2, wm); windowAt(b, sx * (w / 2 + .36), 1.2 + h * .55, -d * .3, sx * Math.PI / 2, wm, RND() < .3); windowAt(b, sx * w * .3, 1.2 + h * .55, d / 2 + .36, 0, wm); }
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(b, .55, h, .55, tr, sx * w / 2, 1.2 + h / 2, sz * d / 2);
   const n = s > 1.2 ? 6 : 4; for (let i = 0; i < n; i++) column(b, -w / 2 + .9 + i * (w - 1.8) / (n - 1), d / 2 + 1.6, 1.2, h - .2, .38 * s, M.marble, RND() < .12);
-  box(b, w + 1.6, .6, d + 3.2, M.marble2, 0, 1.2 + h + .3, .8);
-  if (RND() < .3) { add(b, new T.SphereGeometry(Math.min(w, d) * .36, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.roof, 0, 1.2 + h + .6, 0); }
-  else add(b, prism(w + 1.6, d + 3.2, 2.6 * s), PICK([M.roof, M.roof2, M.marble]), 0, 1.2 + h + .6, .8);
-  if (RND() < .45) for (let k = 0; k < 2; k++) add(b, new T.IcosahedronGeometry(R(.6, 1.2), 0), M.pink, R(-w / 2, w / 2), 1.2 + h + R(.8, 1.6), R(-d / 2, d / 2));
+  box(b, w + 1.6, .6, d + 3.2, M.marble2, 0, 1.2 + h + .3, .8); box(b, w + 1.7, .35, d + 3.3, tr, 0, 1.2 + h - .1, .8);
+  for (let k = 0; k < Math.round(w / 1.2); k++) box(b, .35, .3, .12, M.gold, -w / 2 + .6 + k * 1.2, 1.2 + h - .1, d / 2 + 2.45);   // friz süsleri
+  const roofY = 1.2 + h + .6, rh = 2.6 * s;
+  if (RND() < .3) { add(b, new T.SphereGeometry(Math.min(w, d) * .36, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.roof, 0, roofY, 0); cyl(b, .5, .7, 1.2, M.gold, 0, roofY + Math.min(w, d) * .36 + .5, 0, 8); }
+  else { add(b, prism(w + 1.6, d + 3.2, rh), PICK([M.roof, M.roof2, M.marble]), 0, roofY, .8); add(b, new T.CylinderGeometry(.75, .75, .15, 14).rotateX(Math.PI / 2), M.gold, 0, roofY + rh * .38, .8 + (d + 3.2) / 2 + .02);
+    for (const sx of [-1, 1]) add(b, new T.ConeGeometry(.32, .9, 6), M.gold, sx * (w / 2 + .6), roofY + .45, .8 + (d + 3.2) / 2); add(b, new T.ConeGeometry(.3, 1, 6), M.gold, 0, roofY + rh + .4, .8 + (d + 3.2) / 2); }
+  if (RND() < .55) { const f = sub(b, 0, d / 2 + 6.5, 0, 0); cyl(f, 2.2, 2.4, .7, M.marble2, 0, .35, 0, 18); cyl(f, 1.9, 1.9, .1, M.teal, 0, .66, 0, 18); cyl(f, .25, .3, 1.6, M.marble, 0, 1.1, 0, 8); add(f, new T.SphereGeometry(.45, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), M.marble, 0, 1.9, 0); }
+  for (const sx of [-1, 1]) { const u = sub(b, sx * (w * .25 + .8), d / 2 + 3.4, 0, .4); cyl(u, .35, .25, .5, M.marble2, 0, .25, 0, 8); add(u, new T.IcosahedronGeometry(.4, 0), M.pink, 0, .7, 0); }
+  if (RND() < .45) for (let k = 0; k < 2; k++) add(b, new T.IcosahedronGeometry(R(.6, 1.2), 0), M.pink, R(-w / 2, w / 2), roofY + R(.4, 1.4), R(-d / 2, d / 2));
   ob(x, z, Math.min(w, d) * .62 + 1, y + 1.2 + h + 2.6 * s);
 }
-function house(g, x, z, ry, y) {
-  const M = mats(), b = sub(g, x, z, ry, y), w = R(5, 8), d = R(5, 7), h = R(3.5, 5.5), wm = PICK([M.marble, M.sandst, M.teal, M.marble2]), fl = RND() < .35 ? 2 : 1;
-  box(b, w, h, d, wm, 0, h / 2, 0); box(b, 1.3, 2.1, .2, M.dark, 0, 1.05, d / 2 + .02); for (const sx of [-1, 1]) box(b, .9, .9, .2, M.dark, sx * w * .3, h * .62, d / 2 + .02);
-  let top = h; if (fl === 2) { const w2 = w * .65, d2 = d * .65, h2 = R(2.6, 3.6); box(b, w2, h2, d2, wm, -w * .12, h + h2 / 2, -d * .1); box(b, .8, .8, .2, M.dark, -w * .12, h + h2 * .55, -d * .1 + d2 / 2 + .02); top = h + h2; }
-  if (RND() < .4) add(b, new T.SphereGeometry(Math.min(w, d) * .3, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), M.roof, 0, top, 0); else box(b, w + .3, .3, d + .3, M.marble2, 0, h + .15, 0);
-  if (RND() < .3) { const c = sub(b, w * .3, d * .2, 0, h + .3); coralClump(c); }
+function house(g, x, z, ry, y) {   // ayrıntılı ev: kemerli kapı, çerçeveli pencereler, köşe sütunları, friz, balkon, çatı terası / kubbe
+  const M = mats(), b = sub(g, x, z, ry, y), w = R(5.5, 8.5), d = R(5, 7.5), h = R(3.6, 5.2), wm = PICK([M.marble, M.sandst, M.teal, M.marble2]), tr = wm === M.marble ? M.teal : M.marble, fl = RND() < .42 ? 2 : 1, h0 = .35;
+  box(b, w + .7, h0, d + .7, M.marble2, 0, h0 / 2, 0); box(b, w, h, d, wm, 0, h0 + h / 2, 0);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(b, .36, h, .36, tr, sx * w / 2, h0 + h / 2, sz * d / 2);
+  box(b, w + .3, .3, d + .3, tr, 0, h0 + h - .15, 0); box(b, w + .1, .12, d + .1, M.gold, 0, h0 + h - .38, 0);
+  // kemerli kapı + basamak
+  box(b, 1.3, 2, .12, M.dark, 0, h0 + 1, d / 2 + .02); add(b, new T.CylinderGeometry(.65, .65, .12, 12, 1, false, Math.PI / 2, Math.PI).rotateX(Math.PI / 2), M.dark, 0, h0 + 2, d / 2 + .02);
+  add(b, new T.TorusGeometry(.76, .1, 5, 12, Math.PI), tr, 0, h0 + 2, d / 2 + .06); for (const sx of [-1, 1]) box(b, .18, 2, .16, tr, sx * .76, h0 + 1, d / 2 + .06);
+  box(b, 1.9, .2, .7, M.marble, 0, .1, d / 2 + .6); box(b, 1.6, .2, .4, M.marble, 0, .3, d / 2 + .5);
+  if (RND() < .5) for (const sx of [-1, 1]) { cyl(b, .22, .16, .45, M.roof2, sx * 1.25, h0 + .22, d / 2 + .5, 8); add(b, new T.IcosahedronGeometry(.28, 0), PICK([M.pink, M.teal]), sx * 1.25, h0 + .6, d / 2 + .5); }
+  // pencereler
+  if (w > 6.2) for (const sx of [-1, 1]) windowAt(b, sx * w * .32, h0 + h * .56, d / 2 + .02, 0, wm, RND() < .2); else windowAt(b, w * .3, h0 + h * .56, d / 2 + .02, 0, wm);
+  for (const sx of [-1, 1]) windowAt(b, sx * (w / 2 + .02), h0 + h * .56, 0, sx * Math.PI / 2, wm, RND() < .25);
+  windowAt(b, 0, h0 + h * .56, -d / 2 - .02, Math.PI, wm, true);
+  let top = h0 + h;
+  if (fl === 2) { const w2 = w * .66, d2 = d * .66, h2 = R(2.6, 3.4), zc = -d * .12; box(b, w2, h2, d2, wm, 0, top + h2 / 2, zc); for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(b, .28, h2, .28, tr, sx * w2 / 2, top + h2 / 2, zc + sz * d2 / 2);
+    windowAt(b, 0, top + h2 * .55, zc + d2 / 2 + .02, 0, wm, RND() < .3); box(b, w2 + .25, .25, d2 + .25, tr, 0, top + h2 - .12, zc);
+    balustrade(b, 0, top, d / 2 - .2, w * .9, 0); for (const sx of [-1, 1]) balustrade(b, sx * (w / 2 - .2), top, zc + d2 / 2 + (d / 2 - zc - d2 / 2) / 2, d / 2 - zc - d2 / 2, Math.PI / 2);
+    top += h2; }
+  const rk = RND();
+  if (rk < .38) { const rr = Math.min(fl === 2 ? w * .66 : w, fl === 2 ? d * .66 : d) * .34, zc = fl === 2 ? -d * .12 : 0; cyl(b, rr + .15, rr + .15, .3, M.marble2, 0, top + .15, zc, 14); add(b, new T.SphereGeometry(rr, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), PICK([M.roof, M.teal, M.roof]), 0, top + .3, zc); cyl(b, .18, .22, .5, M.gold, 0, top + .3 + rr + .2, zc, 8); add(b, new T.ConeGeometry(.2, .5, 6), M.gold, 0, top + .3 + rr + .7, zc); top += rr + 1; }
+  else if (rk < .7) { const ww = fl === 2 ? w * .66 : w, dd = fl === 2 ? d * .66 : d, zc = fl === 2 ? -d * .12 : 0; box(b, ww + .3, .3, dd + .3, M.marble2, 0, top + .15, zc);
+    for (let k = 0; k < Math.round((ww + dd) * 2 / 1.1); k++) { const p = k * 1.1, per = (ww + dd) * 2; let px, pz; if (p < ww) { px = -ww / 2 + p; pz = dd / 2; } else if (p < ww + dd) { px = ww / 2; pz = dd / 2 - (p - ww); } else if (p < ww * 2 + dd) { px = ww / 2 - (p - ww - dd); pz = -dd / 2; } else { px = -ww / 2; pz = -dd / 2 + (p - ww * 2 - dd); } if (p < per) box(b, .5, .5, .5, M.marble2, px, top + .55, zc + pz); }
+    if (RND() < .6) amphora(sub(b, R(-ww / 4, ww / 4), zc + R(-dd / 4, dd / 4), 0, top + .3), 0, 0); if (RND() < .5) coralClump(sub(b, R(-ww / 4, ww / 4), zc + R(-dd / 4, dd / 4), 0, top + .3)); top += .8; }
+  else { const ww = fl === 2 ? w * .66 : w, dd = fl === 2 ? d * .66 : d, zc = fl === 2 ? -d * .12 : 0, rh = R(1.4, 2.2); add(b, new T.ConeGeometry(Math.hypot(ww, dd) / 2 + .3, rh, 4).rotateY(Math.PI / 4).scale(ww / Math.hypot(ww, dd) * 1.414, 1, dd / Math.hypot(ww, dd) * 1.414), PICK([M.roof2, M.roof]), 0, top + rh / 2, zc); top += rh; }
+  if (RND() < .33) { const yd = sub(b, 0, 0, 0, 0), L = d / 2 + 3.2; for (const sx of [-1, 1]) { box(yd, .3, .9, L - d / 2 + .2, M.marble2, sx * (w / 2 + 1), .45, d / 2 + (L - d / 2) / 2); box(yd, (w + 2) / 2 - 1.2, .9, .3, M.marble2, sx * ((w + 2) / 4 + .6), .45, L); } }
   ob(x, z, Math.max(w, d) * .58, y + top + .5);
 }
 function coralClump(g) { const M = mats(); for (let k = 0; k < 3; k++) { add(g, new T.IcosahedronGeometry(R(.3, .7), 0), PICK([M.pink, M.teal, M.sandst]), R(-.6, .6), R(0, .4), R(-.6, .6)); } }
