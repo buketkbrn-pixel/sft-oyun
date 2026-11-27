@@ -36,6 +36,7 @@ function snd(kind, vol = 1) {
   else if (kind === 'skylaser') { tone('sawtooth', 1600, 200, 0, 1, .12); tone('sine', 400, 80, 0, 1.1, .2); }
   else if (kind === 'meteor') { noise(0, 1, 500, .6, .2, 'lowpass'); tone('sine', 900, 120, 0, .9, .1); }
   else if (kind === 'impact') { tone('sine', 90, 25, 0, 1.2, .5); noise(0, 1, 400, .5, .45, 'lowpass'); }
+  else if (kind === 'zap') { noise(0, .07, 3200 + Math.random() * 1500, 1.4, .09, 'highpass'); tone('square', 1900, 380, 0, .05, .025); }
   else if (kind === 'shield') { tone('sine', 520, 780, 0, .4, .1); tone('sine', 780, 1170, .05, .4, .07); }
 }
 function laserLoop(want) {
@@ -384,8 +385,103 @@ function swordTick(dt, t) {
   }
 }
 
+/* ---------- ⚡ ŞİMŞEK eşyası: vuruşa şimşek · sağ tık elden şimşek (nişan kamerası) · X şimşek yağmuru · K elde büyük ışık · bilekte hale, şimşek gözler, mini şimşekler ---------- */
+const LT = { bolts: [], pend: [], zap: false, zapT: 0, dmgT: 0, cd: 0, cast: 0, light: false, miniT: 0, halos: [], eyes: [], ball: null, crossPrev: null, rig: null };
+const ltOn = () => G.INV.eq === 'bolt' && !G.giant && !CO.on;
+const BOLT_N = 900, LX = new T.Vector3(1, 0, 0), segGeo = new T.CylinderGeometry(1, 1, 1, 5, 1, true).translate(0, .5, 0);
+const bCore = new T.InstancedMesh(segGeo, addMat(0xffffff, .95), BOLT_N), bGlow = new T.InstancedMesh(segGeo, addMat(0x6fb4ff, .3), BOLT_N);
+for (const m of [bCore, bGlow]) { m.frustumCulled = false; m.count = 0; m.renderOrder = 5; G.scene.add(m); }
+const boltShape = (() => { const s = new T.Shape(); s.moveTo(.15, .5); s.lineTo(-.25, -.05); s.lineTo(.02, -.05); s.lineTo(-.15, -.5); s.lineTo(.3, .1); s.lineTo(.03, .1); s.lineTo(.15, .5); return new T.ShapeGeometry(s); })();
+function zig(a, b, jit) {
+  const L = a.distanceTo(b), n = Math.max(4, Math.min(22, Math.round(L * 1.6))), pts = [a.clone()]; V1.subVectors(b, a).normalize();
+  const p1 = new T.Vector3().crossVectors(V1, Math.abs(V1.y) > .9 ? LX : UP).normalize(), p2 = new T.Vector3().crossVectors(V1, p1);
+  for (let k = 1; k < n; k++) { const s = Math.sin(Math.PI * k / n) * jit * L * .11; pts.push(a.clone().lerp(b, k / n).addScaledVector(p1, R(-1, 1) * s).addScaledVector(p2, R(-1, 1) * s)); }
+  pts.push(b.clone()); return pts;
+}
+function addBolt(a, b, o = {}) {   // w kalınlık · life süre · jit kıvrım · br dal · re: çıtırdayarak yeniden şekillenir
+  const life = o.life || .12, w = o.w || .05, jit = o.jit || 1, pts = zig(a, b, jit); LT.bolts.push({ pts, t: 0, life, w, a: a.clone(), b: b.clone(), jit, re: o.re });
+  for (let k = 0; k < (o.br || 0); k++) { const s = pts[1 + Math.floor(Math.random() * (pts.length - 2))], L = a.distanceTo(b) * R(.15, .35); V2.subVectors(b, a).normalize(); V3.set(R(-1, 1), R(-1, 1), R(-1, 1)).normalize().multiplyScalar(.9).add(V2).normalize(); LT.bolts.push({ pts: zig(s, s.clone().addScaledVector(V3, L), 1.2), t: 0, life: life * .8, w: w * .55 }); }
+}
+function boltsTick(dt) {
+  let n = 0;
+  for (let i = LT.bolts.length - 1; i >= 0; i--) { const B = LT.bolts[i]; B.t += dt; if (B.t > B.life) { LT.bolts.splice(i, 1); continue; }
+    if (B.re && (B.rt = (B.rt || 0) - dt) <= 0) { B.rt = .045; B.pts = zig(B.a, B.b, B.jit); }
+    const w = B.w * (1 - B.t / B.life * .6) * (Math.random() < .25 ? .45 : 1);
+    for (let k = 0; k < B.pts.length - 1 && n < BOLT_N; k++) { const p = B.pts[k]; V1.subVectors(B.pts[k + 1], p); const L = V1.length(); if (L < 1e-4) continue;
+      dmy.position.copy(p); dmy.quaternion.setFromUnitVectors(UP, V1.divideScalar(L)); dmy.scale.set(w, L, w); dmy.updateMatrix(); bCore.setMatrixAt(n, dmy.matrix); dmy.scale.set(w * 4, L, w * 4); dmy.updateMatrix(); bGlow.setMatrixAt(n, dmy.matrix); n++; } }
+  bCore.count = bGlow.count = n; if (n) bCore.instanceMatrix.needsUpdate = bGlow.instanceMatrix.needsUpdate = true;
+}
+function sndThunder(v) { try { G.play('thunder', { gain: v }); } catch (e) {} }
+function skyStrike(p, h, dmg, tg) {   // gökten şimşek: hedefe çakar, yere sıçrar
+  const hp = new T.Vector3(p.x, p.y + h * .5, p.z), top = new T.Vector3(p.x + R(-5, 5), p.y + 55, p.z + R(-5, 5));
+  addBolt(top, hp, { w: .15, life: .34, jit: 1.1, br: 4, re: true });
+  for (let k = 0; k < 3; k++) addBolt(hp, new T.Vector3(p.x + R(-2.2, 2.2), p.y + .05, p.z + R(-2.2, 2.2)), { w: .045, life: .25, jit: 1.3 });
+  burst(hp, 40, 7, 0xbfe0ff, .5); burst(hp, 16, 4, 0xffffff, .3); ring(V1.set(p.x, p.y + .2, p.z), 3.5, 0x8fc8ff);
+  if (tg) { try { tg.hit(dmg, new T.Vector3(R(-1, 1), 1.4, R(-1, 1)).normalize(), 5); } catch (e) {} }
+  hurtAll(hp, 2.2, Math.round(dmg * .35), 3, .6); sndThunder(.5); G.shake = Math.max(G.shake, .25);
+}
+function boltPunch(dir) {   // 👊 vuruş vurur, sonra vurduğuna şimşek çakar
+  if (!ltOn()) return; const P = G.player.position, hs = hand(-1, new T.Vector3()), fa = Math.atan2(dir.x, dir.z);
+  addBolt(hs, hs.clone().add(V1.set(dir.x, 0, dir.z).normalize().multiplyScalar(1.6)), { w: .035, life: .12, br: 2 }); snd('zap', .8);
+  let k = 0; for (const o of targets()) { const dx = o.p.x - P.x, dz = o.p.z - P.z, d = Math.hypot(dx, dz); if (d > 3.4 + o.r) continue; if (Math.abs(G.wrapAng(Math.atan2(dx, dz) - fa)) > 1.1 && d > 1.2) continue; LT.pend.push({ t: .14 + k * .06, id: o.id, p: o.p.clone(), h: o.h, dmg: 40 }); k++; }
+}
+function storm() {   // ⛈️ yakındaki tüm düşmanlara şimşek
+  if (!ltOn() || LT.cd > 0) return; LT.cd = 3.5; LT.cast = .9; const P = G.player.position;
+  const TL = targets().map(o => [o, Math.hypot(o.p.x - P.x, o.p.z - P.z)]).filter(x => x[1] < 30).sort((a, b) => a[1] - b[1]).slice(0, 12);
+  TL.forEach(([o], k) => LT.pend.push({ t: .25 + k * .09, id: o.id, p: o.p.clone(), h: o.h, dmg: 60 }));
+  if (!TL.length) for (let k = 0; k < 6; k++) { const a = R(0, 6.28), r = R(4, 14); LT.pend.push({ t: .25 + k * .1, p: new T.Vector3(P.x + Math.sin(a) * r, P.y, P.z + Math.cos(a) * r), h: .2, dmg: 30 }); }
+  for (const s of [1, -1]) { const hh = hand(s, new T.Vector3()); addBolt(hh, hh.clone().add(V1.set(R(-3, 3), 40, R(-3, 3))), { w: .08, life: .35, br: 2, re: true }); }
+  burst(V1.set(P.x, P.y + 1, P.z), 50, 6, 0xbfe0ff, .6); sndThunder(.8); G.showMsg('⛈️ ' + adT(TL.length ? `Şimşek yağmuru! ${TL.length} düşman` : 'Şimşek yağmuru! Yakında düşman yok'), 1.6);
+}
+function boltLight() { if (G.INV.eq !== 'bolt') return; LT.light = !LT.light; snd('zap', 1); G.showMsg('💡 ' + adT(LT.light ? 'Elde büyük ışık açık' : 'Işık kapalı'), 1.2); }
+function zapTick(dt) {   // sağ tık: elden şimşek, en yakın hedefe kilitlenir ve 2 düşmana sıçrar
+  const want = ltOn() && G.laserHeld && !G.dead;
+  if (want !== LT.zap) { LT.zap = want; const cr = document.getElementById('cross'); if (cr) { if (want) { LT.crossPrev = cr.style.display; cr.style.display = 'block'; } else cr.style.display = LT.crossPrev || 'none'; } }
+  if (!want) return;
+  G.camera.getWorldDirection(V2); const fa = Math.atan2(V2.x, V2.z); G.facing = fa; G.charHolder.rotation.y = fa;
+  LT.zapT -= dt; if (LT.zapT > 0) return; LT.zapT = .06;
+  const hs = hand(-1, new T.Vector3()), aim = aimPoint(60), P = G.player.position; let end = aim, tgt = null, bd = 3.5;
+  for (const o of targets()) { const d = Math.hypot(o.p.x - aim.x, o.p.y + o.h * .5 - aim.y, o.p.z - aim.z); if (d < bd + o.r) { bd = d; tgt = o; } }
+  if (tgt) end = new T.Vector3(tgt.p.x, tgt.p.y + tgt.h * .5, tgt.p.z);
+  addBolt(hs, end, { w: .06, life: .08, br: 2 }); burst(end, 6, 4, 0xbfe0ff, .25); snd('zap', .45);
+  LT.dmgT -= .06; if (LT.dmgT > 0) return; LT.dmgT = .12;
+  if (!tgt) { hurtAll(aim, 1.6, 8, 1.5); return; }
+  try { tgt.hit(10, new T.Vector3(end.x - P.x, 0, end.z - P.z).normalize(), 1.5); } catch (e) {}
+  let from = end; const used = new Set([tgt.id]);
+  for (let c = 0; c < 2; c++) { let nx = null, nd = 6; for (const o of targets()) { if (used.has(o.id)) continue; const d = Math.hypot(o.p.x - from.x, o.p.z - from.z); if (d < nd) { nd = d; nx = o; } } if (!nx) break; used.add(nx.id);
+    const e2 = new T.Vector3(nx.p.x, nx.p.y + nx.h * .5, nx.p.z); addBolt(from, e2, { w: .04, life: .1, br: 1 }); try { nx.hit(6, new T.Vector3(e2.x - from.x, 0, e2.z - from.z).normalize(), 1); } catch (e) {} from = e2; }
+}
+function ltDecor(dt, t) {   // bilekte hale, parlak şimşek gözler, etrafa mini şimşekler, elde ışık topu
+  const r = G.playerRig, on = ltOn() && !G.dead && r && r.stick && r.stick.visible !== false;
+  if (r && LT.rig !== r) { for (const o of [...LT.halos, ...LT.eyes]) if (o.parent) o.parent.remove(o); LT.halos = []; LT.eyes = []; LT.rig = null; }
+  if (on && !LT.rig) { LT.rig = r;
+    for (const arm of [r.armL, r.armR]) { const g = new T.Group(); g.position.set(0, -.27, 0); const t1 = new T.Mesh(new T.TorusGeometry(.085, .013, 6, 28), addMat(0xd6f0ff, .95)); t1.rotation.x = Math.PI / 2; const t2 = new T.Mesh(new T.TorusGeometry(.115, .006, 4, 28), addMat(0x6fb4ff, .75)); t2.rotation.x = Math.PI / 2;
+      const gl = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0x8fd0ff, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .7 })); gl.scale.setScalar(.42); g.add(t1, t2, gl); arm.el.add(g); LT.halos.push(g); }
+    for (const s of [1, -1]) { const m = new T.Group(), o = new T.Mesh(boltShape, new T.MeshBasicMaterial({ color: 0x14102a, side: T.DoubleSide })), f = new T.Mesh(boltShape, new T.MeshBasicMaterial({ color: 0xffc81a, side: T.DoubleSide, toneMapped: false }));
+      o.scale.setScalar(1.45); o.position.z = -.004; m.add(o, f); m.position.set(.066 * s, .04, .183); m.rotation.set(-.2, .4 * s, 0); m.scale.set(.1 * s, .1, .1);   // ⚡ parlak şimşek gözler (koyu kenarlı altın)
+      const gl = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffb000, transparent: true, depthWrite: false, opacity: .55 })); gl.scale.setScalar(.17); gl.position.set(.06 * s, .035, .172); r.head.add(m, gl); LT.eyes.push(m, gl); } }
+  for (const o of [...LT.halos, ...LT.eyes]) o.visible = !!on;
+  if (!LT.ball && G.HAND) { const b = new T.Group(); b.add(new T.Mesh(new T.SphereGeometry(.06, 12, 10), new T.MeshBasicMaterial({ color: 0xeef7ff, toneMapped: false }))); const gl = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0x9fd4ff, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .9 })); gl.scale.setScalar(.9); b.add(gl); b.position.set(0, .02, .08); G.HAND.add(b); LT.ball = b; }
+  if (LT.ball) { LT.ball.visible = !!on && LT.light; if (LT.ball.visible) LT.ball.children[1].scale.setScalar(.8 + Math.random() * .35); }
+  if (!on) return;
+  LT.halos.forEach((g, i) => { g.rotation.y += dt * (i ? 6 : -6); g.children[2].material.opacity = .45 + Math.random() * .45; g.children[1].scale.setScalar(1 + Math.sin(t * 9 + i) * .12); });
+  for (let i = 1; i < LT.eyes.length; i += 2) LT.eyes[i].material.opacity = .55 + Math.random() * .4;
+  LT.miniT -= dt; if (LT.miniT <= 0) { LT.miniT = R(.04, .12); const P = G.player.position, a = R(0, 6.28), rr = R(.25, .65), p = new T.Vector3(P.x + Math.cos(a) * rr, P.y + R(.15, 1.9), P.z + Math.sin(a) * rr);
+    addBolt(p, p.clone().add(V1.set(R(-.7, .7), R(-.6, .6), R(-.7, .7))), { w: .017, life: R(.07, .15), jit: 1.4 });
+    if (Math.random() < .35) { const hs = hand(Math.random() < .5 ? 1 : -1, new T.Vector3()); addBolt(hs, hs.clone().add(V1.set(R(-.5, .5), R(-.5, .3), R(-.5, .5))), { w: .01, life: .08, jit: 1.5 }); }
+    if (Math.random() < .25) { const b2 = R(0, 6.28), g0 = new T.Vector3(P.x + Math.cos(b2) * R(.4, 1.6), P.y + .03, P.z + Math.sin(b2) * R(.4, 1.6)); addBolt(g0, g0.clone().add(V1.set(R(-.9, .9), 0, R(-.9, .9))), { w: .014, life: .1, jit: 1.3 }); } }
+}
+function ltTick(dt, t) {
+  LT.cd = Math.max(0, LT.cd - dt); LT.cast = Math.max(0, LT.cast - dt);
+  for (let i = LT.pend.length - 1; i >= 0; i--) { const q = LT.pend[i]; q.t -= dt; if (q.t > 0) continue; LT.pend.splice(i, 1); const tg = q.id ? targets().find(o => o.id === q.id) : null; skyStrike(tg ? tg.p : q.p, tg ? tg.h : q.h, q.dmg, tg); }
+  try { zapTick(dt); } catch (e) {} ltDecor(dt, t); boltsTick(dt);
+}
+
 /* ---------- 🙌 el kol hareketleri ---------- */
 function pose(r, dt) {
+  if (r && ltOn() && (LT.zap || LT.cast > 0)) { const k = 1 - Math.exp(-14 * dt), S = (o, ax, v) => { o.rotation[ax] += (v - o.rotation[ax]) * k; };   // ⚡ şimşek: sağ kol ileri / iki kol göğe
+    if (LT.cast > 0) { for (const [a, s] of [[r.armL, 1], [r.armR, -1]]) { S(a.sh, 'x', -3); S(a.sh, 'z', .3 * s); S(a.el, 'x', -.1); } return; }
+    const ap = Math.max(-1, Math.min(1, G.pitch * .8 - .05)); S(r.armR.sh, 'x', -1.57 + ap); S(r.armR.sh, 'z', -.12); S(r.armR.el, 'x', -.05); return; }
   if (!r || (!CO.on && !CO.anim)) return; const k = 1 - Math.exp(-14 * dt), S = (o, ax, v) => { o.rotation[ax] += (v - o.rotation[ax]) * k; }, t = G.elapsed;
   if (CO.anim && CO.anim.type === 'in') { for (const [a, s] of [[r.armL, 1], [r.armR, -1]]) { S(a.sh, 'x', -1.25); S(a.sh, 'z', .3 * s); S(a.el, 'x', -1.1); } return; }
   if (CO.anim && CO.anim.type === 'out') { for (const [a, s] of [[r.armL, 1], [r.armR, -1]]) { S(a.sh, 'x', -.2); S(a.sh, 'z', 2.7 * s); S(a.el, 'x', -.2); } return; }
@@ -405,10 +501,13 @@ function late(dt) {
   if (CO.on && (G.INV.eq !== 'cosmic' || G.dead)) deactivate(false);
   const t = G.elapsed;
   if (dt) { animTick(dt); rushTick(dt, t); laserTick(dt, t); strikesTick(dt, t); shadowsTick(dt, t); swordTick(dt, t); fxTick(dt, t); ringsTick(dt); partsTick(dt); }
+  if (dt) try { ltTick(dt, t); } catch (e) {}
   shieldTick(dt, t); skyTick(dt); ui();
 }
 function prompt() { if (G.INV.eq !== 'cosmic' || CO.on || CO.anim || G.giant) return null; return [(G.touchMode ? '👆 ' : 'V — ') + '🔮 ' + adT('Küreyi kullan'), activate]; }
-function key(code) { if (!CO.on) return false; if (code === 'KeyK') { deactivate(true); return true; } if (code === 'KeyX') { strike(); return true; } if (code === 'KeyC') { shadowsKey(); return true; } if (code === 'KeyZ') { swordKey(); return true; }
+function key(code) {
+  if (ltOn()) { if (code === 'KeyX') { storm(); return true; } if (code === 'KeyK') { boltLight(); return true; } }   // ⚡ şimşek tuşları
+  if (!CO.on) return false; if (code === 'KeyK') { deactivate(true); return true; } if (code === 'KeyX') { strike(); return true; } if (code === 'KeyC') { shadowsKey(); return true; } if (code === 'KeyZ') { swordKey(); return true; }
   if (SW.list.length) { const m = /^(?:Digit|Numpad)([0-9])$/.exec(code); if (m) { const n = +m[1]; if (n) setCount(n); else swDismiss(); return true; } }   // 🗡️ 1-9 kaç kılıç · 0 kapat
   return false; }
 function toggle() { if (CO.on) deactivate(true); else activate(); }
@@ -423,7 +522,11 @@ $('cosSword').addEventListener('pointerdown', e => { e.stopPropagation(); swordK
 $('cosSwX').addEventListener('click', e => { e.stopPropagation(); swDismiss(); }); $('cosSwM').addEventListener('click', e => { e.stopPropagation(); mergeKey(); }); $('cosSwN').addEventListener('click', e => { e.stopPropagation(); $('cosSwNum').classList.toggle('open'); });   // ×N: rakam paneli aç/kapat
 for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $('cosSwNum').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 $('cosSwNum').addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-n]'); if (!b) return; setCount(+b.dataset.n); $('cosSwNum').classList.remove('open'); });
-function ui() { const p = $('cosPad'); p.style.display = CO.on && G.touchMode && !G.paused ? 'flex' : 'none'; if (!CO.on) return; $('cosStrike').classList.toggle('cd', CO.cd > 0); $('cosShadow').classList.toggle('on', SH.list.some(s => !s.dead && !s.recall)); const sw = SW.list.length > 0; p.classList.toggle('sw', sw); $('cosSword').classList.toggle('on', sw); $('cosSwM').classList.toggle('on', SW.giant); const nt = '×' + SW.n; if ($('cosSwN').textContent !== nt) { $('cosSwN').textContent = nt; for (const b of $('cosSwNum').children) b.classList.toggle('sel', +b.dataset.n === SW.n); } if (!sw) $('cosSwNum').classList.remove('open'); }
+document.head.insertAdjacentHTML('beforeend', `<style>#ltStorm{position:fixed;right:14px;top:calc(36% + env(safe-area-inset-top));z-index:7;display:none;width:62px;height:62px;border-radius:50%;border:2px solid rgba(190,225,255,.8);background:radial-gradient(circle,#3b8cff,#0b1f5c);color:#fff;font-size:28px;box-shadow:0 0 16px rgba(110,180,255,.8)}#ltStorm.cd{opacity:.45}</style>`);
+document.body.insertAdjacentHTML('beforeend', '<button id="ltStorm">⛈️</button>');
+for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $('ltStorm').addEventListener(ev, e => e.stopPropagation(), { passive: true });
+$('ltStorm').addEventListener('click', e => { e.stopPropagation(); storm(); });
+function ui() { const ls = $('ltStorm'), lv = ltOn() && G.touchMode && !G.paused; ls.style.display = lv ? 'block' : 'none'; if (lv) ls.classList.toggle('cd', LT.cd > 0); const p = $('cosPad'); p.style.display = CO.on && G.touchMode && !G.paused ? 'flex' : 'none'; if (!CO.on) return; $('cosStrike').classList.toggle('cd', CO.cd > 0); $('cosShadow').classList.toggle('on', SH.list.some(s => !s.dead && !s.recall)); const sw = SW.list.length > 0; p.classList.toggle('sw', sw); $('cosSword').classList.toggle('on', sw); $('cosSwM').classList.toggle('on', SW.giant); const nt = '×' + SW.n; if ($('cosSwN').textContent !== nt) { $('cosSwN').textContent = nt; for (const b of $('cosSwNum').children) b.classList.toggle('sel', +b.dataset.n === SW.n); } if (!sw) $('cosSwNum').classList.remove('open'); }
 
-window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey, mergeKey, setCount, swDismiss, swOn: () => CO.on && SW.list.length > 0, camK, lasing: () => !!CO.lasOn };
+window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey, mergeKey, setCount, swDismiss, swOn: () => CO.on && SW.list.length > 0, camK, lasing: () => !!CO.lasOn || LT.zap, boltPunch, boltLight, boltLightOn: () => LT.light && G.INV.eq === 'bolt', storm, LT };
 })(window.__sftG);

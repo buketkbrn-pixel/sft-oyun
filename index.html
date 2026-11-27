@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.34</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.35</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -3838,14 +3838,15 @@ function updateItems(dt, show, aiming) {
   const ph = slotHolders.umbrella[0].userData.ph, can = ph && ph.userData && ph.userData.canopy;
   if (can) { const k = 1 - Math.exp(-10 * dt), o = INV.umb ? 1 : 0; can.scale.x = can.scale.z = THREE.MathUtils.lerp(can.scale.x, .1 + .9 * o, k); can.scale.y = THREE.MathUtils.lerp(can.scale.y, 2.6 - 1.6 * o, k); can.position.y = .72 - .2 * (1 - o); }
   // el feneri
-  const tOn = show && id === 'torch' && INV.torch;
+  const tOn = show && id === 'torch' && INV.torch, bOn = !tOn && show && id === 'bolt' && window.__cos && __cos.boltLightOn();   // ⚡ elde büyük ışık
+  if (bOn) { HAND.getWorldPosition(TORCH.v); camera.getWorldDirection(TORCH.d); TORCH.d.y += .16; TORCH.d.normalize(); TORCH.light.position.copy(TORCH.v); TORCH.light.target.position.copy(TORCH.v).addScaledVector(TORCH.d, 10); TORCH.light.target.updateMatrixWorld(); }
   if (tOn) {
     const w = INV.holders.torch; w.updateMatrixWorld(true);
     w.localToWorld(TORCH.v.set(0, .24, 0)); TORCH.d.set(0, 1, 0).transformDirection(w.matrixWorld);
     TORCH.light.position.copy(TORCH.v); TORCH.light.target.position.copy(TORCH.v).addScaledVector(TORCH.d, 10); TORCH.light.target.updateMatrixWorld();
   }
   const tL = TORCH.long, L = TORCH.light;   // 🔦 normal: daha parlak · uzun mod: çok uzağa ve geniş aydınlatır
-  L.intensity = THREE.MathUtils.lerp(L.intensity, tOn ? (tL ? 230 : 115) : 0, 1 - Math.exp(-14 * dt)); L.distance = tL ? 160 : 60; L.angle = tL ? .64 : .42; L.penumbra = tL ? .38 : .5; L.decay = tL ? 1 : 1.25;
+  L.intensity = THREE.MathUtils.lerp(L.intensity, tOn ? (tL ? 230 : 115) : bOn ? 320 : 0, 1 - Math.exp(-14 * dt)); L.distance = bOn ? 170 : tL ? 160 : 60; L.angle = bOn ? .8 : tL ? .64 : .42; L.penumbra = bOn ? .45 : tL ? .38 : .5; L.decay = bOn || tL ? 1 : 1.25; L.color.setHex(bOn ? 0xd4e8ff : 0xfff1d6);
   L.visible = L.intensity > .3;
   const tDark = Math.max(DAY.N, inDungeon ? .8 : inAtl ? .45 : inHome || inHouse ? .25 : 0), bs = tL ? 1.75 : 1;
   TORCH.beam.visible = tOn && tDark > .05 && fpBlend < .5; TORCH.beam.material.opacity = (tL ? .2 : .22) * tDark; TORCH.beam.scale.set(bs, tL ? 3.4 : 1, bs);
@@ -3955,6 +3956,7 @@ ITEMS.push({ id: 'skate', name: 'Kaykay', icon: '🛹', kind: 'toggle', desc: 'B
   { id: 'guitar', name: 'Gitar', icon: '🎸', kind: 'play', desc: 'Çal: her basışta yeni akor' },
   { id: 'apple', name: 'Elma', icon: '🍎', kind: 'eat', desc: 'Ye: canın dolar' });
 ITEMS.splice(1, 0, { id: 'cosmic', name: 'Kozmik küre', icon: '🔮', kind: 'cosmic', desc: 'V: küre içine girer, can iki katı · mor lazer, 60 kol, X gökten saldırı, C 6 mor gölge, Z kılıç (1-9 kaç kılıç, nokta dev kılıç, 0 kapat) · K: küreyi çıkar' });   // 🔮 en başta
+ITEMS.splice(2, 0, { id: 'bolt', name: 'Şimşek', icon: '⚡', kind: 'bolt', desc: 'Vur: vurduğuna şimşek çakar · sağ tık: elinden şimşek (nişan kamerası, yakındakilere sıçrar) · X: yakındaki tüm düşmanlara şimşek · K: elde büyük ışık' });   // ⚡
 for (const it of ITEMS) ITEM_BY[it.id] = it;
 try { const s = localStorage.getItem('copAdamEsya'); if (s && ITEM_BY[s]) INV.eq = s; } catch (e) {}
 Object.assign(ITEM_BY.sword, { reach: 3.0, arc: 85 }); Object.assign(ITEM_BY.bat, { reach: 2.7, arc: 80 });   // daha geniş vuruş alanı
@@ -8883,7 +8885,7 @@ let started = false, lockWorked = false, lockFailed = false, mouseX = innerWidth
 const isLocked = () => document.pointerLockElement === canvas;
 
 function keyAction(code) {
-  if (window.__cos && __cos.on() && __cos.key(code)) return;   // 🔮 K: küreyi çıkar · X: gökten saldırı
+  if (window.__cos && __cos.key(code)) return;   // 🔮 K: küreyi çıkar · X: gökten saldırı · ⚡ şimşek: X yağmur, K ışık
   if (inDungeon && window.__dg && __dg.key(code)) return;   // 🗝️ zindan: F çakmak
   if (inAtl && window.__atl && __atl.key(code)) return;   // 🌊 Atlantis: Q dalış, E hızlı yüzme
   if (HR.on && hrKey(code)) return;   // 🖐️ el ragdoll
@@ -9009,7 +9011,7 @@ canvas.addEventListener('mousedown', e => {
   dragging = true;
   if (paused || CINE || DRESS.open || TET.open || !(isLocked() || lockFailed)) return;
   if (RACE_LOCK) { if (e.button === 0 && window.__race) __race.key('Mouse0'); return; }
-  if (e.button === 2) { if (HR.on) { hrRelease(true); return; } if (inRoyale) { BR.zoom = true; return; } if (!giant && INV.eq === 'superfight') { superDown('kick'); return; } if (!giant && ((INV.eq === 'robo' && ROBO.open) || (INV.eq === 'cosmic' && window.__cos && __cos.on()))) laserHeld = true; else grabReq = true; return; }
+  if (e.button === 2) { if (HR.on) { hrRelease(true); return; } if (inRoyale) { BR.zoom = true; return; } if (!giant && INV.eq === 'superfight') { superDown('kick'); return; } if (!giant && ((INV.eq === 'robo' && ROBO.open) || (INV.eq === 'cosmic' && window.__cos && __cos.on()) || INV.eq === 'bolt')) laserHeld = true; else grabReq = true; return; }
   if (e.button === 1 && !giant && INV.eq === 'superfight') { e.preventDefault(); superDown('hado'); return; }   // sağ tık: robot kollarla lazer / (devken) al-bırak
   if (e.button !== 0) return;
   if (giant) { leftReq = true; return; }                    // devken sol tık: yere vur / fırlat
@@ -9356,7 +9358,7 @@ for (const b of document.querySelectorAll('#touchUI .tb:not(.jstick)')) {
     if (key) { keys[key] = true; keyAction(key); }
     if (tap) keyAction(tap);
     if (act === 'act') { if (giant) leftReq = true; else if (gunMode) mouseHeld = true; else punchReq = true; }
-    if (act === 'arms') { if (INV.eq === 'speaker') spkPlaceToggle(); else if (INV.eq === 'torch') torchMode(); else if (INV.eq === 'cosmic' && window.__cos) __cos.toggle(); else toggleRobo(); }
+    if (act === 'arms') { if (INV.eq === 'speaker') spkPlaceToggle(); else if (INV.eq === 'torch') torchMode(); else if (INV.eq === 'cosmic' && window.__cos) __cos.toggle(); else if (INV.eq === 'bolt' && window.__cos) __cos.boltLight(); else toggleRobo(); }
     if (act === 'run') setRunToggle(!runToggle);
     if (act === 'kick') superDown('kick');
     if (act === 'hado') superDown('hado');
@@ -9445,7 +9447,7 @@ function equip(id) {
   if (id !== 'torch') INV.torch = false;
   if (id !== 'umbrella') INV.umb = false;
   INV.skate = id === 'skate'; if (id === 'robo') ROBO.open = true;
-  $('mode').textContent = `${it.icon} ${it.name}` + (gunMode ? ' — mermi ∞' : '') + (touchMode ? '' : id === 'superfight' ? '  ·  sol tık: vuruş · sağ tık: tekme · G: enerji topu · R: güç alanı' : id === 'robo' ? '  ·  K: kollar · sağ tık: lazer' : id === 'speaker' ? '  ·  K: koy / al' : '  ·  I: envanter');
+  $('mode').textContent = `${it.icon} ${it.name}` + (gunMode ? ' — mermi ∞' : '') + (touchMode ? '' : id === 'superfight' ? '  ·  sol tık: vuruş · sağ tık: tekme · G: enerji topu · R: güç alanı' : id === 'bolt' ? '  ·  sol tık: şimşekli vuruş · sağ tık: elden şimşek · X: şimşek yağmuru · K: büyük ışık' : id === 'robo' ? '  ·  K: kollar · sağ tık: lazer' : id === 'speaker' ? '  ·  K: koy / al' : '  ·  I: envanter');
   $('cross').style.display = gunMode ? 'block' : 'none';
   try { localStorage.setItem('copAdamEsya', id); } catch (e) {}
   touchUIState = '';
@@ -9506,12 +9508,12 @@ let touchUIState = '';
 function updateTouchUI(flying) {
   const hh = inHome ? homeH() : null, teaOk = (!!sitting && teaReady()) || !!hh, invOk = inviteAvailable() || (inHome && ['off', 'sit', 'walk'].includes(HGUEST.state));
   const tvOk = inHome && homeFloor(player.position.y) === 0 && !TET.open;
-  const st = [giant, flying, boostMode, gunMode, INV.eq, ROBO.open, ROBO.ultra, HERO.on, SPK.placed, !!carried, teaOk, invOk, runToggle, walkSquash, hh && hh[0], HGUEST.state, tvOk, TET.open, GT.near, !!GT.obj, !!ROBO.volt, !!ROBO.titan, !!ROBO.ultra, ROBO.open, TORCH.long, !!(window.__cos && __cos.on())].join();
+  const st = [giant, flying, boostMode, gunMode, INV.eq, ROBO.open, ROBO.ultra, HERO.on, SPK.placed, !!carried, teaOk, invOk, runToggle, walkSquash, hh && hh[0], HGUEST.state, tvOk, TET.open, GT.near, !!GT.obj, !!ROBO.volt, !!ROBO.titan, !!ROBO.ultra, ROBO.open, TORCH.long, !!(window.__cos && __cos.on()), !!(window.__cos && __cos.boltLightOn())].join();
   if (st === touchUIState) return;
   touchUIState = st;
   const show = (id, on) => $(id).classList.toggle('hide', !on);
   for (const id of ['tbJump', 'tbFly', 'tbSlide', 'tbRun', 'tbShield']) show(id, !giant);
-  show('tbMode', !giant && (INV.eq === 'robo' || INV.eq === 'speaker' || INV.eq === 'torch' || INV.eq === 'cosmic'));
+  show('tbMode', !giant && (INV.eq === 'robo' || INV.eq === 'speaker' || INV.eq === 'torch' || INV.eq === 'cosmic' || INV.eq === 'bolt'));
   show('tbUltra', false); show('tbVolt', false); { const rm = !giant && !HERO.on && INV.eq === 'robo'; show('tbModes', rm); $('tbModes').classList.toggle('on', !!(ROBO.ultra || ROBO.volt || ROBO.titan) && ROBO.open); if (!rm) rmClose(); } $('tbUltra').classList.toggle('on', ROBO.ultra && ROBO.open);
   show('tbBoost', flying && !boostMode); show('tbGrab', giant || GT.near || !!GT.obj); show('tbTea', teaOk); show('tbInvite', invOk);
   show('tbStomp', giant); show('tbWalkSq', giant); show('tbLie', giant); $('tbWalkSq').classList.toggle('on', walkSquash);
@@ -9519,8 +9521,8 @@ function updateTouchUI(flying) {
   $('tbTea').innerHTML = hh ? (hh[0] === 'Ye' ? '🍽️' : hh[0].startsWith('Çay') ? '☕' : hh[0].includes('TV') || hh[0].includes('video') ? '📺' : '🎮') + '<small>' + hh[0].split(' ')[0] + '</small>' : '☕<small>Çay iç</small>';
   $('tbInvite').innerHTML = inHome ? (HGUEST.state === 'off' ? '📞<small>Davet</small>' : '👋<small>Uğurla</small>') : '📞<small>Davet</small>';
   $('tbAct').firstChild.textContent = giant ? '💥' : INV.eq === 'robo' && ROBO.open ? '🦾' : INV.eq === 'superfight' ? '👊' : curItem().icon;
-  $('tbMode').innerHTML = INV.eq === 'speaker' ? (SPK.placed ? '✋<small>Al</small>' : '📦<small>Koy</small>') : INV.eq === 'torch' ? (TORCH.long ? '🔦<small>Uzun</small>' : '🔦<small>Normal</small>') : INV.eq === 'cosmic' ? (window.__cos && __cos.on() ? '🔮<small>Kapat</small>' : '🔮<small>Kullan</small>') : ROBO.open ? '🦾<small>Kapat</small>' : '🦾<small>Kollar</small>'; $('tbMode').classList.toggle('on', (INV.eq === 'robo' && ROBO.open) || (INV.eq === 'torch' && TORCH.long));
-  document.body.classList.toggle('robosplit', ((INV.eq === 'robo' && ROBO.open) || (INV.eq === 'cosmic' && window.__cos && __cos.on())) && !giant);
+  $('tbMode').innerHTML = INV.eq === 'bolt' ? (window.__cos && __cos.boltLightOn() ? '💡<small>Açık</small>' : '💡<small>Işık</small>') : INV.eq === 'speaker' ? (SPK.placed ? '✋<small>Al</small>' : '📦<small>Koy</small>') : INV.eq === 'torch' ? (TORCH.long ? '🔦<small>Uzun</small>' : '🔦<small>Normal</small>') : INV.eq === 'cosmic' ? (window.__cos && __cos.on() ? '🔮<small>Kapat</small>' : '🔮<small>Kullan</small>') : ROBO.open ? '🦾<small>Kapat</small>' : '🦾<small>Kollar</small>'; $('tbMode').classList.toggle('on', (INV.eq === 'robo' && ROBO.open) || (INV.eq === 'torch' && TORCH.long));
+  document.body.classList.toggle('robosplit', ((INV.eq === 'robo' && ROBO.open) || (INV.eq === 'cosmic' && window.__cos && __cos.on()) || INV.eq === 'bolt') && !giant);
   document.body.classList.toggle('supersplit', INV.eq === 'superfight' && !giant);
   { const b = $('tbShield'); if (b) b.firstChild.textContent = INV.eq === 'superfight' ? '💠' : '🛡️'; const sm = b && b.querySelector('small'); if (sm) sm.textContent = INV.eq === 'superfight' ? 'Alan' : 'Kalkan'; }
   $('tbFly').firstChild.textContent = boostMode ? '🛑' : '🕊️'; $('tbFly').lastChild.textContent = boostMode ? 'İn' : 'Uç';
@@ -10155,6 +10157,7 @@ function cosTargets() {   // 🔮 kozmik mod: her bölgeden vurulabilir düşman
 }
 function doPunchHit(dir) {
   if (window.__cos && __cos.on()) { __cos.punch(dir); return; }   // 🔮 kozmik yumruk
+  if (INV.eq === 'bolt' && window.__cos) try { __cos.boltPunch(dir); } catch (e) {}   // ⚡ vurduğuna şimşek çakar
   if (inMaker && window.__mk) __mk.punch(dir);   // 🗺️ haritadaki canavarlar / NPC'ler
   if (inDungeon && window.__dg) { __dg.attack(dir); return; }   // 🗝️ zindan iskeletleri
   if (inSpace && window.__spc) { __spc.attack(dir); return; }   // 🌌 mikroplar, kozmik yaratıklar
