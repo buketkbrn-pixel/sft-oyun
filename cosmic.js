@@ -5,6 +5,7 @@
    X (telefonda ☄️): baktığın yere gökten lazer → yıldırım → düşen kozmik göktaşı. Gökyüzü uzay gibi olur. K: küre çıkar, uzaya uçar, boş ele dönersin.
    Küre içindeyken can iki katı. C (👥): içinden 6 mor gölge çıkar, uçarak düşmanlara çoklu yumruk atar, vurdukları canın yarısı sana geçer, ölene kadar dövüşür.
    Z (🗡️): kozmik kılıç çağır · tek basış uzun savurma · art arda basış: kılıç kare kare konumlara ışınlanıp keser (akıcı animasyon yok).
+   Kılıç açıkken 1-9: kaç kılıç (her biri kendi yönünde saldırır) · nokta (.): hepsi birleşip ilk kılıcın yerinde dev parlak kılıç olur (aynı kontroller; X gökten saldırı yakındaki düşmanlara da düşer) · 0: kılıçları kapat.
    index.html bunu yükler; oyunun değişkenlerine window.__sftG (G) ile erişir. Tasarımlar bu oyuna özgüdür. */
 (function (G) {
 'use strict';
@@ -186,17 +187,22 @@ function laserTick(dt, t) {
 
 /* ---------- ☄️ gökten lazer → yıldırım → göktaşı ---------- */
 function strike() {
-  if (!CO.on || CO.cd > 0 || CO.anim) return; CO.cd = 2.6; const p = aimPoint(120); CO.castT = 1;
+  if (!CO.on || CO.cd > 0 || CO.anim) return; CO.cd = 2.6; const p = aimPoint(120); CO.castT = 1; strikeAt(p);
+  if (SW.giant) { const P = G.player.position, TL = targets().map(o => [o, Math.hypot(o.p.x - P.x, o.p.z - P.z)]).filter(x => x[1] < 35 && Math.hypot(x[0].p.x - p.x, x[0].p.z - p.z) > 4).sort((a, b) => a[1] - b[1]).slice(0, 6);   // ⚔️ dev kılıç: yakındaki düşmanlara da düşer
+    TL.forEach((x, k) => strikeAt(new T.Vector3(x[0].p.x, x[0].p.y, x[0].p.z), .1 + k * .1)); }
+  snd('skylaser'); G.play('magic');
+}
+function strikeAt(p, delay = 0) {
   const col = new T.Mesh(new T.CylinderGeometry(1.4, 1.4, 120, 16, 1, true).translate(0, 60, 0), addMat(PURPLE, .55)), core = new T.Mesh(new T.CylinderGeometry(.35, .35, 120, 10, 1, true).translate(0, 60, 0), addMat(0xffffff, .9));
   for (const m of [col, core]) { m.position.copy(p); m.frustumCulled = false; G.scene.add(m); }
-  CO.strikes.push({ p: p.clone(), t: 0, col, core, bolt: null, met: null, done: [] }); snd('skylaser'); G.play('magic');
+  CO.strikes.push({ p: p.clone(), t: -delay, col, core, bolt: null, met: null, done: [] }); if (delay) col.visible = core.visible = false;
 }
 function boltMesh(p) { const pts = [], n = 16; let x = p.x + R(-3, 3), z = p.z + R(-3, 3); for (let k = 0; k <= n; k++) { const y = p.y + 70 * (1 - k / n); pts.push(new T.Vector3(x, y, z)); x += (p.x - x) / (n - k + 1) + R(-1.4, 1.4); z += (p.z - z) / (n - k + 1) + R(-1.4, 1.4); } pts[n].copy(p);
   const g = new T.Group(); for (let k = 0; k < n; k++) { const a = pts[k], b = pts[k + 1]; V1.subVectors(b, a); const L = V1.length(); const m = new T.Mesh(new T.CylinderGeometry(.12, .12, 1, 5, 1, true).translate(0, .5, 0), addMat(0xf3e0ff, 1)); m.position.copy(a); m.quaternion.setFromUnitVectors(UP, V1.normalize()); m.scale.y = L; g.add(m); const m2 = new T.Mesh(m.geometry, addMat(PURPLE, .5)); m2.position.copy(m.position); m2.quaternion.copy(m.quaternion); m2.scale.set(4, L, 4); g.add(m2); }
   g.traverse(o => o.frustumCulled = false); G.scene.add(g); return g; }
 function strikesTick(dt, t) {
   CO.cd = Math.max(0, CO.cd - dt); CO.castT = Math.max(0, (CO.castT || 0) - dt);
-  for (let i = CO.strikes.length - 1; i >= 0; i--) { const S = CO.strikes[i]; S.t += dt; const p = S.p;
+  for (let i = CO.strikes.length - 1; i >= 0; i--) { const S = CO.strikes[i]; S.t += dt; const p = S.p; if (S.t < 0) continue; if (S.col && !S.col.visible) { S.col.visible = S.core.visible = true; snd('skylaser', .5); }
     if (S.col) { const k = Math.min(1, S.t / .2), w = S.t < .7 ? k * (1 + Math.sin(t * 50) * .1) : Math.max(0, 1 - (S.t - .7) / .25); S.col.scale.set(w, 1, w); S.core.scale.set(w, 1, w); if (S.t < .7) { if (Math.random() < .8) emit(p.x + R(-1.5, 1.5), p.y + R(0, 30), p.z + R(-1.5, 1.5), 0, -R(5, 15), 0, .5, PURPLE); if ((S.tk = (S.tk || 0) - dt) <= 0) { S.tk = .12; hurtAll(p, 3.5, 9, 1, .2); } } if (S.t > .95) { G.scene.remove(S.col); G.scene.remove(S.core); S.col = null; } }
     if (S.t > .7 && !S.done.includes('bolt')) { S.done.push('bolt'); S.bolt = boltMesh(p); G.play('thunder', { gain: .9 }); G.shake = Math.max(G.shake, .5); burst(p, 60, 8, 0xf3e0ff, .7); hurtAll(p, 4.5, 60, 10, .5); ring(V1.copy(p).setY(p.y + .3), 7, 0xf3e0ff); }
     if (S.bolt && S.t > 1.05) { G.scene.remove(S.bolt); S.bolt = null; }
@@ -273,50 +279,107 @@ function shadowsTick(dt, t) {
   }
 }
 
-/* ---------- 🗡️ kozmik kılıç: tek basış uzun savurma · art arda basış kare kare ışınlanarak kesme ---------- */
-const SW = { g: null, mode: 'idle', t: 0, last: -9, hold: 0, ghosts: [], slashes: [] };
-function swordMesh(ghost) {
-  const g = new T.Group(), bl = new T.Shape(); bl.moveTo(0, 0); bl.lineTo(.13, .2); bl.lineTo(.1, 2.5); bl.lineTo(0, 2.95); bl.lineTo(-.1, 2.5); bl.lineTo(-.13, .2); bl.lineTo(0, 0);
-  const bladeM = ghost ? addMat(0xc084ff, .5) : new T.MeshStandardMaterial({ color: 0xc9a6ff, emissive: 0x8a4dff, emissiveIntensity: 1.4, metalness: .6, roughness: .2 });
-  const blade = new T.Mesh(new T.ExtrudeGeometry(bl, { depth: .05, bevelEnabled: true, bevelSize: .02, bevelThickness: .02, bevelSegments: 1 }).translate(0, .25, -.025), bladeM); g.add(blade);
-  const core = new T.Mesh(new T.BoxGeometry(.03, 2.5, .09).translate(0, 1.55, 0), addMat(0xffffff, ghost ? .4 : .9)); g.add(core);
-  const gm = ghost ? addMat(0xff8af0, .5) : new T.MeshStandardMaterial({ color: 0xffd36a, metalness: .9, roughness: .25, emissive: 0x5a2a00 });
-  g.add(new T.Mesh(new T.BoxGeometry(.7, .09, .14).translate(0, .22, 0), gm)); g.add(new T.Mesh(new T.CylinderGeometry(.045, .05, .36, 8).translate(0, .02, 0), ghost ? gm : new T.MeshStandardMaterial({ color: 0x2a1650, roughness: .6 })));
-  const pm = new T.Mesh(new T.OctahedronGeometry(.08, 0).translate(0, -.2, 0), ghost ? gm : new T.MeshBasicMaterial({ color: 0xff8af0, toneMapped: false })); g.add(pm);
-  if (!ghost) { const gl = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xb070ff, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .55 })); gl.scale.set(1.3, 3.6, 1); gl.position.y = 1.5; g.add(gl); }
-  g.scale.setScalar(1.25); g.traverse(o => o.frustumCulled = false); return g;
+/* ---------- 🗡️ kozmik kılıçlar: Z çağır · tek basış savurma · art arda kare kare · 1-9 kaç kılıç · . birleşip dev kılıç · 0 kapat ---------- */
+const SW = { list: [], n: 1, giant: false, merging: 0, last: -9, hs: -9, ghosts: [], slashes: [] }, BIG = 4;
+let SWG = null;
+function swGeo() { if (SWG) return SWG; const bl = new T.Shape(); bl.moveTo(0, 0); bl.lineTo(.13, .2); bl.lineTo(.1, 2.5); bl.lineTo(0, 2.95); bl.lineTo(-.1, 2.5); bl.lineTo(-.13, .2); bl.lineTo(0, 0);
+  return SWG = { blade: new T.ExtrudeGeometry(bl, { depth: .05, bevelEnabled: true, bevelSize: .02, bevelThickness: .02, bevelSegments: 1 }).translate(0, .25, -.025), core: new T.BoxGeometry(.03, 2.5, .09).translate(0, 1.55, 0), guard: new T.BoxGeometry(.7, .09, .14).translate(0, .22, 0), grip: new T.CylinderGeometry(.045, .05, .36, 8).translate(0, .02, 0), pom: new T.OctahedronGeometry(.08, 0).translate(0, -.2, 0),
+    sl1: new T.CylinderGeometry(.05, .05, 3.6, 6), sl2: new T.CylinderGeometry(.22, .22, 3.6, 8),
+    bladeM: new T.MeshStandardMaterial({ color: 0xc9a6ff, emissive: 0x8a4dff, emissiveIntensity: 1.4, metalness: .6, roughness: .2 }), coreM: addMat(0xffffff, .9), guardM: new T.MeshStandardMaterial({ color: 0xffd36a, metalness: .9, roughness: .25, emissive: 0x5a2a00 }), gripM: new T.MeshStandardMaterial({ color: 0x2a1650, roughness: .6 }), pomM: new T.MeshBasicMaterial({ color: 0xff8af0, toneMapped: false }) }; }
+function swordMesh(kind) {   // 0 normal · 1 hayalet iz · 2 dev parlak kılıç
+  const Z = swGeo(), g = new T.Group(), gh = kind === 1, bm = gh ? addMat(0xc084ff, .5) : Z.bladeM, cm = gh ? addMat(0xffffff, .4) : Z.coreM, gm = gh ? addMat(0xff8af0, .5) : Z.guardM;
+  g.add(new T.Mesh(Z.blade, bm), new T.Mesh(Z.core, cm), new T.Mesh(Z.guard, gm), new T.Mesh(Z.grip, gh ? gm : Z.gripM), new T.Mesh(Z.pom, gh ? gm : Z.pomM));
+  if (!gh) { const gl = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xb070ff, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: kind === 2 ? .85 : .55 })); gl.scale.set(1.3, 3.6, 1); gl.position.y = 1.5; g.add(gl); }
+  if (kind === 2) { const h1 = new T.Mesh(Z.blade, addMat(0xd9a8ff, .32)); h1.scale.set(2.2, 1.04, 4); g.add(h1); const h2 = new T.Mesh(Z.blade, addMat(PINK, .16)); h2.scale.set(3.8, 1.08, 7); g.add(h2);
+    for (const y of [.7, 1.7, 2.7]) { const s = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffd6ff, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .65 })); s.scale.setScalar(1.5); s.position.y = y; g.add(s); } }
+  g.traverse(o => o.frustumCulled = false); return g;
+}
+const swScale = s => s.big ? 1.25 * BIG : 1.25, swLen = s => 2.95 * swScale(s) + .3;
+function swDir(s) { const N = SW.list.length; return s.big || N <= 1 ? G.facing : G.facing + s.i * Math.PI * 2 / N; }   // her kılıç kendi yönünde
+function idlePos(s, out) {
+  const P = G.player.position, f = G.facing, sf = Math.sin(f), cf = Math.cos(f), t = G.elapsed;
+  if (s.big) return out.set(P.x - cf * 3.6 + sf * 1.2, P.y + 1.7 + Math.sin(t * 1.6) * .15, P.z + sf * 3.6 + cf * 1.2);   // sağda, biraz önde: kamera görsün
+  const k = s.i >> 1, sd = s.i & 1 ? -1 : 1, rx = sd * (.95 + k * .55), bk = .35 + k * .12;   // kanat gibi: sağ omuz, sol omuz, sonra dışa ve yukarı doğru
+  return out.set(P.x - cf * rx - sf * bk, P.y + 1.45 + k * .42 + Math.sin(t * 2 + s.i) * .08, P.z + sf * rx - cf * bk);
+}
+function idleQuat(s, pos, q) { const P = G.player.position; V2.set(pos.x - P.x, 0, pos.z - P.z); const L = V2.length() || 1; V2.multiplyScalar((s.big ? .3 : .3 + (s.i >> 1) * .14) / L); V2.y = 1; if (s.big) { V2.x += Math.sin(G.facing) * .45; V2.z += Math.cos(G.facing) * .45; } return q.setFromUnitVectors(UP, V2.normalize()); }
+let camAdd = 0; function camK(dt) { camAdd += ((SW.giant && CO.on ? 5.5 : 0) - camAdd) * Math.min(1, (dt || .016) * 3); return camAdd; }   // dev kılıç varken kamera biraz geri çekilir
+function newSword(i, from, big) { const s = { g: swordMesh(big ? 2 : 0), i, big: !!big, mode: 'idle', t: 0, hit: false, hold: 0, born: 0 }; s.g.scale.setScalar(.01); if (from) s.g.position.copy(from); else idlePos(s, s.g.position); idleQuat(s, s.g.position, s.g.quaternion); G.scene.add(s.g); return s; }
+function dropSword(s) { burst(s.g.position, s.big ? 120 : 24, s.big ? 9 : 4, PURPLE, .6); G.scene.remove(s.g); }
+function swHelp(n) { return G.touchMode ? `Kozmik kılıç ×${n}! 🗡️ tek: savur · art arda: kare kare · 🔢 kaç kılıç · ⭐ dev kılıç · ✖ kapat` : `Kozmik kılıç ×${n}! Z: savur · art arda Z: kare kare · 1-9: kaç kılıç · nokta (.): birleşip dev kılıç · 0: kapat`; }
+function summon() { SW.giant = false; SW.merging = 0; for (let i = 0; i < SW.n; i++) SW.list.push(newSword(i)); for (const s of SW.list) burst(s.g.position, 30, 5, PURPLE, .6); snd('in', .5); G.showMsg('🗡️ ' + adT(swHelp(SW.n)), 3); }
+function swDismiss(quiet) { for (const s of SW.list) dropSword(s); SW.list = []; SW.giant = false; SW.merging = 0; if (!quiet) { snd('out', .35); G.showMsg('🗡️ ' + adT('Kılıçlar kapandı'), 1.2); } }
+function setCount(n) {
+  SW.n = n; if (SW.giant || SW.merging) { split(); return; }
+  if (!SW.list.length) { summon(); return; }
+  const from = SW.list[0].g.position.clone();
+  while (SW.list.length < n) { const s = newSword(SW.list.length, from); burst(from, 14, 4, PINK, .5); SW.list.push(s); }
+  while (SW.list.length > n) dropSword(SW.list.pop());
+  SW.list.forEach((s, i) => s.i = i); snd('tap'); G.showMsg('🗡️ ×' + n, 1);
+}
+function mergeKey() {
+  if (!CO.on) return; if (!SW.list.length) summon();
+  if (SW.giant) { split(); return; } if (SW.merging) return;
+  if (SW.list.length === 1) { finishMerge(); return; }
+  SW.merging = .5; for (const s of SW.list) s.mode = 'merge'; snd('in', .6); G.showMsg('✨ ' + adT('Kılıçlar birleşiyor…'), 1);
+}
+function finishMerge() {
+  const at = SW.list[0].g.position.clone(); for (const s of SW.list) G.scene.remove(s.g);
+  const b = newSword(0, at, true); b.born = .15; SW.list = [b]; SW.giant = true; SW.merging = 0;
+  burst(at, 200, 12, PURPLE, 1); burst(at, 80, 8, 0xffffff, .7); ring(V1.copy(at), 8, PINK); ring(V1.copy(at).setY(at.y + 2), 5, 0xffffff); snd('burst'); G.shake = Math.max(G.shake, .6);
+  G.showMsg('⚔️ ' + adT(G.touchMode ? 'Dev kozmik kılıç! Aynı kontroller · ☄️ gökten saldırı artık yakındaki düşmanlara da düşer · ⭐ ayır' : 'Dev kozmik kılıç! Aynı kontroller · X gökten saldırı artık yakındaki düşmanlara da düşer · nokta (.): ayır'), 3.2);
+}
+function split() {
+  const at = SW.list.length ? SW.list[0].g.position.clone() : idlePos({ i: 0 }, new T.Vector3()); for (const s of SW.list) G.scene.remove(s.g);
+  SW.list = []; SW.giant = false; SW.merging = 0; for (let i = 0; i < SW.n; i++) SW.list.push(newSword(i, at));
+  burst(at, 90, 9, PURPLE, .8); ring(V1.copy(at), 5, PINK); snd('out', .5); G.showMsg('🗡️ ' + adT('Dev kılıç ayrıldı') + ' ×' + SW.n, 1.4);
 }
 function swordKey() {
-  if (!SW.g) { SW.g = swordMesh(false); G.scene.add(SW.g); swordIdlePos(SW.g.position); burst(SW.g.position, 50, 5, PURPLE, .7); snd('in', .5); G.showMsg('🗡️ ' + adT(G.touchMode ? 'Kozmik kılıç! 🗡️ tek: savur · art arda: kare kare kes' : 'Kozmik kılıç! Z tek basış: uzun savurma · art arda Z: kare kare kes'), 2.6); return; }
-  const now = G.elapsed; if (now - SW.last < .45) snap(); else swing(); SW.last = now;
+  if (!SW.list.length) { summon(); return; } if (SW.merging) return;
+  const now = G.elapsed; if (now - SW.last < .45) snapAll(); else swingAll(); SW.last = now;
 }
-function swordIdlePos(out) { const P = G.player.position, f = G.facing; return out.set(P.x + Math.cos(f) * -.95 - Math.sin(f) * .35, P.y + 1.55 + Math.sin(G.elapsed * 2) * .08, P.z - Math.sin(f) * -.95 - Math.cos(f) * .35); }
-function swing() { SW.mode = 'swing'; SW.t = 0; SW.hit = false; snd('out', .35); }
-function nearestTarget(maxD) { const P = G.player.position; let b = null, bd = maxD; for (const o of targets()) { const d = Math.hypot(o.p.x - P.x, o.p.z - P.z); if (d < bd) { bd = d; b = o; } } return b; }
-function snap() {   // ✨ kare kare: kılıç aniden yeni bir konuma geçer ve keser (arada animasyon yok)
-  const P = G.player.position, tg = nearestTarget(10), c = tg ? new T.Vector3(tg.p.x, tg.p.y + tg.h * .5, tg.p.z) : new T.Vector3(P.x + Math.sin(G.facing) * 3, P.y + 1.2, P.z + Math.cos(G.facing) * 3);
-  ghostAt(SW.g);
-  const a = R(0, Math.PI * 2), el = R(-.6, .9), d = (tg ? tg.r : .5) + 1.5, pos = V1.set(c.x + Math.cos(a) * Math.cos(el) * d, c.y + Math.sin(el) * d, c.z + Math.sin(a) * Math.cos(el) * d);
-  SW.g.position.copy(pos); V2.subVectors(c, pos).normalize(); SW.g.quaternion.setFromUnitVectors(UP, V2); SW.g.rotateY(R(0, Math.PI));
-  SW.mode = 'snap'; SW.hold = .55;
-  const sl = new T.Mesh(new T.CylinderGeometry(.05, .05, 3.6, 6), addMat(0xffffff, 1)), sl2 = new T.Mesh(new T.CylinderGeometry(.22, .22, 3.6, 8), addMat(PINK, .55)); V3.set(R(-1, 1), R(-1, 1), R(-1, 1)).normalize(); for (const m of [sl, sl2]) { m.position.copy(c); m.quaternion.setFromUnitVectors(UP, V3); m.frustumCulled = false; G.scene.add(m); } SW.slashes.push({ ms: [sl, sl2], t: 0 });
-  if (tg) { try { tg.hit(26, V2.clone().setY(0).normalize(), 4); } catch (e) {} } hurtAll(c, 1.3, 10, 2);
-  burst(c, 26, 6, Math.random() < .5 ? PURPLE : 0xffffff, .4); snd('tap'); snd('skylaser', .25); G.shake = Math.max(G.shake, .12);
+function swingAll() { const N = SW.list.length; for (const s of SW.list) { s.mode = 'swing'; s.t = -s.i * .03; s.hit = false; s.w = s.big || N <= 1 ? 1.95 : Math.max(.55, Math.PI / N + .2); } snd('out', SW.giant ? .6 : .35); }
+function swingTick(s, dt, P) {
+  s.t += dt; if (s.t < 0) { idleFollow(s, dt); return; }
+  const dur = s.big ? .6 : .42, k = Math.min(1, s.t / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2, a0 = swDir(s), a = a0 - s.w + e * 2 * s.w, rad = s.big ? 2.6 : 2.1, L = swLen(s);
+  s.g.position.set(P.x + Math.sin(a) * rad, P.y + (s.big ? 1.1 : 1.25) - (k - .5) * .5, P.z + Math.cos(a) * rad); V2.set(Math.sin(a), s.big ? .2 : .12, Math.cos(a)).normalize(); s.g.quaternion.setFromUnitVectors(UP, V2);
+  for (let j = 0; j < (s.big ? 12 : 4); j++) { const s2 = R(.8, L); emit(P.x + Math.sin(a) * s2, s.g.position.y + R(-.15, .15) + V2.y * s2, P.z + Math.cos(a) * s2, 0, R(0, .5), 0, s.big ? .5 : .35, j % 2 ? PURPLE : 0xffffff); }
+  if (!s.hit && k > .45) { s.hit = true; let n = 0;
+    for (const o of targets()) { const dx = o.p.x - P.x, dz = o.p.z - P.z, d = Math.hypot(dx, dz); if (d > rad + L - .3 + o.r) continue; const ang = Math.abs(G.wrapAng(Math.atan2(dx, dz) - a0)); if (ang > s.w + .15 && d > 1.2) continue; try { o.hit(s.big ? 120 : 55, new T.Vector3(dx, .4, dz).normalize(), s.big ? 30 : 16); } catch (e) {} n++; }
+    if (G.elapsed - SW.hs > .06) { SW.hs = G.elapsed; snd('punch', n ? 1 : .5); } if (n) G.shake = Math.max(G.shake, s.big ? .7 : .35); if (s.i === 0) ring(V1.set(P.x, P.y + 1.25, P.z), s.big ? 14 : 5, PURPLE); if (s.big) burst(V1.set(P.x + Math.sin(a0) * 9, P.y + 1.2, P.z + Math.cos(a0) * 9), 80, 10, PINK, .6); }
+  if (k >= 1) s.mode = 'idle';
 }
-function ghostAt(src) { let gh = SW.ghosts.find(x => x.t >= .3); if (!gh) { if (SW.ghosts.length < 8) { gh = { g: swordMesh(true), t: 1 }; G.scene.add(gh.g); SW.ghosts.push(gh); } else gh = SW.ghosts[0]; } gh.g.position.copy(src.position); gh.g.quaternion.copy(src.quaternion); gh.g.visible = true; gh.t = 0; }
+function snapAll() {   // ✨ kare kare: her kılıç aniden kendi hedefinin yanına geçip keser (arada animasyon yok)
+  const P = G.player.position, TL = targets().map(o => [o, Math.hypot(o.p.x - P.x, o.p.z - P.z)]).filter(x => x[1] < (SW.giant ? 22 : 12)).sort((a, b) => a[1] - b[1]).map(x => x[0]);
+  for (const s of SW.list) snapOne(s, TL.length ? TL[s.i % TL.length] : null);
+  snd('tap'); snd('skylaser', SW.giant ? .45 : .25); G.shake = Math.max(G.shake, SW.giant ? .45 : .12);
+}
+function snapOne(s, tg) {
+  const P = G.player.position, a0 = swDir(s), far = s.big ? 8 : 3.2, c = tg ? new T.Vector3(tg.p.x, tg.p.y + tg.h * .5, tg.p.z) : new T.Vector3(P.x + Math.sin(a0) * far, P.y + 1.2, P.z + Math.cos(a0) * far);
+  ghostAt(s.g);
+  const a = R(0, Math.PI * 2), el = s.big ? R(.25, 1.1) : R(-.6, .9), d = s.big ? 7.5 : (tg ? tg.r : .5) + 1.5;
+  s.g.position.set(c.x + Math.cos(a) * Math.cos(el) * d, c.y + Math.sin(el) * d, c.z + Math.sin(a) * Math.cos(el) * d); V2.subVectors(c, s.g.position).normalize(); s.g.quaternion.setFromUnitVectors(UP, V2); s.g.rotateY(R(0, Math.PI));
+  s.mode = 'snap'; s.hold = .55;
+  const Z = swGeo(), m1 = new T.Mesh(Z.sl1, addMat(0xffffff, 1)), m2 = new T.Mesh(Z.sl2, addMat(PINK, .55)), sc = s.big ? 3.2 : 1; V3.set(R(-1, 1), R(-1, 1), R(-1, 1)).normalize();
+  for (const m of [m1, m2]) { m.position.copy(c); m.quaternion.setFromUnitVectors(UP, V3); m.scale.setScalar(sc); m.frustumCulled = false; G.scene.add(m); } SW.slashes.push({ ms: [m1, m2], t: 0, sc });
+  if (tg) { try { tg.hit(s.big ? 70 : 26, V2.clone().setY(0).normalize(), s.big ? 9 : 4); } catch (e) {} } hurtAll(c, s.big ? 4 : 1.3, s.big ? 30 : 10, s.big ? 6 : 2);
+  burst(c, s.big ? 60 : 18, s.big ? 10 : 6, Math.random() < .5 ? PURPLE : 0xffffff, .4);
+}
+function ghostAt(src) { let gh = SW.ghosts.find(x => x.t >= .3); if (!gh) { if (SW.ghosts.length < 24) { gh = { g: swordMesh(1), t: 1 }; G.scene.add(gh.g); SW.ghosts.push(gh); } else gh = SW.ghosts[0]; } gh.g.position.copy(src.position); gh.g.quaternion.copy(src.quaternion); gh.g.scale.copy(src.scale); gh.g.visible = true; gh.t = 0; }
+function idleFollow(s, dt) { idlePos(s, V1); s.g.position.lerp(V1, Math.min(1, dt * 10)); idleQuat(s, V1, Q1); s.g.quaternion.slerp(Q1, Math.min(1, dt * 8)); }
 function swordTick(dt, t) {
   for (const gh of SW.ghosts) { gh.t += dt; gh.g.visible = gh.t < .3; if (gh.g.visible) gh.g.traverse(o => { if (o.material) o.material.opacity = .5 * (1 - gh.t / .3); }); }
-  for (let i = SW.slashes.length - 1; i >= 0; i--) { const sl = SW.slashes[i]; sl.t += dt; for (const m of sl.ms) { m.material.opacity = Math.max(0, (m.material.color.r > .99 ? 1 : .55) * (1 - sl.t / .2)); m.scale.set(1, 1 + sl.t * 2, 1); } if (sl.t > .2) { for (const m of sl.ms) { G.scene.remove(m); m.geometry.dispose(); m.material.dispose(); } SW.slashes.splice(i, 1); } }
-  if (!SW.g) return; if (!CO.on) { burst(SW.g.position, 30, 4, PURPLE, .5); G.scene.remove(SW.g); SW.g = null; SW.mode = 'idle'; return; }
-  const P = G.player.position, f = G.facing, g = SW.g;
-  if (SW.mode === 'swing') { SW.t += dt; const k = Math.min(1, SW.t / .42), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2, a = f - 1.95 + e * 3.9;
-    g.position.set(P.x + Math.sin(a) * 2.1, P.y + 1.25 - (k - .5) * .5, P.z + Math.cos(a) * 2.1); V2.set(Math.sin(a), .12, Math.cos(a)).normalize(); g.quaternion.setFromUnitVectors(UP, V2);
-    for (let j = 0; j < 4; j++) { const s2 = R(.8, 3.7); emit(P.x + Math.sin(a) * s2, P.y + 1.25 + R(-.15, .15), P.z + Math.cos(a) * s2, 0, R(0, .5), 0, .35, j % 2 ? PURPLE : 0xffffff); }
-    if (!SW.hit && k > .45) { SW.hit = true; let n = 0; for (const o of targets()) { const dx = o.p.x - P.x, dz = o.p.z - P.z, d = Math.hypot(dx, dz); if (d > 5.6 + o.r) continue; const ang = Math.abs(G.wrapAng(Math.atan2(dx, dz) - f)); if (ang > 2.05 && d > 1.2) continue; try { o.hit(55, new T.Vector3(dx, .4, dz).normalize(), 16); } catch (e) {} n++; } snd('punch', n ? 1 : .5); if (n) G.shake = Math.max(G.shake, .35); ring(V1.set(P.x, P.y + 1.25, P.z), 5, PURPLE); }
-    if (k >= 1) { SW.mode = 'idle'; } }
-  else if (SW.mode === 'snap') { SW.hold -= dt; if (SW.hold <= 0) { ghostAt(g); swordIdlePos(g.position); g.quaternion.setFromAxisAngle(V2.set(Math.cos(f), 0, -Math.sin(f)), .25); SW.mode = 'idle'; } }
-  else { swordIdlePos(V1); g.position.lerp(V1, Math.min(1, dt * 10)); Q1.setFromAxisAngle(V2.set(Math.cos(f), 0, -Math.sin(f)), .25 + Math.sin(t * 1.5) * .05); g.quaternion.slerp(Q1, Math.min(1, dt * 8)); }
-  if (Math.random() < .5) { V3.set(0, R(.4, 3.6), 0).applyQuaternion(g.quaternion).add(g.position); emit(V3.x, V3.y, V3.z, R(-.2, .2), R(.1, .6), R(-.2, .2), .4, Math.random() < .6 ? PURPLE : PINK); }
+  for (let i = SW.slashes.length - 1; i >= 0; i--) { const sl = SW.slashes[i]; sl.t += dt; sl.ms.forEach((m, j) => { m.material.opacity = Math.max(0, (j ? .55 : 1) * (1 - sl.t / .2)); m.scale.set(sl.sc, sl.sc * (1 + sl.t * 2), sl.sc); }); if (sl.t > .2) { for (const m of sl.ms) { G.scene.remove(m); m.material.dispose(); } SW.slashes.splice(i, 1); } }
+  if (!SW.list.length) return; if (!CO.on) { swDismiss(true); return; }
+  const P = G.player.position;
+  if (SW.merging > 0) { SW.merging -= dt; const c = idlePos(SW.list[0], V3); for (const s of SW.list) { s.g.position.lerp(c, Math.min(1, dt * 9)); s.g.rotateY(dt * 14); if (Math.random() < .6) emit(s.g.position.x, s.g.position.y + 1, s.g.position.z, R(-1, 1), R(0, 1), R(-1, 1), .4, PINK); } if (SW.merging <= 0) finishMerge(); return; }
+  for (const s of SW.list) {
+    s.born = Math.min(1, s.born + dt * 4); s.g.scale.setScalar(swScale(s) * Math.max(.01, s.born * (2 - s.born)));
+    if (s.mode === 'swing') swingTick(s, dt, P);
+    else if (s.mode === 'snap') { s.hold -= dt; if (s.hold <= 0) { ghostAt(s.g); idlePos(s, s.g.position); idleQuat(s, s.g.position, s.g.quaternion); s.mode = 'idle'; } }
+    else idleFollow(s, dt);
+    const L = swLen(s); for (let j = 0, n = s.big ? 4 : (Math.random() < .5 ? 1 : 0); j < n; j++) { V4.set(0, R(.4, L - .3), 0).applyQuaternion(s.g.quaternion).add(s.g.position); emit(V4.x, V4.y, V4.z, R(-.2, .2), R(.1, .6), R(-.2, .2), s.big ? .6 : .4, Math.random() < .6 ? PURPLE : PINK); }
+  }
 }
 
 /* ---------- 🙌 el kol hareketleri ---------- */
@@ -326,7 +389,7 @@ function pose(r, dt) {
   if (CO.anim && CO.anim.type === 'out') { for (const [a, s] of [[r.armL, 1], [r.armR, -1]]) { S(a.sh, 'x', -.2); S(a.sh, 'z', 2.7 * s); S(a.el, 'x', -.2); } return; }
   if (CO.castT > 0) { const up = CO.castT > .55; for (const [a, s] of [[r.armL, 1], [r.armR, -1]]) { S(a.sh, 'x', up ? -3 : -1.4); S(a.sh, 'z', up ? .25 * s : .1 * s); S(a.el, 'x', up ? -.1 : -.2); } return; }
   if (CO.lasOn) { const ap = Math.max(-1, Math.min(1, G.pitch * .8 - .05)); for (const [a, s] of [[r.armL, 1], [r.armR, -1]]) { S(a.sh, 'x', -1.57 + ap); S(a.sh, 'z', .16 * s); S(a.el, 'x', -.05); } return; }
-  if (SW.mode === 'swing') { const k = Math.min(1, SW.t / .42); S(r.armR.sh, 'x', -1.45); S(r.armR.sh, 'z', -1.3 + k * 2.4); S(r.armR.el, 'x', -.15); S(r.armL.sh, 'z', .5); return; }
+  const swg = SW.list.find(x => x.mode === 'swing' && x.t >= 0); if (swg) { const k = Math.min(1, swg.t / (swg.big ? .6 : .42)); S(r.armR.sh, 'x', -1.45); S(r.armR.sh, 'z', -1.3 + k * 2.4); S(r.armR.el, 'x', -.15); S(r.armL.sh, 'z', .5); return; }
   if (CO.rush > 0) { const w = t * 24; S(r.armL.sh, 'x', -1.5 + Math.sin(w) * .45); S(r.armR.sh, 'x', -1.5 - Math.sin(w) * .45); S(r.armL.el, 'x', -.4 - Math.max(0, Math.cos(w)) * .5); S(r.armR.el, 'x', -.4 - Math.max(0, -Math.cos(w)) * .5); S(r.armL.sh, 'z', .2); S(r.armR.sh, 'z', -.2); }
 }
 
@@ -343,17 +406,20 @@ function late(dt) {
   shieldTick(dt, t); skyTick(dt); ui();
 }
 function prompt() { if (G.INV.eq !== 'cosmic' || CO.on || CO.anim || G.giant) return null; return [(G.touchMode ? '👆 ' : 'V — ') + '🔮 ' + adT('Küreyi kullan'), activate]; }
-function key(code) { if (!CO.on) return false; if (code === 'KeyK') { deactivate(true); return true; } if (code === 'KeyX') { strike(); return true; } if (code === 'KeyC') { shadowsKey(); return true; } if (code === 'KeyZ') { swordKey(); return true; } return false; }
+function key(code) { if (!CO.on) return false; if (code === 'KeyK') { deactivate(true); return true; } if (code === 'KeyX') { strike(); return true; } if (code === 'KeyC') { shadowsKey(); return true; } if (code === 'KeyZ') { swordKey(); return true; }
+  if (SW.list.length) { const m = /^(?:Digit|Numpad)([0-9])$/.exec(code); if (m) { const n = +m[1]; if (n) setCount(n); else swDismiss(); return true; } }   // 🗡️ 1-9 kaç kılıç · 0 kapat
+  return false; }
 function toggle() { if (CO.on) deactivate(true); else activate(); }
 
 /* ---------- 🖥️ telefon: ☄️ düğmesi ---------- */
 document.head.insertAdjacentHTML('beforeend', `<style>#cosPad{position:fixed;right:12px;top:calc(30% + env(safe-area-inset-top));z-index:7;display:none;flex-direction:column;gap:8px;align-items:flex-end}
-#cosPad button{border-radius:50%;border:2px solid rgba(220,180,255,.7);background:radial-gradient(circle,#7b2ff7,#2a0b5c);color:#fff;box-shadow:0 0 14px rgba(176,107,255,.6)}#cosStrike{width:62px;height:62px;font-size:28px}#cosShadow,#cosSword{width:46px;height:46px;font-size:20px}#cosPad button.cd{opacity:.45}#cosPad button.on{background:radial-gradient(circle,#ff8af0,#7b2ff7)}</style>`);
-document.body.insertAdjacentHTML('beforeend', `<div id="cosPad"><button id="cosStrike">☄️</button><button id="cosShadow">👥</button><button id="cosSword">🗡️</button></div>`);
-for (const id of ['cosStrike', 'cosShadow', 'cosSword']) for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
+#cosPad button{border-radius:50%;border:2px solid rgba(220,180,255,.7);background:radial-gradient(circle,#7b2ff7,#2a0b5c);color:#fff;box-shadow:0 0 14px rgba(176,107,255,.6)}#cosStrike{width:62px;height:62px;font-size:28px}#cosShadow,#cosSword{width:46px;height:46px;font-size:20px}#cosPad button.cd{opacity:.45}#cosSwRow{display:flex;gap:6px;align-items:center}#cosSwX,#cosSwM,#cosSwN{display:none;width:36px;height:36px;font-size:14px;font-weight:700;padding:0}#cosPad.sw #cosSwX,#cosPad.sw #cosSwM,#cosPad.sw #cosSwN{display:block}#cosPad button.on{background:radial-gradient(circle,#ff8af0,#7b2ff7)}</style>`);
+document.body.insertAdjacentHTML('beforeend', `<div id="cosPad"><button id="cosStrike">☄️</button><button id="cosShadow">👥</button><div id="cosSwRow"><button id="cosSwX">✖</button><button id="cosSwM">⭐</button><button id="cosSwN">×1</button><button id="cosSword">🗡️</button></div></div>`);
+for (const id of ['cosStrike', 'cosShadow', 'cosSword', 'cosSwX', 'cosSwM', 'cosSwN']) for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
 $('cosStrike').addEventListener('click', e => { e.stopPropagation(); strike(); }); $('cosShadow').addEventListener('click', e => { e.stopPropagation(); shadowsKey(); });
 $('cosSword').addEventListener('pointerdown', e => { e.stopPropagation(); swordKey(); });
-function ui() { const p = $('cosPad'); p.style.display = CO.on && G.touchMode && !G.paused ? 'flex' : 'none'; if (!CO.on) return; $('cosStrike').classList.toggle('cd', CO.cd > 0); $('cosShadow').classList.toggle('on', SH.list.some(s => !s.dead && !s.recall)); $('cosSword').classList.toggle('on', !!SW.g); }
+$('cosSwX').addEventListener('click', e => { e.stopPropagation(); swDismiss(); }); $('cosSwM').addEventListener('click', e => { e.stopPropagation(); mergeKey(); }); $('cosSwN').addEventListener('click', e => { e.stopPropagation(); setCount(SW.n % 9 + 1); });
+function ui() { const p = $('cosPad'); p.style.display = CO.on && G.touchMode && !G.paused ? 'flex' : 'none'; if (!CO.on) return; $('cosStrike').classList.toggle('cd', CO.cd > 0); $('cosShadow').classList.toggle('on', SH.list.some(s => !s.dead && !s.recall)); const sw = SW.list.length > 0; p.classList.toggle('sw', sw); $('cosSword').classList.toggle('on', sw); $('cosSwM').classList.toggle('on', SW.giant); const nt = '×' + SW.n; if ($('cosSwN').textContent !== nt) $('cosSwN').textContent = nt; }
 
-window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey };
+window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey, mergeKey, setCount, swDismiss, swOn: () => CO.on && SW.list.length > 0, camK };
 })(window.__sftG);
