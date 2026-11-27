@@ -166,11 +166,13 @@ function punch(dir) {
 function rushTick(dt, t) {
   if (CO.rush <= 0) { arms.count = 0; return; } CO.rush -= dt; CO.rushN = Math.min(60, CO.rushN + dt * 38); const n = Math.floor(CO.rushN); arms.count = n;
   const P = G.player.position, f = G.facing, fx = Math.sin(f), fz = Math.cos(f), rx = Math.cos(f), rz = -Math.sin(f);
-  for (let i = 0; i < n; i++) { const d = armD[i], e = Math.abs(Math.sin(t * d.w + d.ph)), bx = P.x + rx * Math.sin(d.a) * d.r - fx * .2, by = P.y + d.h, bz = P.z + rz * Math.sin(d.a) * d.r - fz * .2;
-    const tx = P.x + fx * 3.6 + rx * Math.sin(d.a) * .9, ty = P.y + 1.2 + (d.h - 1.2) * .3, tz = P.z + fz * 3.6 + rz * Math.sin(d.a) * .9; V1.set(tx - bx, ty - by, tz - bz); const L = V1.length();
+  for (let i = 0; i < n; i++) { const d = armD[i], e = Math.abs(Math.sin(t * d.w + d.ph)), bx = P.x + rx * Math.sin(d.a) * d.r * 1.4 - fx * .2, by = P.y + d.h, bz = P.z + rz * Math.sin(d.a) * d.r * 1.4 - fz * .2;
+    const ang = f + d.a * .66, reach = 4.4 + Math.cos(d.a * 2) * .4, tx = P.x + Math.sin(ang) * reach, ty = P.y + 1.2 + (d.h - 1.2) * .95, tz = P.z + Math.cos(ang) * reach; V1.set(tx - bx, ty - by, tz - bz); const L = V1.length();   // geniş yelpaze: yaklaşık ±50°
     dmy.position.set(bx, by, bz); dmy.lookAt(tx, ty, tz); dmy.scale.set(1, 1, Math.max(.15, e * L)); dmy.updateMatrix(); arms.setMatrixAt(i, dmy.matrix); }
   arms.instanceMatrix.needsUpdate = true;
-  CO.rushHit -= dt; if (CO.rushHit <= 0) { CO.rushHit = .07; const c = V1.set(P.x + fx * 3, P.y + 1.2, P.z + fz * 3); const hitN = hurtAll(c, 2.4, 6, 2.5, .15); snd('tap', hitN ? 1 : .5); for (let k = 0; k < 4; k++) emit(c.x + R(-1.2, 1.2), c.y + R(-.8, .8), c.z + R(-1.2, 1.2), R(-2, 2), R(0, 3), R(-2, 2), .3, Math.random() < .5 ? 0xffffff : PINK); }
+  CO.rushHit -= dt; if (CO.rushHit <= 0) { CO.rushHit = .07; let hitN = 0; const cy = P.y + 1.2;   // 👊 geniş vuruş: önündeki ~100°'lik yay, 5.6 m
+    for (const o of targets()) { const dx = o.p.x - P.x, dz = o.p.z - P.z, d = Math.hypot(dx, dz); if (d > 5.6 + o.r || Math.abs(o.p.y + o.h * .5 - cy) > 2.6 + o.h) continue; if (Math.abs(G.wrapAng(Math.atan2(dx, dz) - f)) > .95 && d > 1.3) continue; try { o.hit(6, new T.Vector3(dx, .15 * d, dz).normalize(), 2.5); } catch (e) {} hitN++; }
+    snd('tap', hitN ? 1 : .5); for (let k = 0; k < 7; k++) { const a = f + R(-.9, .9), r = R(2.5, 5); emit(P.x + Math.sin(a) * r, cy + R(-1, 1), P.z + Math.cos(a) * r, R(-2, 2), R(0, 3), R(-2, 2), .3, Math.random() < .5 ? 0xffffff : PINK); } }
 }
 
 /* ---------- 🟣 lazer: ortaya + 10 m içindeki en yakın düşmanlara ---------- */
@@ -423,5 +425,5 @@ for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $('cosSwNum').addEv
 $('cosSwNum').addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-n]'); if (!b) return; setCount(+b.dataset.n); $('cosSwNum').classList.remove('open'); });
 function ui() { const p = $('cosPad'); p.style.display = CO.on && G.touchMode && !G.paused ? 'flex' : 'none'; if (!CO.on) return; $('cosStrike').classList.toggle('cd', CO.cd > 0); $('cosShadow').classList.toggle('on', SH.list.some(s => !s.dead && !s.recall)); const sw = SW.list.length > 0; p.classList.toggle('sw', sw); $('cosSword').classList.toggle('on', sw); $('cosSwM').classList.toggle('on', SW.giant); const nt = '×' + SW.n; if ($('cosSwN').textContent !== nt) { $('cosSwN').textContent = nt; for (const b of $('cosSwNum').children) b.classList.toggle('sel', +b.dataset.n === SW.n); } if (!sw) $('cosSwNum').classList.remove('open'); }
 
-window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey, mergeKey, setCount, swDismiss, swOn: () => CO.on && SW.list.length > 0, camK };
+window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey, mergeKey, setCount, swDismiss, swOn: () => CO.on && SW.list.length > 0, camK, lasing: () => !!CO.lasOn };
 })(window.__sftG);

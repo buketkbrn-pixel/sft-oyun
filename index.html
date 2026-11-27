@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.33</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.34</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -11365,7 +11365,7 @@ function update(dt) {
   try { npcRidePre(dt); } catch (e) { sftErr(e); }   // 🫴 NPC'nin avucunda / omzunda / başında
   heroAnimate(dt); updateWebFx(dt); superLegs(dt);
   // Kamera: normalde etrafında döner; silah modunda omuz üstü (sağdan) kilitli nişan kamerası; devken uzaklaşır
-  gunBlend = THREE.MathUtils.lerp(gunBlend, (aiming || (INV.eq === 'wand' && WAND.aim && !giant && !HERO.on && !RACE_LOCK) || ROBO.aimT > 0 || (INV.eq === 'water' && mouseHeld && !giant)) && !dead ? 1 : 0, 1 - Math.exp(-10 * dt));
+  gunBlend = THREE.MathUtils.lerp(gunBlend, (aiming || (INV.eq === 'wand' && WAND.aim && !giant && !HERO.on && !RACE_LOCK) || ROBO.aimT > 0 || (INV.eq === 'water' && mouseHeld && !giant) || (window.__cos && __cos.lasing())) && !dead ? 1 : 0, 1 - Math.exp(-10 * dt));
   camLow = THREE.MathUtils.lerp(camLow, slide ? 1 : 0, 1 - Math.exp(-8 * dt));
   camBase.lerp(tmp.copy(pos).add(new THREE.Vector3(0, ((HERO.on ? 1.02 : 1.5) - .55 * camLow + .25 * gunBlend) * giantS * (gSit ? (gSit.mode === 'lie' ? .32 : .55) : 1) * (1 - .3 * reachK) * (HOME.sleep ? .5 : 1) * (FB.on || V4.on ? .62 : 1) + ROBO.lift, 0)), 1 - Math.exp(-12 * dt));
   camTarget.copy(camBase).addScaledVector(right, .95 * gunBlend);
