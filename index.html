@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.36</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.37</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -26423,13 +26423,69 @@ async function mpJoin(code) {
   } catch (e) { console.warn('MP', e); mpStatus('⚠️ ' + ((e && e.message) || (e && e.type) || e)); try { MP.peer && MP.peer.destroy(); } catch (x) {} MP.peer = null; }
   MP.busy = false; mpUI();
 }
+// ---------- ⚡ hızlı katıl: kod yok, oda sahibi yok — o an basan herkes aynı hızlı odada buluşur ----------
+// Hızlı odalar sabit adlardır (…hizli-0, -1, …). Önce var olana bağlanılır; yoksa ilk basan odayı açar ve görünmez bir aktarıcı olur
+// (sahiplik yetkisi yok, kimseyi atamaz). Aktarıcı ayrılırsa kalanlar kendiliğinden yeniden hızlı katılır ve yine buluşur.
+const MP_QPFX = MP_PFX + 'hizli-', MP_QN = 10;
+function mpQConn(p, target) {   // → 'ok' | 'none' (oda yok) | 'full'
+  return new Promise(res => {
+    let done = false; const c = p.connect(target, { reliable: true, metadata: { v: MP_VER, q: 1 } });
+    const fin = st => { if (done) return; done = true; clearTimeout(to); p.off('error', pe); c.off('data', dh); if (st !== 'ok') try { c.close(); } catch (e) {} res(st); };
+    const to = setTimeout(() => fin('slow'), 8000), pe = e => { if (e && e.type === 'peer-unavailable') fin('none'); };
+    const dh = m => { if (!m) return;
+      if (m.t === 'deny') { fin('full'); return; }
+      if (m.t !== 'welcome') return;
+      MP.peer = p; MP.hc = c; MP.host = false; MP.quick = true; MP.me.id = p.id; MP.code = '⚡ ' + adT('Hızlı oda');
+      p.off('error'); p.on('error', e => mpErr(e)); p.on('call', cl => mpOnCall(cl)); p.on('disconnected', () => { try { p.reconnect(); } catch (e) {} });
+      c.on('data', x => mpOnMsg(x)); c.on('close', () => { if (MP.on && MP.quick) mpQuickRejoin(); });
+      fin('ok'); mpOnMsg(m); };
+    p.on('error', pe); c.on('data', dh); c.on('error', () => fin('none'));
+    c.on('open', () => c.send({ t: 'hello', name: MP.me.name, adm: mpIsAdm(), v: MP_VER, q: 1 }));
+  });
+}
+function mpQClaim(P, n) {   // hızlı odayı aç → { st: 'ok', p } | { st: 'taken' } | { st: 'err' }
+  return new Promise(res => { const p = new P(MP_QPFX + n, mpOpts()), to = setTimeout(() => { try { p.destroy(); } catch (e) {} res({ st: 'err' }); }, 10000);
+    p.on('open', () => { clearTimeout(to); res({ st: 'ok', p }); }); p.on('error', e => { clearTimeout(to); try { p.destroy(); } catch (x) {} res({ st: e && e.type === 'unavailable-id' ? 'taken' : 'err' }); }); });
+}
+function mpQHost(p) {   // hızlı odayı açtın: görünmez aktarıcısın, sahiplik yok, oyun hemen başlar
+  MP.peer = p; MP.code = '⚡ ' + adT('Hızlı oda'); MP.host = true; MP.quick = true; MP.on = true; MP.me.id = p.id; MP.me.slot = 0; MP.started = true; MP.region = 'hub';
+  MP.set = Object.assign({}, MP.set, { ownerKick: false });
+  MP.players = {}; MP.players[MP.me.id] = mpNewPlayer(MP.me.id, MP.me.name, 0, false); MP.players[MP.me.id].admin = mpIsAdm();
+  p.off('error'); p.on('error', e => mpErr(e)); p.on('connection', c => mpHostConn(c)); p.on('call', c => mpOnCall(c)); p.on('disconnected', () => { try { p.reconnect(); } catch (e) {} });
+  MP.houses = mpHouseSlots(); mpEnter();
+  if (curKey !== 'hub') { MP.allowTp = true; try { teleportTo('hub', -3, 9.5, Math.PI, adT('🏡 Köy meydanı')); } finally { MP.allowTp = false; } }
+}
+async function mpQuick(again) {
+  if (MP.on || MP.busy) return; MP.busy = true; mpStatus('⚡ ' + adT('Oyuncu aranıyor…'));
+  let p = null;
+  try {
+    const P = await mpLib(); p = new P(undefined, mpOpts()); await new Promise((res, rej) => { p.on('open', res); p.on('error', rej); });
+    for (let n = 0, tries = 0; n < MP_QN; n++) {
+      mpStatus('⚡ ' + adT('Oyuncu aranıyor…') + (n ? ` (${n + 1})` : ''));
+      const r = await mpQConn(p, MP_QPFX + n);
+      if (r === 'ok') { MP.busy = false; mpUI(); return; }
+      if (r === 'full') continue;
+      const cl = await mpQClaim(P, n);
+      if (cl.st === 'ok') { try { p.destroy(); } catch (e) {} p = null; mpQHost(cl.p); mpStatus('⚡ ' + adT('Hızlı oda açık — başka oyuncular bekleniyor')); mpNote('⚡ ' + adT('Hızlı odadasın! Şu an hızlı katıl diyen herkes buraya gelir'), 4); MP.busy = false; mpUI(); return; }
+      if (r === 'slow' && cl.st === 'taken') { tries = 0; continue; }   // yanıt vermeyen eski oda: sıradakine geç
+      if (++tries < 5) { await new Promise(r2 => setTimeout(r2, cl.st === 'taken' ? 300 : 1200)); n--; continue; }   // aynı anda biri açtı: tekrar bağlanmayı dene
+      tries = 0;
+    }
+    mpStatus('⚠️ ' + adT('Hızlı odaların hepsi dolu, biraz sonra tekrar dene'));
+  } catch (e) { console.warn('MP quick', e); mpStatus('⚠️ ' + adT('Hızlı katılamadın') + ': ' + ((e && (e.type || e.message)) || e)); }
+  try { p && p.destroy(); } catch (e) {} MP.busy = false; mpUI();
+}
+function mpQuickRejoin() {   // aktarıcı ayrıldı: kalanlar yeniden buluşur
+  if (MP.qRe) return; MP.qRe = true; mpLeave(); mpNote('🔄 ' + adT('Biri ayrıldı — hızlı oda yenileniyor…'), 3);
+  setTimeout(() => { MP.qRe = false; mpQuick(true); }, 250 + Math.random() * 900);
+}
 function mpErr(e) { console.warn('MP peer', e); if (e && e.type === 'network') mpNote('⚠️ ' + adT('Ağ sorunu — yeniden bağlanılıyor'), 3); }
 function mpNewPlayer(id, name, slot, owner) { return { id, name: name || ('Oyuncu ' + (slot + 1)), slot, color: MP_COLORS[slot % MP_COLORS.length], ready: false, admin: false, owner: !!owner, perm: [], st: null, av: null, talk: false }; }
 function mpHostConn(c) {
   c.on('data', m => {
     if (m.t === 'hello') {
       const ids = Object.keys(MP.players);
-      if (ids.length >= MP_MAX) { c.send({ t: 'deny', why: adT('Oda dolu (en fazla 5 kişi)') }); setTimeout(() => c.close(), 300); return; }
+      if (ids.length >= MP_MAX) { c.send({ t: 'deny', full: 1, why: adT('Oda dolu (en fazla 5 kişi)') }); setTimeout(() => c.close(), 300); return; }
       if (MP.banned.includes(c.peer) || MP.banned.includes((m.name || '').toLowerCase())) { c.send({ t: 'deny', why: adT('Bu odaya girmen yasaklandı') }); setTimeout(() => c.close(), 300); return; }
       const used = ids.map(i => MP.players[i].slot); let slot = 0; while (used.includes(slot)) slot++;
       const pl = MP.players[c.peer] = mpNewPlayer(c.peer, String(m.name || '').slice(0, 16), slot, false); pl.admin = !!m.adm; MP.conns[c.peer] = c;
@@ -26488,7 +26544,7 @@ function mpLeave(why) {
   for (const id in MP.calls) try { MP.calls[id].close(); } catch (e) {}
   if (MP.mic) { MP.mic.getTracks().forEach(t => t.stop()); MP.mic = null; }
   try { MP.peer && MP.peer.destroy(); } catch (e) {}
-  Object.assign(MP, { on: false, host: false, code: '', peer: null, conns: {}, hc: null, players: {}, started: false, region: 'hub', vote: null, spec: null, ctlBy: null, ctlTgt: null, locked: false, plock: false, heldBy: null, holding: null, follow: null, calls: {}, auds: {}, myHouse: '', npcCtl: 0 });
+  Object.assign(MP, { on: false, host: false, quick: false, code: '', peer: null, conns: {}, hc: null, players: {}, started: false, region: 'hub', vote: null, spec: null, ctlBy: null, ctlTgt: null, locked: false, plock: false, heldBy: null, holding: null, follow: null, calls: {}, auds: {}, myHouse: '', npcCtl: 0 });
   if (carried && carried.type === 'mp') carried = null;
   mpClearHouses(); try { mpFunReset(); } catch (e) {} try { mpxReset(); } catch (e) {} MP_LK.sig = ''; MP_LK.msg = null; document.body.classList.remove('mpOn', 'mpCtl'); mpHud(false); $('mpVote').style.display = 'none'; $('mpCtlBan').style.display = 'none'; $('mpHeld').style.display = 'none';
   if (why) mpNote(why, 4); mpStatus(why || adT('Odadan çıktın')); mpUI();
@@ -26502,7 +26558,7 @@ function mpOnMsg(m) {
       if (MP.started) mpGoRegion({ key: MP.region, hint: MP.regHint }, true); break;
     case 'deny': mpStatus('⛔ ' + m.why); mpNote('⛔ ' + m.why, 4); setTimeout(() => mpLeave(), 200); break;
     case 'kicked': mpLeave(m.ban ? adT('⛔ Odadan yasaklandın') : adT('🚫 Odadan atıldın')); break;
-    case 'bye': mpLeave(adT('🔌 Oda sahibi odayı kapattı')); break;
+    case 'bye': if (MP.quick) { mpQuickRejoin(); break; } mpLeave(adT('🔌 Oda sahibi odayı kapattı')); break;
     case 'pls': mpSetPlayers(m.players); mpUI(); break;
     case 'set': MP.set = m.set; mpApplySet(); mpUI(); break;
     case 'start': MP.started = true; MP.region = 'hub'; mpNote('🎮 ' + adT('Herkes hazır — oyun başladı!'), 3); $('mpPanel').classList.remove('on');
@@ -26968,13 +27024,14 @@ function mpUI() {
   const B = $('mpBody'); if (!B) return; const me = MP.players[MP.me.id]; try { mpBuildHouses(); } catch (e) {}
   if (!MP.on) {
     B.innerHTML = `<div class="row"><span>👤 ${adT('Adın')}</span><input id="mpNameIn" maxlength="16" value="${mpEsc(MP.me.name)}"></div>
+      <div class="row"><button class="b ok" data-mp="quick" style="flex:1;font-size:1.08em">⚡ ${adT('Hızlı katıl')}</button></div><div class="hint">${adT('Kod yok, oda sahibi yok: o an hızlı katıl diyen herkes aynı odada buluşur (en fazla 5 kişi, dolarsa yeni oda açılır).')}</div>
       <div class="row"><button class="b pri" data-mp="create" style="flex:1">🏠 ${adT('Kur')}</button></div><div class="hint">${adT('Kurunca 5 haneli bir oda kodu çıkar; arkadaşların o kodla bağlanır (en fazla 5 kişi).')}</div>
       <div class="row"><input id="mpCodeIn" inputmode="numeric" maxlength="5" placeholder="${adT('5 haneli kod')}"><button class="b ok" data-mp="join">🔗 ${adT('Bağlan')}</button></div>
       <div class="hint">${adT('Tarayıcılar birbirine doğrudan bağlanır. Sadece siteden açınca çalışır (internet gerekir).')}</div>`;
     return;
   }
-  const ps = Object.values(MP.players).sort((a, b) => a.slot - b.slot), iAmOwner = MP.host, adm = mpIsAdm(), myPerm = (me && me.perm) || [];
-  B.innerHTML = `<div class="code">${MP.code}</div><div class="hint" style="text-align:center">${MP.started ? '🎮 ' + adT('Oyun sürüyor') + ' · ' + adT(MP_REGIONS[MP.region] || MP.region) : adT('Herkes ✅ Hazır deyince oyun başlar')}</div>
+  const ps = Object.values(MP.players).sort((a, b) => a.slot - b.slot), iAmOwner = MP.host && !MP.quick, adm = mpIsAdm(), myPerm = (me && me.perm) || [];
+  B.innerHTML = `<div class="code">${MP.code}</div>${MP.quick ? `<div class="hint" style="text-align:center">⚡ ${adT('Hızlı oda · oda sahibi yok')} · ${Object.keys(MP.players).length}/${MP_MAX}</div>` : ''}<div class="hint" style="text-align:center">${MP.started ? '🎮 ' + adT('Oyun sürüyor') + ' · ' + adT(MP_REGIONS[MP.region] || MP.region) : adT('Herkes ✅ Hazır deyince oyun başlar')}</div>
     ${ps.map(p => { const c = '#' + new THREE.Color(p.color).getHexString(), mine = p.id === MP.me.id, canKick = !mine && (adm || (iAmOwner && MP.set.ownerKick && !MP.set.protect[p.id] && !p.admin));
       return `<div class="pl"><span class="dot" style="background:${c}"></span><span class="nm">${p.owner ? '🏠 ' : ''}${p.admin ? '👑 ' : ''}${mpEsc(p.name)}${mine ? ' (' + adT('sen') + ')' : ''}${p.talk ? ' 🎤' : ''}</span>${MP.started ? '' : p.ready ? '✅' : '⏳'}
         ${mine ? '' : `<button data-mp="perm" data-id="${p.id}" title="${adT('Beni tutabilir')}">${myPerm.includes(p.id) ? '🤚✅' : '🤚❌'}</button><button data-mp="mute" data-id="${p.id}">${MP.mutes[p.id] ? '🔇' : '🔊'}</button>`}${canKick ? `<button data-mp="kick" data-id="${p.id}">🚫</button>` : ''}</div>`; }).join('')}
@@ -26987,7 +27044,7 @@ function mpUI() {
 $('mpPanel').addEventListener('click', e => {
   const b = e.target.closest('[data-mp]'); if (!b) return; e.stopPropagation(); play('ui'); const k = b.dataset.mp, id = b.dataset.id;
   if (k === 'x') mpPanel(false);
-  else if (k === 'create' || k === 'join') { const n = ($('mpNameIn').value || '').trim().slice(0, 16) || ('Oyuncu' + ((Math.random() * 90 + 10) | 0)); MP.me.name = n; try { localStorage.setItem('sftMpAd', n); } catch (x) {} if (k === 'create') mpCreate(); else mpJoin($('mpCodeIn').value); }
+  else if (k === 'create' || k === 'join' || k === 'quick') { const n = ($('mpNameIn').value || '').trim().slice(0, 16) || ('Oyuncu' + ((Math.random() * 90 + 10) | 0)); MP.me.name = n; try { localStorage.setItem('sftMpAd', n); } catch (x) {} if (k === 'create') mpCreate(); else if (k === 'quick') mpQuick(); else mpJoin($('mpCodeIn').value); }
   else if (k === 'ready') mpReady();
   else if (k === 'leave') mpLeave(adT('🚪 Odadan çıktın'));
   else if (k === 'perm') { const me = MP.players[MP.me.id]; mpSetPerm(id, !(me && me.perm || []).includes(id)); }
@@ -29302,7 +29359,7 @@ const AX_LIST = [
   ['q1', '📜', 'Görevli', '1 görev bitir', () => PROG.qd >= 1], ['q10', '📚', 'Görev ustası', '10 görev bitir', () => PROG.qd >= 10],
   ['d1', '👟', 'Yürüyüşçü', '1 km yürü', () => ACHX.st.dist >= 1000], ['d10', '🥾', 'Gezgin', '10 km yürü', () => ACHX.st.dist >= 10000], ['d42', '🏅', 'Maratoncu', '42 km yürü', () => ACHX.st.dist >= 42195],
   ['t10', '⏱️', 'Isınma', '10 dakika oyna', () => ACHX.st.time >= 600], ['t60', '⌛', 'Bir saat', '1 saat oyna', () => ACHX.st.time >= 3600], ['t600', '🕰️', 'Müdavim', '10 saat oyna', () => ACHX.st.time >= 36000],
-  ['mp', '👥', 'Arkadaşlarla', 'Çok oyunculu bir odaya gir', () => typeof MP !== 'undefined' && MP.on], ['mph', '🏠', 'Ev sahibi', 'Bir oda kur', () => MP.on && MP.host], ['mp3', '🎉', 'Kalabalık', 'Odada 3 kişi olun', () => MP.on && Object.keys(MP.players).length >= 3],
+  ['mp', '👥', 'Arkadaşlarla', 'Çok oyunculu bir odaya gir', () => typeof MP !== 'undefined' && MP.on], ['mph', '🏠', 'Ev sahibi', 'Bir oda kur', () => MP.on && MP.host && !MP.quick], ['mp3', '🎉', 'Kalabalık', 'Odada 3 kişi olun', () => MP.on && Object.keys(MP.players).length >= 3],
   ['mpw', '🏆', 'Şampiyon', 'Çok oyunculu bir oyun kazan', () => ACHX.st.win >= 1],
   ['vr1', '🥽', 'Sanal dünya', 'Bir VR modunu aç', () => Object.keys(ACHX.st.vr).length >= 1], ['vr3', '🕶️', 'VR ustası', '3 farklı VR modunu dene', () => Object.keys(ACHX.st.vr).length >= 3],
   ['ch_an', '🎀', 'Anime', 'Anime karakterle oyna', () => ANIME.on], ['ch_pet', '🐾', 'Hayvan dostu', 'Pati ya da hamam böceği ol', () => HERO.on], ['ch_glb', '🧩', 'Kendi karakterin', 'Kendi modelini yükleyip oyna', () => ANIME.on && ANIME.kind === 'custom'],
