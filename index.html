@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.42</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.43</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -9688,6 +9688,8 @@ function groundAt(x, z, y) {   // her eşyanın üstünde durulabilir (ağaçlar
   if (inMaker && window.__mk) g = __mk.ramp(x, z, y, g);
   if (inAtl && window.__atl) g = __atl.ground(x, z, y, g);   // 🌊 deniz tabanı
   if (inSpace && window.__spc) g = __spc.ground(x, z, y, g);   // 🌌 uzayda zemin yok, yalnızca kayalar
+  if (inCity && window.__kent) g = __kent.ground(x, z, y, g);   // ⛰️ şehir: dağlar, üst yollar, katlar
+  if (window.__ed && __ed.n) g = __ed.ground(x, z, y, g);   // 🛠️ çalışma modunda eklenenler
   if (inRace && window.__race) g = __race.ground(x, z, y, g);   // 🏎️ pist yüksekliği   // 🗺️ harita rampaları / merdivenleri
   return g;
 }
@@ -9816,7 +9818,7 @@ function updateNPC(n, dt) {
     n.rig.look.rotation.y = 0;
     const up = n.state === 'held' && (n.lockP || (typeof HOLDUP !== 'undefined' && HOLDUP.on));   // 🧍 dimdik tutulur (sallanmaz)
     if (n.anim) { n.anim.mixer.update(dt); playAnim(n.anim, up ? 'idle' : 'jump'); }
-    else if (up) animateStick(n.rig, dt, { speed: 0 });
+    else if (up) { animateStick(n.rig, dt, { speed: 0 }); if (carried && carried.two && carried.ref === n) twoPose(n); }
     else { animateStick(n.rig, dt, { speed: 0, airborne: true, vy: 1 }); if (n.state === 'held' && !(GP.on && carried && carried.ref === n) && !GPL.list.includes(n)) dangle(n.rig, n.holder, dt, n); }
     return;
   }
@@ -10160,6 +10162,7 @@ function cosTargets() {   // 🔮 kozmik mod: her bölgeden vurulabilir düşman
   try { if (inDungeon && window.__dg && __dg.targets) L.push(...__dg.targets()); } catch (e) {}
   try { if (inSpace && window.__spc && __spc.targets) L.push(...__spc.targets()); } catch (e) {}
   try { if (inCity && window.__sehir) L.push(...__sehir.targets()); } catch (e) {}   // 👽 dev uzaylılar
+  try { if (window.__ed && __ed.n) L.push(...__ed.targets()); } catch (e) {}   // 🛠️ çalışma modunda eklenen kırılabilirler
   return L;
 }
 function doPunchHit(dir) {
@@ -10233,6 +10236,7 @@ function shoot() {
   if (inDungeon && window.__dg) { const td = __dg.ray(shotO, shotD, best, BULLET_DMG * 2); if (td !== null) { best = td; kind = 'dg'; shotP.copy(shotO).addScaledVector(shotD, best); hitMarkT = .08; } }   // 🗝️ iskelet
   if (inSpace && window.__spc) { const td = __spc.ray(shotO, shotD, best, BULLET_DMG * 2); if (td !== null) { best = td; kind = 'spc'; shotP.copy(shotO).addScaledVector(shotD, best); hitMarkT = .08; } }   // 🌌 uzay canavarı
   if (inCity && window.__sehir) { const td = __sehir.ray(shotO, shotD, best, BULLET_DMG * 2); if (td !== null) { best = td; kind = 'spc'; shotP.copy(shotO).addScaledVector(shotD, best); hitMarkT = .08; } }   // 👽 dev uzaylı
+  if (window.__ed && __ed.n) { const td = __ed.ray(shotO, shotD, best, BULLET_DMG * 2); if (td !== null) { best = td; kind = 'spc'; shotP.copy(shotO).addScaledVector(shotD, best); hitMarkT = .08; } }   // 🛠️ eklenen hedefler
   (gi.id === 'rifle' ? rifleMuzzle : muzzle).getWorldPosition(muzzleW);
   spawnTracer(muzzleW, shotP);
   flash.position.copy(muzzleW); const fs = .35 + Math.random() * .2; flash.scale.set(fs, fs, 1);
@@ -10361,6 +10365,7 @@ function dangle(r, obj, dt, st) {
   r.legL.kn.rotation.x = .12 + Math.max(0, -kL) * 1.5; r.legR.kn.rotation.x = .12 + Math.max(0, -kR) * 1.5;
   if (r.neck) r.neck.rotation.x = .3; if (r.torso) r.torso.rotation.x = .04 - D.ax * .15;
 }
+function twoPose(n) { const r = n.rig; r.armL.sh.rotation.set(-.35, 0, .55); r.armR.sh.rotation.set(-.35, 0, -.55); r.armL.el.rotation.x = r.armR.el.rotation.x = -.25; r.legL.hip.rotation.x = .12; r.legR.hip.rotation.x = -.1; r.legL.kn.rotation.x = r.legR.kn.rotation.x = .15; }   // 💪 iki elle tutulan: kollar hafif yukarıda, bacaklar rahat
 function updateCarried() {
   if (!carried || GP.on) return;   // 🤲 avuçtayken yerini gpLate belirler
   charHolder.updateMatrixWorld(true);
@@ -10382,6 +10387,11 @@ function updateCarried() {
     o.rotation.set(0, facing, .32);
     return;
   }
+  if (carried.type === 'npc' && !giant && BODYSZ.v >= 1.95) {   // 💪 2× boy: kişiyi iki elle, koltuk altlarından tutup önünde kaldırırsın
+    playerRig.armL.el.localToWorld(TV.set(0, -.36, 0)); handW.add(TV).multiplyScalar(.5); const n = carried.ref; n.lockP = true;
+    o.position.set(handW.x + Math.sin(facing) * .12, handW.y - 1.32, handW.z + Math.cos(facing) * .12); n.holder.rotation.y = facing + Math.PI; n.facing = facing + Math.PI;
+    twoPose(n); carried.two = true; return; }
+  if (carried.two) { carried.two = false; carried.ref.lockP = false; }
   const drop = carried.type === 'npc' ? 1.05 : carried.type === 'mon' ? 1.3 : .45 * o.scale.x;
   o.position.set(handW.x, handW.y - drop, handW.z);
   if (carried.type !== 'obj') { carried.ref.holder.rotation.y = facing + Math.PI; carried.ref.facing = facing + Math.PI; }
@@ -10560,7 +10570,7 @@ function findGrabTarget() {
   let best = null, bd = Math.max(3.5, 1.15 * S);
   const consider = (type, ref, q) => { const d = Math.hypot(q.x - gx, q.z - gz); if (d < bd) { bd = d; best = { type, ref }; } };
   if (!inArena && !inHouse && !inMall && !inCloset) {
-    for (const n of npcs) if (n.state !== 'held' && n.state !== 'thrown' && n.holder.visible && !(n.spS > 1.5)) consider('npc', n, n.holder.position);
+    for (const n of npcs) if (n.state !== 'held' && n.state !== 'thrown' && n.holder.visible && !(n.spS > 1.5) && !n.isKid) consider('npc', n, n.holder.position);
     for (const slot of GRAB_SLOTS) for (const h of slotHolders[slot] || []) if (!h.userData.flying) consider('obj', h, h.position);
     if (inCity) for (const c of CITY.cars) if (c.g.visible && !c.g.userData.flying) consider('obj', c.g, c.g.position);
     if (inCity) for (const h of CITY.chunks) if (h.parent && !h.userData.flying) consider('obj', h, h.position);
@@ -10950,15 +10960,16 @@ function update(dt) {
   // Dev: sol tık yere vurur (elinde bir şey varsa fırlatır), sağ tık / G alır-bırakır
   if (leftReq) {
     leftReq = false;
-    if (canAct && giant && giantS > 1.6 && !grabAct && !stomp) {
+    if (canAct && !giant && carried && BODYSZ.v >= 1.95) dropCarried(true);   // 💪 2× boyda sol tık: elindekini at
+    else if (canAct && giant && giantS > 1.6 && !grabAct && !stomp) {
       if (carried) { if (GP.on) gpMove('flip'); else dropCarried(true); }   // 🤲 avuçtayken sol tık: evir
       else if (!slam) { if (gSit) standUp(); slam = { t: 0, hit: false }; }
     }
   }
   if (grabReq) {
     grabReq = false;
-    if (canAct && giant && giantS > 1.6) { if (carried) dropCarried(false); else if (!slam && !stomp) startGrab(); }
-    else if (canAct && !giant) showMsg('Bir şey almak için önce B ile dev ol', 1.2);
+    if (canAct && (giant ? giantS > 1.6 : BODYSZ.v >= 1.95 && giantS > 1.5)) { if (carried) dropCarried(false); else if (!slam && !stomp) startGrab(); }   // 💪 ayarlardan 2× boyda da her şeyi kaldırırsın
+    else if (canAct && !giant) showMsg(adT('Bir şey almak için B ile dev ol ya da Ayarlar → Vücut boyu 2×'), 1.6);
   }
   if (slam) {
     slam.t += dt;
@@ -11193,6 +11204,7 @@ function update(dt) {
   if (!charRig) sigmaPost(dt);   // 🗿 Sigma katmanı (kasılmış yürüyüş, sinematik poz)
   if (!charRig && inAtl && window.__atl) try { __atl.pose(playerRig, dt); } catch (e) {}   // 🌊 yüzme pozu (pervane bacaklar)
   if (!charRig && window.__cos) try { __cos.pose(playerRig, dt); } catch (e) {}   // 🔮 kozmik el kol hareketleri
+  if (!charRig && carried && carried.two) { const r = playerRig; r.armL.sh.rotation.set(-1.25, 0, -.32); r.armR.sh.rotation.set(-1.25, 0, .32); r.armL.el.rotation.x = r.armR.el.rotation.x = -.35; }   // 💪 iki elle kaldırma pozu
   if (CLIMB.on && !charRig) climbPose();
   if (!charRig) animeAnimate(dt);
   animeUpdate(dt, speed / giantS);
@@ -22250,7 +22262,7 @@ function cyPersona(n, role) {
   const c = CY_COL[n.role] ?? NPC_COLORS[Math.floor(Math.random() * NPC_COLORS.length)]; n.rig.bodyMat.color.setHex(c); n.color = c;
   const w = CY_ROLES[n.role][2]; n.work = w && CITY.lots[w] && CITY.lots[w].work ? CITY.lots[w].work : null;
   n.friend = CITY.sav.friends[n.name + n.role] || 0; n.love = (CITY.sav.love || {})[n.name + n.role] || 0; n.fear = 0; n.bowT = 0; n.cower = 0; cyHat(n);
-  try { humanize(n.rig, { shirt: c, longSleeve: n.role === 'police' || Math.random() < .4 }); } catch (e) {}   // 👥 şişman, zayıf, kaslı… gerçekçi insanlar
+  if (CY_COL[n.role] == null) { const c2 = [0xff3b30, 0xff9500, 0xffcc00, 0x34c759, 0x00c7be, 0x30b0ff, 0x007aff, 0x5856d6, 0xaf52de, 0xff2d55, 0xff6f61, 0x7bd148][(Math.random() * 12) | 0]; n.color = c2; n.rig.bodyMat.color.setHex(c2); }   // 🎨 renkli çöp adamlar
 }
 function cySpawnSpot(far) {   // oyuncudan uzak (ya da yakın) bir kaldırım köşesi
   const P = player.position, A = AREAS.city;
@@ -26603,6 +26615,7 @@ function mpOnMsg(m) {
     case 'spl': try { spellNet(m); } catch (e) { console.warn('spl', e); } break;   // 🪄 arkadaşın büyüsü
     case 'dgs': try { if (window.__dg) __dg.net(m); } catch (e) { console.warn('dg', e); } break;   // 🗝️ zindan kapıları
     case 'cosh': try { if (window.__cos) __cos.net(m); } catch (e) {} break;   // 🔮 arkadaşın kozmik kalkanı
+    case 'ed': try { if (window.__ed) __ed.net(m); } catch (e) { console.warn('ed', e); } break;   // 🛠️ çalışma modu eşitleme
     case 'rcar': case 'rgo': case 'rq': case 'rst': case 'rbt': case 'rfx': try { if (window.__race) __race.net(m); } catch (e) { console.warn('race', e); } break;   // 🏎️ yarış
     case 'brrv': case 'brp': case 'brkn': case 'brl': case 'brlr': try { if (inRoyale && BR.state !== 'off') brTeamNet(m); } catch (e) { console.warn('br', e); } break;
     case 'brs': case 'brb': case 'brh': case 'brd': case 'brk': case 'brc': case 'brq': try { brNet(m); } catch (e) { console.warn('br', e); } break;   // 🤝 ortak battle royale
@@ -31276,7 +31289,7 @@ window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G
   d('speckleTexture', () => speckleTexture); d('started', () => started, v => { started = v; }); d('staticPH', () => staticPH); d('teleportTo', () => teleportTo);
   d('teleporting', () => teleporting, v => { teleporting = v; }); d('touchMode', () => touchMode, v => { touchMode = v; }); d('tryLock', () => tryLock); d('vel', () => vel);
   d('vy', () => vy, v => { vy = v; }); d('mergeGeometries', () => mergeGeometries);
-  d('INV', () => INV); d('equip', () => equip); d('HAND', () => HAND); d('roboRay', () => roboRay); d('laserHeld', () => laserHeld); d('shielding', () => shielding); d('slideObj', () => slide); d('boostMode', () => boostMode); d('flyingNow', () => flyingNow); d('groundAt', () => groundAt); d('CITY', () => CITY); d('cyPedAt', () => cyPedAt); d('cyNews', () => cyNews); d('cySay', () => cySay); d('cyBlast', () => cyBlast); d('progSpend', () => progSpend); d('bldNear', () => bldNear); d('aptTakeNpc', () => aptTakeNpc); d('giantS', () => giantS); d('npcs', () => npcs); d('handObjsIn', () => handObjsIn); d('handTakeObj', () => handTakeObj); d('handThrowObj', () => handThrowObj); d('handCrushObj', () => handCrushObj);   // ✋
+  d('INV', () => INV); d('equip', () => equip); d('HAND', () => HAND); d('roboRay', () => roboRay); d('laserHeld', () => laserHeld); d('shielding', () => shielding); d('slideObj', () => slide); d('boostMode', () => boostMode); d('flyingNow', () => flyingNow); d('groundAt', () => groundAt); d('CITY', () => CITY); d('renderer', () => renderer); d('slotHolders', () => slotHolders); d('npcHuman', () => npcHuman); d('qLabel', () => qLabel); d('cyPedAt', () => cyPedAt); d('cyNews', () => cyNews); d('cySay', () => cySay); d('cyBlast', () => cyBlast); d('progSpend', () => progSpend); d('bldNear', () => bldNear); d('aptTakeNpc', () => aptTakeNpc); d('giantS', () => giantS); d('npcs', () => npcs); d('handObjsIn', () => handObjsIn); d('handTakeObj', () => handTakeObj); d('handThrowObj', () => handThrowObj); d('handCrushObj', () => handCrushObj);   // ✋
   d('cosTargets', () => cosTargets);   // 🔮
   d('wrapAng', () => wrapAng); d('yaw', () => yaw, v => { yaw = v; });
   return G; })();
@@ -31287,6 +31300,8 @@ window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G
 { const s = document.createElement('script'), ms = document.getElementById('sftSpaceSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'space.js'; s.onerror = () => console.warn('🗺️ space.js yüklenemedi'); document.head.appendChild(s); }   // 🌌 uzay
 { const s = document.createElement('script'), ms = document.getElementById('sftCosmicSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'cosmic.js'; s.onerror = () => console.warn('🗺️ cosmic.js yüklenemedi'); document.head.appendChild(s); }   // 🔮 kozmik küre
 { const s = document.createElement('script'), ms = document.getElementById('sftSehirSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'sehir.js'; s.onerror = () => console.warn('🗺️ sehir.js yüklenemedi'); document.head.appendChild(s); }   // 🏙️ şehir: uzaylılar, tören, gruplar
+{ const s = document.createElement('script'), ms = document.getElementById('sftKentSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'kent.js'; s.onerror = () => console.warn('🗺️ kent.js yüklenemedi'); document.head.appendChild(s); }   // 🏙️ şehir dünyası: dağlar, üst yollar, iç mekânlar
+{ const s = document.createElement('script'), ms = document.getElementById('sftEdSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'editor.js'; s.onerror = () => console.warn('🗺️ editor.js yüklenemedi'); document.head.appendChild(s); }   // 🛠️ çalışma modu
 
 renderer.setAnimationLoop(() => {
   try {   // bir alt sistem hata verse bile oyun donmasın: hata ekranda gösterilir, çizim sürer
@@ -31320,6 +31335,8 @@ renderer.setAnimationLoop(() => {
   updateSky(); updateMountains();
   try { if (window.__cos) __cos.late(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🔮 kozmik mod
   try { if (window.__sehir) __sehir.tick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // 🏙️ şehir
+  try { if (window.__kent) __kent.tick(paused || photoMode ? 0 : dt); } catch (e) { sftErr(e); }   // ⛰️ şehir dünyası
+  try { if (window.__ed) __ed.tick(dt); } catch (e) { sftErr(e); }   // 🛠️ çalışma modu
   } catch (e) { sftErr(e); }
   try { renderFrame(); } catch (e) { sftErr(e); }
 });

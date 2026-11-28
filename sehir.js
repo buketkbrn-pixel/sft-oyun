@@ -324,14 +324,15 @@ addEventListener('keydown', e => { if (!CER.on) return; if (e.code === 'Escape' 
 
 /* ---------- 👥 arkadaş grupları: birlikte gezen, tanışan, sohbet eden, aktivite yapan şehirliler ---------- */
 const GIRL = new Set(['Ayşe', 'Zeynep', 'Elif', 'Selin', 'Ece', 'Derya', 'Defne', 'Pelin', 'Nazlı', 'Yasemin', 'İrem', 'Melis', 'Gizem', 'Buse', 'Ezgi']);
-const isGirl = n => GIRL.has(n.name), FREE_ROLES = new Set(['walker', 'office', 'jogger', 'dancer', 'artist', 'banker', 'shop', 'musician', 'doctor']);
+const isGirl = n => GIRL.has(n.name), FREE_ROLES = new Set(['walker', 'office', 'jogger', 'dancer', 'artist', 'banker', 'shop', 'musician', 'doctor', 'worker', 'sweeper']);
 const GRP = { list: [], t: 4, on: true };
 const LINES = {
   girls: ['Kızlar, kahve içelim mi? ☕', 'Bu ayakkabılar çok tatlı!', 'Akşam sinemaya gidelim!', 'Bak şu vitrine, bayıldım 😍', 'Haftaya doğum günüm var 🎂', 'Çok güldüm yaa 😂'],
   boys: ['Kanka akşam maç var ⚽', 'Abi şu arabaya bak! 🚗', 'Hadi basket oynayalım 🏀', 'Kanka acıktım, döner yiyelim 🥙', 'Dün oyunda rekor kırdım 🎮', 'Hahaha efsane 😂'],
   mix: ['Bugün hava çok güzel ☀️', 'Yarın denize gidelim mi? 🏖️', 'Şu yeni kafeyi denedin mi?', 'Haftasonu planın ne?', 'Hahaha aynen 😄', 'Devi gördün mü? Kocamandı!'],
   meet1: ['Merhaba! Ben {a} 👋', 'Selam, nasılsın? 😊', 'Pardon, seni bir yerden tanıyor muyum?'], meet2: ['Memnun oldum, ben {b}!', 'İyiyim, sen nasılsın?', 'Evet! Spor salonundan 😄'], meet3: ['Birlikte yürüyelim mi?', 'Bir kahve içelim mi? ☕', 'Görüşürüz, iyi günler! 👋'],
-  ball: ['Pas ver! ⚽', 'Gooool! 🙌', 'Güzel vuruş!'], selfie: ['Gülümseyin! 📸', 'Bir daha çekelim 😄', 'Bunu paylaşıyorum! #SFT'], dance: ['Bu şarkı süper! 🎶', 'Hadi dans! 💃🕺'], ice: ['Çilekli en iyisi 🍓', 'Benimki çikolatalı 🍫', 'Erimeden yiyelim 😋'],
+  ball: ['Pas ver! ⚽', 'Gooool! 🙌', 'Güzel vuruş!'], diva: ['Bugün çok güzelim 💅', 'Paparazziler nerede? 📸', 'Bu çanta yeni 👜', 'Kuaförden geliyorum ✨'], shop: ['Market indirimdeymiş 🛒', 'Süt almayı unuttum!', 'Poşetler çok ağır 😅'],
+  greet: ['Selam! Sen o kahramansın değil mi? 😮', 'Bir selfie çekebilir miyiz? 📸', 'Çak bir beşlik! ✋', 'Pardon, SFT Market nerede?', 'Kıyafetin çok havalı! 😎', 'Seni haberde gördüm! 📺', 'İmza verir misin? ✍️'], greet2: ['Teşekkürler, iyi günler! 👋', 'Harikasın! 🙌', 'Görüşürüz kanka! ✌️'], selfie: ['Gülümseyin! 📸', 'Bir daha çekelim 😄', 'Bunu paylaşıyorum! #SFT'], dance: ['Bu şarkı süper! 🎶', 'Hadi dans! 💃🕺'], ice: ['Çilekli en iyisi 🍓', 'Benimki çikolatalı 🍫', 'Erimeden yiyelim 😋'],
 };
 const L = k => adT(pick(LINES[k]));
 function freePed(n) { return n && !n.dead && n.holder.visible && !n.grp && n.state !== 'held' && n.state !== 'thrown' && n.state !== 'down' && n.state !== 'flee' && !n.follow && !n.inc && !n.sick && !n.stuck && !n.beach && !n.angry && FREE_ROLES.has(n.role) && !(G.CITY.talk && G.CITY.talk.n === n) && !(G.CITY.ev && G.CITY.ev.peds && G.CITY.ev.peds.includes(n)); }
@@ -347,7 +348,8 @@ function grpPull() {   // yakında boşta kimse yoksa: uzaktaki şehirlileri yak
 function grpForm() {
   { const P0 = G.player.position, nearN = G.CITY.peds.filter(n => freePed(n) && Math.hypot(n.holder.position.x - P0.x, n.holder.position.z - P0.z) < 45).length; if (nearN < 3) grpPull(); }
   const P = G.player.position, pool = G.CITY.peds.filter(n => freePed(n) && Math.hypot(n.holder.position.x - P.x, n.holder.position.z - P.z) < 150 && Math.hypot(n.holder.position.x - P.x, n.holder.position.z - P.z) > 6); if (pool.length < 2) return;
-  let kind = pick(['walk', 'walk', 'walk', 'meet', 'meet', 'chat', 'ball', 'selfie', 'dance', 'ice']); const sex = pick(['girls', 'boys', 'mix', 'mix']);
+  let kind = pick(['walk', 'walk', 'walk', 'meet', 'meet', 'chat', 'ball', 'selfie', 'dance', 'ice', 'diva', 'shop', 'shop', 'greet']); const sex = pick(['girls', 'boys', 'mix', 'mix']);
+  if (kind === 'diva' || kind === 'shop' || kind === 'greet') { const n = pool.filter(q => kind !== 'diva' || isGirl(q)).sort((x, y) => x.holder.position.distanceTo(P) - y.holder.position.distanceTo(P))[kind === 'greet' ? 0 : (Math.random() * Math.min(5, pool.length)) | 0]; if (!n || (kind === 'greet' && (GRP.list.some(g => g.kind === 'greet') || G.giant))) return; soloGroup(n, kind); return; }
   const want = kind === 'meet' || kind === 'ball' ? 2 : Math.random() < .55 ? 2 : 3, a = pick(pool), mem = [a];
   const ok = n => sex === 'girls' ? isGirl(n) : sex === 'boys' ? !isGirl(n) : true;
   const near = pool.filter(n => n !== a && ok(n)).sort((x, y) => x.holder.position.distanceTo(a.holder.position) - y.holder.position.distanceTo(a.holder.position));
@@ -361,6 +363,14 @@ function grpForm() {
   if (kind === 'ball') { const b = new T.Mesh(new T.SphereGeometry(.17, 14, 10), new T.MeshStandardMaterial({ color: 0xffffff, roughness: .5 })); G.scene.add(b); g.ball = { m: b, from: 0, t: 0 }; g.props.push(b); }
   GRP.list.push(g);
 }
+function soloGroup(n, kind) {   // 💃 diva · 🛍️ alışverişten dönen · 👋 bize gelip etkileşen
+  const g = { kind, sex: 'mix', mem: [n], t: 0, life: kind === 'greet' ? 22 : R(30, 50), st: kind === 'greet' ? 'come' : 'go', node: nearNode(n.holder.position.x, n.holder.position.z), next: -1, anchor: n.holder.position.clone(), dir: new T.Vector3(0, 0, 1), talkT: R(3, 7), props: [] };
+  n.grp = g; n.state = 'idle'; const M = c => new T.MeshStandardMaterial({ color: c, roughness: .5 });
+  if (kind === 'diva') { const bagM = new T.Mesh(new T.BoxGeometry(.26, .2, .1), M(pick([0xe91e63, 0xffd600, 0x212121, 0x9c27b0]))); bagM.position.set(0, -.3, .05); n.rig.armL.el.add(bagM); g.props.push(bagM); const gl = new T.Mesh(new T.BoxGeometry(.3, .07, .04), M(0x111111)); gl.position.set(0, .03, .16); n.rig.head.add(gl); g.props.push(gl); n.rig.bodyMat.color.setHex(pick([0xff4081, 0xe040fb, 0xffd740, 0xff6e40])); }
+  if (kind === 'shop') for (const arm of [n.rig.armL, n.rig.armR]) { const b = new T.Mesh(new T.BoxGeometry(.24, .3, .12), M(pick([0xffffff, 0xd50000, 0xfff3e0, 0xc8e6c9]))); b.position.set(0, -.5, 0); arm.el.add(b); g.props.push(b); const st = new T.Mesh(new T.TorusGeometry(.06, .01, 4, 10), M(0x9e9e9e)); st.position.set(0, -.33, 0); arm.el.add(st); g.props.push(st); }
+  if (kind === 'greet' && Math.random() < .5) { const ph = new T.Mesh(new T.BoxGeometry(.08, .14, .015), M(0x111111)); n.rig.armR.el.add(ph); ph.position.set(0, -.38, .05); g.props.push(ph); g.selfie = true; }
+  GRP.list.push(g);
+}
 function handOf(n) { return n.rig.armR.el; }
 function grpRelease(g) { const i = GRP.list.indexOf(g); if (i >= 0) GRP.list.splice(i, 1); for (const p of g.props) if (p.parent) p.parent.remove(p); for (const n of g.mem) { if (n.grp === g) { n.grp = null; if (n.state !== 'held' && n.state !== 'thrown') { n.state = 'idle'; n.timer = R(.5, 2); } } } }
 function grpTick(dt, t) {
@@ -371,8 +381,12 @@ function grpTick(dt, t) {
     g.talkT -= dt;
     if (g.kind === 'meet' && g.st === 'approach') { const [a, b] = g.mem, pa = a.holder.position, pb = b.holder.position, d = pa.distanceTo(pb); if (d < 1.4) { g.st = 'greet'; g.gt = 0; say(a, adT(pick(LINES.meet1)).replace('{a}', a.name), 2.2); } g.anchor.copy(pa).lerp(pb, .5); continue; }
     if (g.st === 'greet') { g.gt += dt; if (g.gt > 2.3 && !g.g2) { g.g2 = true; say(g.mem[1], adT(pick(LINES.meet2)).replace('{b}', g.mem[1].name), 2.2); } if (g.gt > 4.6 && !g.g3) { g.g3 = true; say(g.mem[0], L('meet3'), 2.2); } if (g.gt > 6.5) { if (Math.random() < .6) { g.kind = 'walk'; g.st = 'go'; g.sex = 'mix'; } else { grpRelease(g); } } continue; }
-    if (g.kind === 'walk' || g.kind === 'ice') { if (g.st === 'go') { if (g.next < 0) { const nb = G.CITY.nodes[g.node].nb || []; g.next = nb.length ? pick(nb) : g.node; } const tp = nodeW(g.next).clone(), d = Math.hypot(tp.x - g.anchor.x, tp.z - g.anchor.z); if (d < .8) { g.node = g.next; g.next = -1; } else { g.dir.set(tp.x - g.anchor.x, 0, tp.z - g.anchor.z).normalize(); g.anchor.addScaledVector(g.dir, Math.min(d, 1.35 * dt)); }
-        if (g.talkT <= 0) { g.talkT = R(7, 13); g.st = 'talk'; g.tt = 0; say(pick(g.mem), g.kind === 'ice' ? L('ice') : L(g.sex), 2.6); } }
+    if (g.kind === 'greet') { const n = g.mem[0], q = n.holder.position, d = Math.hypot(P.x - q.x, P.z - q.z);
+      if (g.st === 'come') { g.anchor.copy(q); if (d < 2.6) { g.st = 'talk'; g.tt = 0; say(n, L('greet'), 3); } else if (g.t > 14) { grpRelease(g); continue; } }
+      else if (g.st === 'talk') { g.tt += dt; if (g.tt > 3.3 && !g.rep) { g.rep = true; if (g.selfie) { burst(q.x, q.y + 2.2, q.z, 30, 3, 0xffffff, .3, 0); FAME.v += 120; } say(n, L('greet2'), 2.4); } if (g.tt > 6) { g.st = 'leave'; g.lt = 0; } }
+      else { g.lt = (g.lt || 0) + dt; if (g.lt > 4) { grpRelease(g); continue; } } continue; }
+    if (g.kind === 'walk' || g.kind === 'ice' || g.kind === 'diva' || g.kind === 'shop') { if (g.st === 'go') { if (g.next < 0) { const nb = G.CITY.nodes[g.node].nb || []; g.next = nb.length ? pick(nb) : g.node; } const tp = nodeW(g.next).clone(), d = Math.hypot(tp.x - g.anchor.x, tp.z - g.anchor.z); if (d < .8) { g.node = g.next; g.next = -1; } else { g.dir.set(tp.x - g.anchor.x, 0, tp.z - g.anchor.z).normalize(); g.anchor.addScaledVector(g.dir, Math.min(d, 1.35 * dt)); }
+        if (g.talkT <= 0) { g.talkT = R(7, 13); if (g.mem.length > 1 || g.kind === 'diva' || g.kind === 'shop') { g.st = g.mem.length > 1 ? 'talk' : 'go'; g.tt = 0; say(pick(g.mem), g.kind === 'ice' ? L('ice') : g.kind === 'diva' ? L('diva') : g.kind === 'shop' ? L('shop') : L(g.sex), 2.6); } } }
       else if (g.st === 'talk') { g.tt += dt; if (g.tt > 2.8 && !g.rep) { g.rep = true; say(pick(g.mem), g.kind === 'ice' ? L('ice') : L(g.sex), 2.4); } if (g.tt > 5.5) { g.st = 'go'; g.rep = false; } } }
     else if (g.kind === 'chat' || g.kind === 'selfie' || g.kind === 'dance') { if (g.talkT <= 0) { g.talkT = R(3.5, 6); say(pick(g.mem), g.kind === 'chat' ? L(g.sex) : L(g.kind), 2.4); if (g.kind === 'selfie') { const h = g.mem[0].holder.position; burst(h.x, h.y + 2.2, h.z, 20, 2, 0xffffff, .3, 0); } } }
     else if (g.kind === 'ball' && g.ball) { const B = g.ball, a = g.mem[B.from], b = g.mem[1 - B.from]; B.t += dt / 1.1; const pa = a.holder.position, pb = b.holder.position; B.m.position.lerpVectors(pa, pb, Math.min(1, B.t)); B.m.position.y = pa.y + .17 + Math.sin(Math.min(1, B.t) * Math.PI) * 1.2; if (B.t >= 1) { B.t = 0; B.from = 1 - B.from; if (Math.random() < .3) say(b, L('ball'), 1.4); } }
@@ -383,7 +397,11 @@ function grpNpc(n, dt) {   // updateNPC kancası: gruptaki kişiyi biz yönetiri
   const i = g.mem.indexOf(n), h = n.holder, r = n.rig, k = Math.min(1, dt * 6), t = G.elapsed; let spd = 0, face = null;
   if (g.kind === 'meet' && g.st === 'approach') { const o = g.mem[1 - i].holder.position; V1.subVectors(o, h.position).setY(0); const d = V1.length(); if (d > 1.2) { h.position.addScaledVector(V1.normalize(), Math.min(d - 1.2, 1.4 * dt)); spd = 1.4; } face = Math.atan2(o.x - h.position.x, o.z - h.position.z); }
   else if (g.st === 'greet') { const o = g.mem[1 - i].holder.position; face = Math.atan2(o.x - h.position.x, o.z - h.position.z); }
-  else if ((g.kind === 'walk' || g.kind === 'ice') && g.st === 'go') { const side = V2.set(g.dir.z, 0, -g.dir.x), off = (i - (g.mem.length - 1) / 2) * .9; V3.copy(g.anchor).addScaledVector(side, off).addScaledVector(g.dir, -Math.abs(off) * .15); V1.subVectors(V3, h.position).setY(0); const d = V1.length(); if (d > .05) h.position.addScaledVector(V1.normalize(), Math.min(d, (1.35 + d) * dt)); spd = 1.35; face = Math.atan2(g.dir.x, g.dir.z); }
+  else if (g.kind === 'greet') { const P = G.player.position; V1.subVectors(P, h.position).setY(0); const d = V1.length();
+    if (g.st === 'come' && d > 2) { h.position.addScaledVector(V1.normalize(), Math.min(d - 2, 2.3 * dt)); spd = 2.3; face = Math.atan2(V1.x, V1.z); }
+    else if (g.st === 'leave') { h.position.addScaledVector(V1.normalize(), -1.6 * dt); spd = 1.6; face = Math.atan2(-V1.x, -V1.z); }
+    else { face = Math.atan2(V1.x, V1.z); g.st === 'talk' && (G.facing = G.facing); } }
+  else if ((g.kind === 'walk' || g.kind === 'ice' || g.kind === 'diva' || g.kind === 'shop') && g.st === 'go') { const side = V2.set(g.dir.z, 0, -g.dir.x), off = (i - (g.mem.length - 1) / 2) * .9; V3.copy(g.anchor).addScaledVector(side, off).addScaledVector(g.dir, -Math.abs(off) * .15); V1.subVectors(V3, h.position).setY(0); const d = V1.length(); if (d > .05) h.position.addScaledVector(V1.normalize(), Math.min(d, (1.35 + d) * dt)); spd = 1.35; face = Math.atan2(g.dir.x, g.dir.z); }
   else { const c = g.anchor, ang = i / g.mem.length * Math.PI * 2 + (g.kind === 'ball' ? 0 : .5), rad = g.kind === 'ball' ? 2.4 : g.kind === 'selfie' ? .55 : .85; V3.set(c.x + Math.sin(ang) * rad, h.position.y, c.z + Math.cos(ang) * rad); V1.subVectors(V3, h.position).setY(0); const d = V1.length(); if (d > .05) { h.position.addScaledVector(V1.normalize(), Math.min(d, 1.4 * dt)); spd = d > .3 ? 1.4 : 0; }
     face = g.kind === 'selfie' ? Math.atan2(g.mem[0].holder.position.x - c.x, g.mem[0].holder.position.z - c.z) + (i ? 0 : 0) : Math.atan2(c.x - h.position.x, c.z - h.position.z); if (g.kind === 'selfie' && i === 0) face += Math.PI; }
   if (face != null) h.rotation.y += ((((face - h.rotation.y) + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * k;
@@ -397,6 +415,9 @@ function grpNpc(n, dt) {   // updateNPC kancası: gruptaki kişiyi biz yönetiri
     else if (talking) { r.armR.sh.rotation.x = -.6 + Math.sin(t * 5 + i * 2) * .5; r.armL.sh.rotation.x = -.3 + Math.sin(t * 4 + i) * .3; if (r.head) r.head.rotation.x = Math.sin(t * 6 + i) * .08; }
   }
   if (g.kind === 'ice' && spd >= .3) { r.armR.sh.rotation.x = -1.3; r.armR.el.rotation.x = -1.2; }
+  if (g.kind === 'diva') { r.armL.sh.rotation.x = -.5; r.armL.el.rotation.x = -1.5; r.armR.sh.rotation.z = -.35 + Math.sin(t * 4) * .1; r.torso.rotation.y = Math.sin(t * 5) * .12; if (r.head) r.head.rotation.x = -.12; }
+  if (g.kind === 'shop') { r.armL.sh.rotation.x = .05; r.armR.sh.rotation.x = .05; r.armL.sh.rotation.z = .12; r.armR.sh.rotation.z = -.12; }
+  if (g.kind === 'greet' && g.st === 'talk') { const tt = g.tt || 0; if (g.selfie) { r.armR.sh.rotation.x = -2.2; r.armR.el.rotation.x = -.2; } else if (tt < 1.4) { r.armR.sh.rotation.x = -2.8; r.armR.sh.rotation.z = -.3 + Math.sin(t * 9) * .4; } else if (tt > 3 && tt < 4) { r.armR.sh.rotation.x = -2.6; r.armR.el.rotation.x = -.1; } }
   return true;
 }
 
@@ -478,5 +499,5 @@ function tick(dt) {
 }
 function npc(n, dt) { const g = n.grp; if (!g) return false; if (g.kind === 'film') { if (!GRP.list.includes(g)) { n.grp = null; return false; } return filmNpc(n, dt, g); } return grpNpc(n, dt); }
 
-window.__sehir = { tick, npc, cam: cerCam, prompt, targets: alienTargets, ray: rayHit, blast, punch, invStart, invStop, cerStart, INV, CER, GRP, FAME, EMS, TAXI, FOOD };
+window.__sehir = { soloGroup, tick, npc, cam: cerCam, prompt, targets: alienTargets, ray: rayHit, blast, punch, invStart, invStop, cerStart, INV, CER, GRP, FAME, EMS, TAXI, FOOD };
 })(window.__sftG);
