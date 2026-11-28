@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.41</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.42</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -30410,7 +30410,7 @@ function miaHud() {
   if (MIA3.wanted > 0 && W === 'miami') parts.push(`<span class="mt">🚨 ${'⭐'.repeat(MIA3.wanted)}</span>`);
   if (MIA2.job && W === 'miami') parts.push(`<span class="mj">${{ medic: '🚑', police: '👮', taxi: '🚕', courier: '🍔' }[MIA2.job]} ${{ medic: adT('Paramedik'), police: adT('Polis'), taxi: adT('Taksi'), courier: adT('Kurye') }[MIA2.job]}</span>`);
   if (T && tg) { const d = Math.round(Math.hypot(tg.x - P.x, tg.z - P.z)), a = Math.atan2(tg.x - P.x, tg.z - P.z) - facing, ar = ['⬆️', '↗️', '➡️', '↘️', '⬇️', '↙️', '⬅️', '↖️'][((Math.round(-a / (Math.PI / 4)) % 8) + 8) % 8];
-    const tx = { heal: '🩺 ' + adT('Yaralıya ulaş'), catch: '🏃 ' + adT('Hırsızı yakala'), taxi: T.st === 'wait' ? '🙋 ' + adT('Yolcuyu al') : '📍 ' + T.dst.n, deliver: T.st === 'pick' ? '📦 ' + T.from.n : '🏠 ' + T.to.n }[T.k]; parts.push(`<span class="mt">${tx} · ${ar} ${d} m</span>`); }
+    const tx = T.k === 'heal' ? '🩺 ' + adT('Yaralıya ulaş') : T.k === 'catch' ? '🏃 ' + adT('Hırsızı yakala') : T.k === 'taxi' ? (T.st === 'wait' ? '🙋 ' + adT('Yolcuyu al') : '📍 ' + (T.dst ? T.dst.n : '')) : T.k === 'deliver' ? (T.st === 'pick' ? '📦 ' + (T.from ? T.from.n : '') : '🏠 ' + (T.to ? T.to.n : '')) : ''; parts.push(`<span class="mt">${tx} · ${ar} ${d} m</span>`); }
   if (F && F.holder.parent) { const st = F.hurt ? adT('yerde, yardım bekliyor') : F.state === 'idle' ? adT('duruyor') : F.state === 'flee' ? adT('kaçıyor') : adT('yürüyor'); parts.push(`<span class="mf">👣 ${F.name} · ${st} <button data-mh="unf">✕</button></span>`); }
   h.innerHTML = parts.join(''); h.style.display = 'flex';
   const it = miaNearInter(), heal = T && T.k === 'heal' && T.inc.vic && T.inc.vic.hurt && Math.hypot(T.inc.vic.holder.position.x - P.x, T.inc.vic.holder.position.z - P.z) < 3, taxi = T && T.k === 'taxi' && T.st === 'wait' && Math.hypot(T.n.holder.position.x - P.x, T.n.holder.position.z - P.z) < 3, pick = T && T.k === 'deliver' && T.st === 'pick' && Math.hypot(T.from.x - P.x, T.from.z - P.z) < 3;
