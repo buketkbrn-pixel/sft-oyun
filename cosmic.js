@@ -36,6 +36,10 @@ function snd(kind, vol = 1) {
   else if (kind === 'skylaser') { tone('sawtooth', 1600, 200, 0, 1, .12); tone('sine', 400, 80, 0, 1.1, .2); }
   else if (kind === 'meteor') { noise(0, 1, 500, .6, .2, 'lowpass'); tone('sine', 900, 120, 0, .9, .1); }
   else if (kind === 'impact') { tone('sine', 90, 25, 0, 1.2, .5); noise(0, 1, 400, .5, .45, 'lowpass'); }
+  else if (kind === 'freeze') { tone('sine', 2600, 1300, 0, .25, .06); tone('triangle', 1800, 900, .03, .2, .05); noise(0, .2, 5000, 1, .05, 'highpass'); }
+  else if (kind === 'shatter') { noise(0, .35, 3200, .8, .22); for (let k = 0; k < 6; k++) tone('sine', 2200 + Math.random() * 2400, 1500 + Math.random() * 1500, k * .03, .12, .04); }
+  else if (kind === 'frost') { noise(0, .2, 4500, .6, .04, 'highpass'); }
+  else if (kind === 'bliz') { noise(0, 2.4, 900, .5, .16, 'lowpass'); noise(.1, 2.2, 3500, .7, .08); tone('sine', 300, 120, 0, 1.6, .05); }
   else if (kind === 'zap') { noise(0, .07, 3200 + Math.random() * 1500, 1.4, .09, 'highpass'); tone('square', 1900, 380, 0, .05, .025); }
   else if (kind === 'shield') { tone('sine', 520, 780, 0, .4, .1); tone('sine', 780, 1170, .05, .4, .07); }
 }
@@ -69,7 +73,18 @@ function emit(x, y, z, vx, vy, vz, life, col) { const i = pI = (pI + 1) % NP, d 
 function burst(p, n, sp, col, life = .8) { for (let k = 0; k < n; k++) { V4.set(R(-1, 1), R(-1, 1), R(-1, 1)).normalize().multiplyScalar(R(.3, 1) * sp); emit(p.x, p.y, p.z, V4.x, V4.y, V4.z, R(life * .5, life), Math.random() < .5 ? col : PINK); } }
 function partsTick(dt) {
   for (let i = 0; i < NP; i++) { const d = pD[i]; if (d.l <= 0) continue; d.l -= dt; if (d.l <= 0) { pPos[i * 3 + 1] = -1e5; continue; } const k = d.l / d.m; pPos[i * 3] += d.v.x * dt; pPos[i * 3 + 1] += d.v.y * dt; pPos[i * 3 + 2] += d.v.z * dt; d.v.multiplyScalar(Math.exp(-1.5 * dt)); pCol[i * 3] = d.c.r * k; pCol[i * 3 + 1] = d.c.g * k; pCol[i * 3 + 2] = d.c.b * k; }
-  pGeo.attributes.position.needsUpdate = pGeo.attributes.color.needsUpdate = true;
+  pGeo.attributes.position.needsUpdate = pGeo.attributes.color.needsUpdate = true; coldTick(dt);
+}
+/* ❄️⚡ soğuk/beyaz parçacıklar: buz ve şimşek için (mor-pembe karışmaz) */
+const whiteTex = canvasTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.35, 'rgba(235,248,255,.55)'); gr.addColorStop(1, 'rgba(200,235,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
+const NC = 900, cPos = new Float32Array(NC * 3).fill(-1e5), cCol = new Float32Array(NC * 3), cD = [...Array(NC)].map(() => ({ l: 0, m: 1, v: new T.Vector3(), c: new T.Color() })), cGeo = new T.BufferGeometry(); cGeo.setAttribute('position', new T.BufferAttribute(cPos, 3)); cGeo.setAttribute('color', new T.BufferAttribute(cCol, 3));
+const cParts = new T.Points(cGeo, new T.PointsMaterial({ size: .32, map: whiteTex, vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending, toneMapped: false })); cParts.frustumCulled = false; G.scene.add(cParts);
+let cI = 0;
+function emitC(x, y, z, vx, vy, vz, life, col) { const i = cI = (cI + 1) % NC, d = cD[i]; d.l = d.m = life; d.v.set(vx, vy, vz); d.c.setHex(col); cPos[i * 3] = x; cPos[i * 3 + 1] = y; cPos[i * 3 + 2] = z; }
+function burstC(p, n, sp, col, life = .8) { for (let k = 0; k < n; k++) { V4.set(R(-1, 1), R(-1, 1), R(-1, 1)).normalize().multiplyScalar(R(.3, 1) * sp); emitC(p.x, p.y, p.z, V4.x, V4.y, V4.z, R(life * .5, life), Math.random() < .5 ? col : 0xffffff); } }
+function coldTick(dt) {
+  let any = false; for (let i = 0; i < NC; i++) { const d = cD[i]; if (d.l <= 0) continue; any = true; d.l -= dt; if (d.l <= 0) { cPos[i * 3 + 1] = -1e5; continue; } const k = Math.min(1, d.l / d.m * 1.6); cPos[i * 3] += d.v.x * dt; cPos[i * 3 + 1] += d.v.y * dt; cPos[i * 3 + 2] += d.v.z * dt; d.v.multiplyScalar(Math.exp(-1.2 * dt)); cCol[i * 3] = d.c.r * k; cCol[i * 3 + 1] = d.c.g * k; cCol[i * 3 + 2] = d.c.b * k; }
+  if (any) cGeo.attributes.position.needsUpdate = cGeo.attributes.color.needsUpdate = true;
 }
 
 /* ---------- 🟣 lazer ışınları (çekirdek + parıltı + çevresinde dolanan ışıklar) ---------- */
@@ -416,7 +431,7 @@ function skyStrike(p, h, dmg, tg) {   // gökten şimşek: hedefe çakar, yere s
   const hp = new T.Vector3(p.x, p.y + h * .5, p.z), top = new T.Vector3(p.x + R(-5, 5), p.y + 55, p.z + R(-5, 5));
   addBolt(top, hp, { w: .15, life: .34, jit: 1.1, br: 4, re: true });
   for (let k = 0; k < 3; k++) addBolt(hp, new T.Vector3(p.x + R(-2.2, 2.2), p.y + .05, p.z + R(-2.2, 2.2)), { w: .045, life: .25, jit: 1.3 });
-  burst(hp, 40, 7, 0xbfe0ff, .5); burst(hp, 16, 4, 0xffffff, .3); ring(V1.set(p.x, p.y + .2, p.z), 3.5, 0x8fc8ff);
+  burstC(hp, 40, 7, 0xbfe0ff, .5); burstC(hp, 16, 4, 0xffffff, .3); ring(V1.set(p.x, p.y + .2, p.z), 3.5, 0x8fc8ff);
   if (tg) { try { tg.hit(dmg, new T.Vector3(R(-1, 1), 1.4, R(-1, 1)).normalize(), 5); } catch (e) {} }
   hurtAll(hp, 2.2, Math.round(dmg * .35), 3, .6); sndThunder(.5); G.shake = Math.max(G.shake, .25);
 }
@@ -431,7 +446,7 @@ function storm() {   // ⛈️ yakındaki tüm düşmanlara şimşek
   TL.forEach(([o], k) => LT.pend.push({ t: .25 + k * .09, id: o.id, p: o.p.clone(), h: o.h, dmg: 60 }));
   if (!TL.length) for (let k = 0; k < 6; k++) { const a = R(0, 6.28), r = R(4, 14); LT.pend.push({ t: .25 + k * .1, p: new T.Vector3(P.x + Math.sin(a) * r, P.y, P.z + Math.cos(a) * r), h: .2, dmg: 30 }); }
   for (const s of [1, -1]) { const hh = hand(s, new T.Vector3()); addBolt(hh, hh.clone().add(V1.set(R(-3, 3), 40, R(-3, 3))), { w: .08, life: .35, br: 2, re: true }); }
-  burst(V1.set(P.x, P.y + 1, P.z), 50, 6, 0xbfe0ff, .6); sndThunder(.8); G.showMsg('⛈️ ' + adT(TL.length ? `Şimşek yağmuru! ${TL.length} düşman` : 'Şimşek yağmuru! Yakında düşman yok'), 1.6);
+  burstC(V1.set(P.x, P.y + 1, P.z), 50, 6, 0xbfe0ff, .6); sndThunder(.8); G.showMsg('⛈️ ' + adT(TL.length ? `Şimşek yağmuru! ${TL.length} düşman` : 'Şimşek yağmuru! Yakında düşman yok'), 1.6);
 }
 function boltLight() { if (G.INV.eq !== 'bolt') return; LT.light = !LT.light; snd('zap', 1); G.showMsg('💡 ' + adT(LT.light ? 'Elde büyük ışık açık' : 'Işık kapalı'), 1.2); }
 function zapTick(dt) {   // sağ tık: elden şimşek, en yakın hedefe kilitlenir ve 2 düşmana sıçrar
@@ -443,7 +458,7 @@ function zapTick(dt) {   // sağ tık: elden şimşek, en yakın hedefe kilitlen
   const hs = hand(-1, new T.Vector3()), aim = aimPoint(60), P = G.player.position; let end = aim, tgt = null, bd = 3.5;
   for (const o of targets()) { const d = Math.hypot(o.p.x - aim.x, o.p.y + o.h * .5 - aim.y, o.p.z - aim.z); if (d < bd + o.r) { bd = d; tgt = o; } }
   if (tgt) end = new T.Vector3(tgt.p.x, tgt.p.y + tgt.h * .5, tgt.p.z);
-  addBolt(hs, end, { w: .06, life: .08, br: 2 }); burst(end, 6, 4, 0xbfe0ff, .25); snd('zap', .45);
+  addBolt(hs, end, { w: .06, life: .08, br: 2 }); burstC(end, 6, 4, 0xbfe0ff, .25); snd('zap', .45);
   LT.dmgT -= .06; if (LT.dmgT > 0) return; LT.dmgT = .12;
   if (!tgt) { hurtAll(aim, 1.6, 8, 1.5); return; }
   try { tgt.hit(10, new T.Vector3(end.x - P.x, 0, end.z - P.z).normalize(), 1.5); } catch (e) {}
@@ -477,10 +492,109 @@ function ltTick(dt, t) {
   try { zapTick(dt); } catch (e) {} ltDecor(dt, t); boltsTick(dt);
 }
 
+/* ---------- ❄️ BUZ eşyası: vuruş dondurur (donmuşa vurunca kırılır) · sağ tık buz ışını (nişan kamerası) · X kar fırtınası · K buz kalkanı · koşarken buz yolu · kar tanesi gözler ---------- */
+const IC = { beam: false, beamT: 0, dmgT: 0, hissT: 0, chill: new Map(), cd: 0, cast: 0, shield: 0, shieldCd: 0, bliz: 0, frozen: new Map(), pend: [], tiles: [], lastTile: null, snowT: 0, spikes: [], halos: [], eyes: [], rig: null, dome: null };
+const icOn = () => G.INV.eq === 'ice' && !G.giant && !CO.on, ICE_C = 0x9fe6ff;
+const iceMat = new T.MeshStandardMaterial({ color: 0xcdf3ff, transparent: true, opacity: .55, roughness: .08, metalness: .1, emissive: 0x2a74a8, emissiveIntensity: .5, depthWrite: false });
+const crystalGeo = new T.OctahedronGeometry(1, 0), spikeGeo = new T.ConeGeometry(.3, 2.3, 6).translate(0, 1.15, 0), tileGeo = new T.CylinderGeometry(.78, .78, .035, 6);
+const snowGeo = w => { const parts = []; for (let k = 0; k < 3; k++) parts.push(new T.PlaneGeometry(w, 1).rotateZ(k * Math.PI / 3)); for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; for (const s of [1, -1]) parts.push(new T.PlaneGeometry(w * .8, .26).translate(0, .13, 0).rotateZ(s * .75).translate(0, .3, 0).rotateZ(a)); } return G.mergeGeometries(parts); };
+const SNOW_IN = snowGeo(.13), SNOW_OUT = snowGeo(.3);
+function crossSet(on, st) { const cr = document.getElementById('cross'); if (!cr) return; if (on) { st.cp = cr.style.display; cr.style.display = 'block'; } else cr.style.display = st.cp || 'none'; }
+function spikes(p, sc, life) { const g = new T.Group(); for (let k = 0; k < 5; k++) { const m = new T.Mesh(spikeGeo, iceMat); m.position.set(R(-.5, .5) * sc, 0, R(-.5, .5) * sc); m.rotation.set(R(-.45, .45), R(0, 3), R(-.45, .45)); m.scale.setScalar(sc * R(.6, 1.15)); g.add(m); } g.position.copy(p); g.scale.set(1, .01, 1); G.scene.add(g); IC.spikes.push({ g, t: 0, life }); }
+function freeze(o, sec) {
+  const id = o.id; if (!id || typeof id !== 'object') return; const was = id.__frz > 0; id.__frz = Math.max(id.__frz || 0, sec); if (was) return;
+  const g = new T.Group(); for (let k = 0; k < 7; k++) { const m = new T.Mesh(crystalGeo, iceMat); m.position.set(R(-.55, .55), R(.1, .95), R(-.55, .55)); m.scale.set(R(.3, .55), R(.45, .85), R(.3, .55)); m.rotation.set(R(0, 3), R(0, 3), R(0, 3)); g.add(m); }
+  const core = new T.Mesh(crystalGeo, iceMat); core.scale.set(.8, .6, .8); core.position.y = .5; g.add(core); G.scene.add(g); IC.frozen.set(id, { g });
+  burstC(V1.set(o.p.x, o.p.y + o.h * .5, o.p.z), 30, 4, ICE_C, .5); snd('freeze', .7);
+}
+function shatterFx(p, h) { const c = new T.Vector3(p.x, p.y + h * .5, p.z); burstC(c, 50, 8, ICE_C, .6); burstC(c, 24, 6, 0xffffff, .4); snd('shatter', .8); }
+function icePunch(dir) {   // 👊 vuruş dondurur · donmuş düşmana vurunca buz kırılır, ekstra hasar
+  if (!icOn()) return; const P = G.player.position, fa = Math.atan2(dir.x, dir.z), hs = hand(-1, new T.Vector3()); burstC(hs, 14, 3, ICE_C, .4); snd('freeze', .45);
+  for (const o of targets()) { const dx = o.p.x - P.x, dz = o.p.z - P.z, d = Math.hypot(dx, dz); if (d > 3.2 + o.r) continue; if (Math.abs(G.wrapAng(Math.atan2(dx, dz) - fa)) > 1.1 && d > 1.2) continue;
+    if (o.id.__frz > 0) { o.id.__frz = 0; try { o.hit(35, new T.Vector3(dx, .3, dz).normalize(), 7); } catch (e) {} shatterFx(o.p, o.h); } else freeze(o, 2.6); }
+}
+function blizzard() {   // 🌨️ kar fırtınası: yakındaki tüm düşmanlar donar, altlarından buz dikenleri çıkar
+  if (!icOn() || IC.cd > 0) return; IC.cd = 5; IC.cast = .9; IC.bliz = 3.2; const P = G.player.position;
+  const TL = targets().map(o => [o, Math.hypot(o.p.x - P.x, o.p.z - P.z)]).filter(x => x[1] < 25).sort((a, b) => a[1] - b[1]).slice(0, 14);
+  TL.forEach(([o], k) => IC.pend.push({ t: .3 + k * .06, id: o.id }));
+  for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; spikes(new T.Vector3(P.x + Math.sin(a) * 2.6, P.y, P.z + Math.cos(a) * 2.6), .7, 1.4); }
+  snd('bliz', 1); G.showMsg('🌨️ ' + adT(TL.length ? `Kar fırtınası! ${TL.length} düşman dondu` : 'Kar fırtınası! Yakında düşman yok'), 1.8);
+}
+function iceShield() {   // 🛡️ buz kalkanı: 6 sn hasar almazsın · bitince ya da tekrar basınca patlar, yakındakileri dondurur
+  if (G.INV.eq !== 'ice' || CO.on) return; if (IC.shield > 0) { shatterShield(); return; }
+  if (IC.shieldCd > 0) { G.showMsg('🛡️ ' + adT('Kalkan dolmadı') + ' ' + Math.ceil(IC.shieldCd) + ' sn', 1); return; }
+  if (!IC.dome) { const g = new T.Group(), sm = new T.MeshStandardMaterial({ color: 0xd8f6ff, transparent: true, opacity: .26, roughness: .05, metalness: .2, emissive: 0x3a90c8, emissiveIntensity: .45, side: T.DoubleSide, depthWrite: false });
+    g.add(new T.Mesh(new T.SphereGeometry(1.95, 28, 18), sm)); g.add(new T.Mesh(new T.IcosahedronGeometry(2.02, 1), new T.MeshBasicMaterial({ color: 0xbfefff, wireframe: true, transparent: true, opacity: .45, blending: T.AdditiveBlending, depthWrite: false })));
+    for (let k = 0; k < 14; k++) { const m = new T.Mesh(crystalGeo, iceMat), a = R(0, 6.28), e = R(-.3, 1.2); m.position.set(Math.cos(a) * Math.cos(e) * 1.95, Math.sin(e) * 1.95, Math.sin(a) * Math.cos(e) * 1.95); m.lookAt(0, 0, 0); m.scale.set(.18, .18, R(.4, .7)); g.add(m); }
+    g.traverse(o => o.frustumCulled = false); G.scene.add(g); IC.dome = g; }
+  IC.shield = 6; IC.domeK = 0; IC.dome.visible = true; snd('freeze', 1); G.showMsg('🛡️ ' + adT(G.touchMode ? 'Buz kalkanı! 6 sn hasar almazsın · 🛡️ tekrar: patlat' : 'Buz kalkanı! 6 sn hasar almazsın · tekrar K: patlat'), 2);
+}
+function shatterShield(quiet) {
+  IC.shield = 0; IC.shieldCd = 6; if (IC.dome) IC.dome.visible = false; if (quiet) return; const P = G.player.position, c = new T.Vector3(P.x, P.y + 1, P.z);
+  burstC(c, 140, 10, ICE_C, .8); burstC(c, 50, 7, 0xffffff, .5); ring(V1.set(P.x, P.y + .3, P.z), 7, ICE_C); snd('shatter', 1); G.shake = Math.max(G.shake, .3);
+  for (const o of targets()) { const dx = o.p.x - P.x, dz = o.p.z - P.z, d = Math.hypot(dx, dz); if (d > 6 + o.r) continue; try { o.hit(30, new T.Vector3(dx, .5, dz).normalize(), 10); } catch (e) {} freeze(o, 3); }
+}
+const bmCore = new T.Mesh(new T.CylinderGeometry(.05, .05, 1, 8, 1, true).translate(0, .5, 0), addMat(0xffffff, .9)), bmShell = new T.Mesh(new T.CylinderGeometry(.17, .17, 1, 10, 1, true).translate(0, .5, 0), addMat(0x7fd8ff, .35));
+for (const m of [bmCore, bmShell]) { m.visible = false; m.frustumCulled = false; G.scene.add(m); }
+function beamTick(dt, t) {   // sağ tık: buz ışını · hedefi üşütür, 0.6 sn tutunca dondurur
+  const want = icOn() && G.laserHeld && !G.dead; if (want !== IC.beam) { IC.beam = want; crossSet(want, IC); }
+  bmCore.visible = bmShell.visible = want; if (!want) return;
+  G.camera.getWorldDirection(V2); const fa = Math.atan2(V2.x, V2.z); G.facing = fa; G.charHolder.rotation.y = fa;
+  const hs = hand(-1, new T.Vector3()), aim = aimPoint(50), P = G.player.position; let end = aim, tgt = null, bd = 3.5;
+  for (const o of targets()) { const d = Math.hypot(o.p.x - aim.x, o.p.y + o.h * .5 - aim.y, o.p.z - aim.z); if (d < bd + o.r) { bd = d; tgt = o; } }
+  if (tgt) end = new T.Vector3(tgt.p.x, tgt.p.y + tgt.h * .5, tgt.p.z);
+  V1.subVectors(end, hs); const L = V1.length() || .01, dir = V1.clone().divideScalar(L), wob = 1 + Math.sin(t * 30) * .15;
+  for (const m of [bmCore, bmShell]) { m.position.copy(hs); m.quaternion.setFromUnitVectors(UP, dir); m.scale.set(wob, L, wob); }
+  const p1 = new T.Vector3().crossVectors(dir, Math.abs(dir.y) > .9 ? LX : UP).normalize(), p2 = new T.Vector3().crossVectors(dir, p1);
+  for (let k = 0; k < 5; k++) { const s = R(0, L), a = t * 12 + s * 3 + k * 1.3; V3.copy(hs).addScaledVector(dir, s).addScaledVector(p1, Math.cos(a) * .24).addScaledVector(p2, Math.sin(a) * .24); emitC(V3.x, V3.y, V3.z, R(-.3, .3), R(-.4, .2), R(-.3, .3), .45, k % 2 ? 0xffffff : ICE_C); }
+  burstC(end, 3, 3, ICE_C, .3); IC.hissT -= dt; if (IC.hissT <= 0) { IC.hissT = .16; snd('frost', .45); }
+  IC.beamT -= dt; if (IC.beamT <= 0 && !tgt && end.y - P.y < .6) { IC.beamT = .3; spikes(new T.Vector3(end.x, P.y, end.z), .35, .8); }
+  IC.dmgT -= dt; if (IC.dmgT > 0) return; IC.dmgT = .12;
+  if (!tgt) { hurtAll(end, 1.4, 4, .5); return; }
+  try { tgt.hit(5, new T.Vector3(dir.x, 0, dir.z).normalize(), .4); } catch (e) {}
+  const c = (IC.chill.get(tgt.id) || 0) + .2; if (c >= .6 && !(tgt.id.__frz > 0)) { freeze(tgt, 3); IC.chill.delete(tgt.id); } else IC.chill.set(tgt.id, c);
+}
+function icDecor(dt, t) {   // kar tanesi gözler, buz bileklik, etrafta kar taneleri
+  const r = G.playerRig, on = icOn() && !G.dead && r && r.stick && r.stick.visible !== false;
+  if (r && IC.rig !== r) { for (const o of [...IC.halos, ...IC.eyes]) if (o.parent) o.parent.remove(o); IC.halos = []; IC.eyes = []; IC.rig = null; }
+  if (on && !IC.rig) { IC.rig = r;
+    for (const arm of [r.armL, r.armR]) { const g = new T.Group(); g.position.set(0, -.27, 0); const tor = new T.Mesh(new T.TorusGeometry(.085, .014, 6, 28), new T.MeshStandardMaterial({ color: 0xe6faff, roughness: .1, metalness: .3, emissive: 0x4aa8e0, emissiveIntensity: .6 })); tor.rotation.x = Math.PI / 2; g.add(tor);
+      for (let k = 0; k < 8; k++) { const m = new T.Mesh(crystalGeo, iceMat), a = k / 8 * Math.PI * 2; m.position.set(Math.cos(a) * .1, 0, Math.sin(a) * .1); m.scale.set(.02, .025, .02); m.lookAt(0, 0, 0); m.scale.z = .055; g.add(m); }
+      arm.el.add(g); IC.halos.push(g); }
+    for (const s of [1, -1]) { const m = new T.Group(), o = new T.Mesh(SNOW_OUT, new T.MeshBasicMaterial({ color: 0x0c1a33, side: T.DoubleSide })), f = new T.Mesh(SNOW_IN, new T.MeshBasicMaterial({ color: 0x6fe4ff, side: T.DoubleSide, toneMapped: false }));
+      o.scale.setScalar(1.12); o.position.z = -.004; m.add(o, f); m.position.set(.066 * s, .04, .183); m.rotation.set(-.2, .4 * s, 0); m.scale.setScalar(.1); r.head.add(m); IC.eyes.push(m); } }
+  for (const o of [...IC.halos, ...IC.eyes]) o.visible = !!on;
+  if (!on) return;
+  IC.halos.forEach((g, i) => g.rotation.y += dt * (i ? 1.5 : -1.5)); IC.eyes.forEach((m, i) => m.children[1].rotation.z = Math.sin(t * 1.5 + i) * .3);
+  IC.snowT -= dt; if (IC.snowT <= 0) { IC.snowT = .05; const P = G.player.position, a = R(0, 6.28), rr = R(.3, 1.6); emitC(P.x + Math.cos(a) * rr, P.y + R(.5, 2.4), P.z + Math.sin(a) * rr, R(-.2, .2), R(-.6, -.2), R(-.2, .2), 1.2, Math.random() < .7 ? 0xffffff : ICE_C);
+    if (Math.random() < .5) { const hs = hand(Math.random() < .5 ? 1 : -1, new T.Vector3()); emitC(hs.x, hs.y, hs.z, R(-.3, .3), R(-.4, 0), R(-.3, .3), .6, 0xd8f6ff); } }
+}
+function pathTick(dt) {   // koşarken buz yolu
+  for (const tl of IC.tiles) { if (tl.t >= tl.life) continue; tl.t += dt; tl.m.visible = tl.t < tl.life; tl.m.scale.setScalar(Math.min(tl.s, .2 + tl.t * 8)); tl.m.material.opacity = .62 * Math.min(1, (tl.life - tl.t) / 1.2); }
+  if (!icOn() || !G.onGround || G.dead) { IC.lastTile = null; return; } const P = G.player.position;
+  if (IC.lastTile && Math.hypot(P.x - IC.lastTile.x, P.z - IC.lastTile.z) < .95) return; const first = !IC.lastTile; IC.lastTile = P.clone(); if (first) return;
+  let tl = IC.tiles.find(x => x.t >= x.life); if (!tl) { if (IC.tiles.length < 70) { tl = { m: new T.Mesh(tileGeo, new T.MeshStandardMaterial({ color: 0xc4efff, transparent: true, opacity: .62, roughness: .04, metalness: .25, emissive: 0x3a8cc0, emissiveIntensity: .35, depthWrite: false })) }; tl.m.renderOrder = 2; G.scene.add(tl.m); IC.tiles.push(tl); } else tl = IC.tiles.reduce((a, b) => a.t > b.t ? a : b); }
+  Object.assign(tl, { t: 0, life: 5, s: R(.9, 1.2) }); tl.m.position.set(P.x, P.y + .025, P.z); tl.m.rotation.y = R(0, 1.05); tl.m.visible = true; emitC(P.x, P.y + .1, P.z, R(-1, 1), R(.3, 1), R(-1, 1), .5, ICE_C);
+}
+function icTick(dt, t) {
+  IC.cd = Math.max(0, IC.cd - dt); IC.cast = Math.max(0, IC.cast - dt); IC.shieldCd = Math.max(0, IC.shieldCd - dt);
+  const TL = targets(), byId = new Map(); for (const o of TL) { byId.set(o.id, o); if (o.id.__frz > 0) o.id.__frz -= dt; }
+  for (const [id, f] of IC.frozen) { const o = byId.get(id); if (!o || !(id.__frz > 0)) { if (o) shatterFx(o.p, o.h); G.scene.remove(f.g); IC.frozen.delete(id); id.__frz = 0; continue; } const rr = o.r * 1.7 + .5; f.g.position.set(o.p.x, o.p.y, o.p.z); f.g.scale.set(rr, o.h * 1.05, rr); }
+  for (const [id, c] of IC.chill) { const v = c - dt * .5; if (v <= 0) IC.chill.delete(id); else IC.chill.set(id, v); }
+  for (let i = IC.pend.length - 1; i >= 0; i--) { const q = IC.pend[i]; q.t -= dt; if (q.t > 0) continue; IC.pend.splice(i, 1); const o = byId.get(q.id); if (!o) continue; spikes(new T.Vector3(o.p.x, o.p.y, o.p.z), .6 + o.r * .5, 1.5); try { o.hit(25, new T.Vector3(0, 1, 0), 3); } catch (e) {} freeze(o, 4); }
+  for (let i = IC.spikes.length - 1; i >= 0; i--) { const s = IC.spikes[i]; s.t += dt; const up = Math.min(1, s.t / .18), dn = Math.max(0, (s.t - s.life) / .3); s.g.scale.y = Math.max(.01, up * (1 - dn)); if (dn >= 1) { G.scene.remove(s.g); IC.spikes.splice(i, 1); } }
+  if (IC.bliz > 0) { IC.bliz -= dt; const P = G.player.position; for (let k = 0; k < 16; k++) { const a = R(0, 6.28), rr = R(1, 17), sp = R(6, 11); emitC(P.x + Math.cos(a) * rr, P.y + R(0, 7), P.z + Math.sin(a) * rr, -Math.sin(a) * sp, R(-2.5, -.5), Math.cos(a) * sp, .9, Math.random() < .75 ? 0xffffff : ICE_C); } }
+  $('icFrost').style.opacity = Math.max(0, Math.min(1, IC.bliz)) * .9;
+  if (IC.shield > 0) { if (G.INV.eq !== 'ice' || CO.on) shatterShield(true); else { IC.shield -= dt; IC.domeK = Math.min(1, IC.domeK + dt * 5); const P = G.player.position; IC.dome.position.set(P.x, P.y + 1, P.z); IC.dome.rotation.y += dt * .5; IC.dome.scale.setScalar(IC.domeK * (1 + Math.sin(t * 3) * .015)); if (IC.shield <= 0) shatterShield(); } }
+  try { beamTick(dt, t); } catch (e) {} pathTick(dt); icDecor(dt, t);
+}
+document.head.insertAdjacentHTML('beforeend', '<style>#icFrost{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;background:radial-gradient(ellipse at center,rgba(220,245,255,0) 50%,rgba(200,238,255,.5) 85%,rgba(235,250,255,.85) 100%)}</style>');
+document.body.insertAdjacentHTML('beforeend', '<div id="icFrost"></div>');
+
 /* ---------- 🙌 el kol hareketleri ---------- */
 function pose(r, dt) {
-  if (r && ltOn() && (LT.zap || LT.cast > 0)) { const k = 1 - Math.exp(-14 * dt), S = (o, ax, v) => { o.rotation[ax] += (v - o.rotation[ax]) * k; };   // ⚡ şimşek: sağ kol ileri / iki kol göğe
-    if (LT.cast > 0) { for (const [a, s] of [[r.armL, 1], [r.armR, -1]]) { S(a.sh, 'x', -3); S(a.sh, 'z', .3 * s); S(a.el, 'x', -.1); } return; }
+  if (r && ((ltOn() && (LT.zap || LT.cast > 0)) || (icOn() && (IC.beam || IC.cast > 0)))) { const cast = LT.cast > 0 || IC.cast > 0; const k = 1 - Math.exp(-14 * dt), S = (o, ax, v) => { o.rotation[ax] += (v - o.rotation[ax]) * k; };   // ⚡ şimşek: sağ kol ileri / iki kol göğe
+    if (cast) { for (const [a, s] of [[r.armL, 1], [r.armR, -1]]) { S(a.sh, 'x', -3); S(a.sh, 'z', .3 * s); S(a.el, 'x', -.1); } return; }
     const ap = Math.max(-1, Math.min(1, G.pitch * .8 - .05)); S(r.armR.sh, 'x', -1.57 + ap); S(r.armR.sh, 'z', -.12); S(r.armR.el, 'x', -.05); return; }
   if (!r || (!CO.on && !CO.anim)) return; const k = 1 - Math.exp(-14 * dt), S = (o, ax, v) => { o.rotation[ax] += (v - o.rotation[ax]) * k; }, t = G.elapsed;
   if (CO.anim && CO.anim.type === 'in') { for (const [a, s] of [[r.armL, 1], [r.armR, -1]]) { S(a.sh, 'x', -1.25); S(a.sh, 'z', .3 * s); S(a.el, 'x', -1.1); } return; }
@@ -493,7 +607,7 @@ function pose(r, dt) {
 
 /* ---------- 🌐 çok oyunculu: arkadaşın kalkanı seni de korur ---------- */
 function net(m) { if (m.t !== 'cosh') return; const P = G.player.position; CO.friendP = new T.Vector3(m.x, m.y + 1, m.z); CO.friendT = G.elapsed + .6; if (Math.hypot(P.x - m.x, P.y - m.y, P.z - m.z) < (m.r || 8)) CO.allyT = G.elapsed + .7; }
-function blocks() { return (CO.on && G.shielding) || CO.allyT > G.elapsed; }
+function blocks() { return (CO.on && G.shielding) || CO.allyT > G.elapsed || IC.shield > 0; }
 
 /* ---------- ⏱️ her kare (gökyüzü güncellemesinden sonra) ---------- */
 function late(dt) {
@@ -502,11 +616,13 @@ function late(dt) {
   const t = G.elapsed;
   if (dt) { animTick(dt); rushTick(dt, t); laserTick(dt, t); strikesTick(dt, t); shadowsTick(dt, t); swordTick(dt, t); fxTick(dt, t); ringsTick(dt); partsTick(dt); }
   if (dt) try { ltTick(dt, t); } catch (e) {}
+  if (dt) try { icTick(dt, t); } catch (e) {}
   shieldTick(dt, t); skyTick(dt); ui();
 }
 function prompt() { if (G.INV.eq !== 'cosmic' || CO.on || CO.anim || G.giant) return null; return [(G.touchMode ? '👆 ' : 'V — ') + '🔮 ' + adT('Küreyi kullan'), activate]; }
 function key(code) {
   if (ltOn()) { if (code === 'KeyX') { storm(); return true; } if (code === 'KeyK') { boltLight(); return true; } }   // ⚡ şimşek tuşları
+  if (icOn()) { if (code === 'KeyX') { blizzard(); return true; } if (code === 'KeyK') { iceShield(); return true; } }   // ❄️ buz tuşları
   if (!CO.on) return false; if (code === 'KeyK') { deactivate(true); return true; } if (code === 'KeyX') { strike(); return true; } if (code === 'KeyC') { shadowsKey(); return true; } if (code === 'KeyZ') { swordKey(); return true; }
   if (SW.list.length) { const m = /^(?:Digit|Numpad)([0-9])$/.exec(code); if (m) { const n = +m[1]; if (n) setCount(n); else swDismiss(); return true; } }   // 🗡️ 1-9 kaç kılıç · 0 kapat
   return false; }
@@ -525,8 +641,8 @@ $('cosSwNum').addEventListener('click', e => { e.stopPropagation(); const b = e.
 document.head.insertAdjacentHTML('beforeend', `<style>#ltStorm{position:fixed;right:14px;top:calc(36% + env(safe-area-inset-top));z-index:7;display:none;width:62px;height:62px;border-radius:50%;border:2px solid rgba(190,225,255,.8);background:radial-gradient(circle,#3b8cff,#0b1f5c);color:#fff;font-size:28px;box-shadow:0 0 16px rgba(110,180,255,.8)}#ltStorm.cd{opacity:.45}</style>`);
 document.body.insertAdjacentHTML('beforeend', '<button id="ltStorm">⛈️</button>');
 for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $('ltStorm').addEventListener(ev, e => e.stopPropagation(), { passive: true });
-$('ltStorm').addEventListener('click', e => { e.stopPropagation(); storm(); });
-function ui() { const ls = $('ltStorm'), lv = ltOn() && G.touchMode && !G.paused; ls.style.display = lv ? 'block' : 'none'; if (lv) ls.classList.toggle('cd', LT.cd > 0); const p = $('cosPad'); p.style.display = CO.on && G.touchMode && !G.paused ? 'flex' : 'none'; if (!CO.on) return; $('cosStrike').classList.toggle('cd', CO.cd > 0); $('cosShadow').classList.toggle('on', SH.list.some(s => !s.dead && !s.recall)); const sw = SW.list.length > 0; p.classList.toggle('sw', sw); $('cosSword').classList.toggle('on', sw); $('cosSwM').classList.toggle('on', SW.giant); const nt = '×' + SW.n; if ($('cosSwN').textContent !== nt) { $('cosSwN').textContent = nt; for (const b of $('cosSwNum').children) b.classList.toggle('sel', +b.dataset.n === SW.n); } if (!sw) $('cosSwNum').classList.remove('open'); }
+$('ltStorm').addEventListener('click', e => { e.stopPropagation(); if (icOn()) blizzard(); else storm(); });
+function ui() { const ls = $('ltStorm'), ice = icOn(), lv = (ltOn() || ice) && G.touchMode && !G.paused; ls.style.display = lv ? 'block' : 'none'; if (lv) { ls.classList.toggle('cd', (ice ? IC.cd : LT.cd) > 0); const lb = ice ? '🌨️' : '⛈️'; if (ls.textContent !== lb) ls.textContent = lb; } const p = $('cosPad'); p.style.display = CO.on && G.touchMode && !G.paused ? 'flex' : 'none'; if (!CO.on) return; $('cosStrike').classList.toggle('cd', CO.cd > 0); $('cosShadow').classList.toggle('on', SH.list.some(s => !s.dead && !s.recall)); const sw = SW.list.length > 0; p.classList.toggle('sw', sw); $('cosSword').classList.toggle('on', sw); $('cosSwM').classList.toggle('on', SW.giant); const nt = '×' + SW.n; if ($('cosSwN').textContent !== nt) { $('cosSwN').textContent = nt; for (const b of $('cosSwNum').children) b.classList.toggle('sel', +b.dataset.n === SW.n); } if (!sw) $('cosSwNum').classList.remove('open'); }
 
-window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey, mergeKey, setCount, swDismiss, swOn: () => CO.on && SW.list.length > 0, camK, lasing: () => !!CO.lasOn || LT.zap, boltPunch, boltLight, boltLightOn: () => LT.light && G.INV.eq === 'bolt', storm, LT };
+window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey, mergeKey, setCount, swDismiss, swOn: () => CO.on && SW.list.length > 0, camK, lasing: () => !!CO.lasOn || LT.zap || IC.beam, icePunch, iceShield, iceShieldOn: () => IC.shield > 0, blizzard, IC, boltPunch, boltLight, boltLightOn: () => LT.light && G.INV.eq === 'bolt', storm, LT };
 })(window.__sftG);

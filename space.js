@@ -163,6 +163,7 @@ function mobTick(dt, t) {
   if (SP.spT <= 0) { SP.spT = .8; if (nG < 8) spawnMob('germ'); else if (nC < 3) spawnMob('beast'); }
   for (let i = SP.mobs.length - 1; i >= 0; i--) { const m = SP.mobs[i], g = m.g, q = g.position;
     if (m.dead) { m.dead += dt; g.scale.multiplyScalar(1 + dt * 3); g.traverse(o => { if (o.material && 'opacity' in o.material) { o.material.transparent = true; o.material.opacity = Math.max(0, 1 - m.dead * 2.5); } }); if (m.dead > .45) { SP.g.remove(g); SP.mobs.splice(i, 1); } continue; }
+    if (m.__frz > 0) continue;   // ❄️ donmuş
     const dx = lp.x - q.x, dy = lp.y - q.y, dz = lp.z - q.z, d = Math.hypot(dx, dy, dz) || 1, sp = m.kind === 'germ' ? (m.small ? 4.6 : 3.4) : 2.2, want = m.kind === 'germ' ? .9 : 9;
     if (d > want) m.vel.lerp(new T.Vector3(dx / d * sp, dy / d * sp, dz / d * sp), Math.min(1, dt * 1.8)); else m.vel.multiplyScalar(Math.exp(-3 * dt));
     for (const o of SP.mobs) if (o !== m && !o.dead) { const ox = q.x - o.g.position.x, oy = q.y - o.g.position.y, oz = q.z - o.g.position.z, od = Math.hypot(ox, oy, oz); if (od < 2.4 && od > .01) m.vel.add(new T.Vector3(ox, oy, oz).multiplyScalar(dt * 6 / od)); }

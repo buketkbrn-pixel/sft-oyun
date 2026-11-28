@@ -264,6 +264,7 @@ function skelTick(s, dt, P) {
   const h = s.h, q = h.position, sc = s.big ? 2.6 : 1, a = A(); s.t += dt; s.hurt = Math.max(0, s.hurt - dt);
   if (s.st === 'rise') { q.y = Math.min(0, -1.8 * sc + s.t * 1.5 * sc); G.animateStick(s.rig, dt, { speed: 0 }); if (q.y >= 0) { s.st = 'chase'; s.t = 0; } return; }
   if (s.st === 'dead') { s.rig.stick.rotation.x = Math.max(-1.5, s.rig.stick.rotation.x - dt * 4); q.y = Math.max(-.25 * sc, q.y - dt * .2); if (s.t > 3.5) { h.visible = false; s.gone = true; } return; }
+  if (s.__frz > 0) return;   // ❄️ donmuş
   const dx = P.x - q.x, dz = P.z - q.z, d = Math.hypot(dx, dz);
   h.rotation.y += G.wrapAng(Math.atan2(dx, dz) - h.rotation.y) * Math.min(1, dt * 8);
   let sp = 0; const reach = 1.25 * sc;
