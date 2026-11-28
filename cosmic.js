@@ -36,6 +36,10 @@ function snd(kind, vol = 1) {
   else if (kind === 'skylaser') { tone('sawtooth', 1600, 200, 0, 1, .12); tone('sine', 400, 80, 0, 1.1, .2); }
   else if (kind === 'meteor') { noise(0, 1, 500, .6, .2, 'lowpass'); tone('sine', 900, 120, 0, .9, .1); }
   else if (kind === 'impact') { tone('sine', 90, 25, 0, 1.2, .5); noise(0, 1, 400, .5, .45, 'lowpass'); }
+  else if (kind === 'clink') { tone('sine', 2900 + Math.random() * 600, 2800, 0, .09, .025); }
+  else if (kind === 'rumble') { noise(0, 1.4, 140, .7, .28, 'lowpass'); tone('sine', 55, 32, 0, 1.4, .14); }
+  else if (kind === 'scream') { const f = 760 + Math.random() * 240; tone('sawtooth', f, f * 1.35, 0, .6, .03); tone('sine', f * 1.5, f * 1.9, .03, .55, .045); }
+  else if (kind === 'thud') { noise(0, .28, 260, .8, .22, 'lowpass'); tone('sine', 95, 48, 0, .22, .12); }
   else if (kind === 'freeze') { tone('sine', 2600, 1300, 0, .25, .06); tone('triangle', 1800, 900, .03, .2, .05); noise(0, .2, 5000, 1, .05, 'highpass'); }
   else if (kind === 'shatter') { noise(0, .35, 3200, .8, .22); for (let k = 0; k < 6; k++) tone('sine', 2200 + Math.random() * 2400, 1500 + Math.random() * 1500, k * .03, .12, .04); }
   else if (kind === 'frost') { noise(0, .2, 4500, .6, .04, 'highpass'); }
@@ -321,7 +325,7 @@ function idlePos(s, out) {
   return out.set(P.x - cf * rx - sf * bk, P.y + 1.45 + k * .42 + Math.sin(t * 2 + s.i) * .08, P.z + sf * rx - cf * bk);
 }
 function idleQuat(s, pos, q) { const P = G.player.position; V2.set(pos.x - P.x, 0, pos.z - P.z); const L = V2.length() || 1; V2.multiplyScalar((s.big ? .3 : .3 + (s.i >> 1) * .14) / L); V2.y = 1; if (s.big) { V2.x += Math.sin(G.facing) * .45; V2.z += Math.cos(G.facing) * .45; } return q.setFromUnitVectors(UP, V2.normalize()); }
-let camAdd = 0; function camK(dt) { camAdd += ((SW.giant && CO.on ? 5.5 : 0) + (HD.on && CO.on ? 3.5 + 1.8 * HD.S : 0) - camAdd) * Math.min(1, (dt || .016) * 3); return camAdd; }   // dev kılıç varken kamera biraz geri çekilir
+let camAdd = 0; function camK(dt) { camAdd += ((SW.giant && CO.on ? 5.5 : 0) + (HD.on && CO.on ? Math.min(42, 3.5 + 1.8 * HD.S) : 0) - camAdd) * Math.min(1, (dt || .016) * 3); return camAdd; }   // dev kılıç varken kamera biraz geri çekilir
 function newSword(i, from, big) { const s = { g: swordMesh(big ? 2 : 0), i, big: !!big, mode: 'idle', t: 0, hit: false, hold: 0, born: 0 }; s.g.scale.setScalar(.01); if (from) s.g.position.copy(from); else idlePos(s, s.g.position); idleQuat(s, s.g.position, s.g.quaternion); G.scene.add(s.g); return s; }
 function dropSword(s) { burst(s.g.position, s.big ? 120 : 24, s.big ? 9 : 4, PURPLE, .6); G.scene.remove(s.g); }
 function swHelp(n) { return G.touchMode ? `Kozmik kılıç ×${n}! 🗡️ tek: savur · art arda: kare kare · ×N: rakamla kaç kılıç · ⭐ dev kılıç · ✖ kapat` : `Kozmik kılıç ×${n}! Z: savur · art arda Z: kare kare · 1-9: kaç kılıç · nokta (.): birleşip dev kılıç · 0: kapat`; }
@@ -596,20 +600,20 @@ document.body.insertAdjacentHTML('beforeend', '<div id="icFrost"></div>');
 const HD = { on: false, S: 1, hands: [], prot: null, protMP: 0, fly: [] };
 const handMat = new T.MeshBasicMaterial({ color: 0x6a34d6, transparent: true, opacity: .84, toneMapped: false }), handRim = new T.MeshBasicMaterial({ color: 0xc58bff, transparent: true, opacity: .26, blending: T.AdditiveBlending, depthWrite: false, side: T.BackSide, toneMapped: false });
 const capG = (r, L) => new T.CapsuleGeometry(r, L, 3, 8).rotateX(Math.PI / 2).translate(0, 0, L / 2 + r * .4);
-function makeHand(side) {
-  const ts = -side, g = new T.Group(), add = (geo, par) => { const m = new T.Mesh(geo, handMat), rr = new T.Mesh(geo, handRim); rr.scale.setScalar(1.16); m.add(rr); par.add(m); return m; };
+function makeHand(side, mat = handMat, rim = handRim, scn = G.scene) {
+  const ts = -side, g = new T.Group(), plain = mat !== handMat, add = (geo, par) => { const m = new T.Mesh(geo, mat); if (rim) { const rr = new T.Mesh(geo, rim); rr.scale.setScalar(1.16); m.add(rr); } par.add(m); return m; };
   const palm = add(new T.SphereGeometry(.5, 16, 12), g); palm.position.z = .6; palm.scale.set(1, .34, 1.1);
-  g.add(new T.Mesh(new T.CylinderGeometry(.24, .42, 1.2, 12, 1, true).rotateX(Math.PI / 2).translate(0, 0, -.4), new T.MeshBasicMaterial({ color: 0x8a4dff, transparent: true, opacity: .32, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, toneMapped: false })));
+  if (!plain) g.add(new T.Mesh(new T.CylinderGeometry(.24, .42, 1.2, 12, 1, true).rotateX(Math.PI / 2).translate(0, 0, -.4), new T.MeshBasicMaterial({ color: 0x8a4dff, transparent: true, opacity: .32, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, toneMapped: false })));
   const fingers = [];
   for (const [x, z, k] of [[ts * .34, 1.0, .92], [ts * .12, 1.07, 1], [-ts * .11, 1.04, .95], [-ts * .32, .96, .78]]) { let par = g, off = new T.Vector3(x, 0, z); const segs = [];
     for (const L0 of [.36, .27, .22]) { const L = L0 * k, j = new T.Group(); j.position.copy(off); par.add(j); add(capG(.085, L), j); segs.push(j); par = j; off = new T.Vector3(0, 0, L + .07); } fingers.push(segs); }
   const tb = new T.Group(); tb.position.set(ts * .42, -.04, .3); g.add(tb); const th = []; { let par = tb, off = new T.Vector3(); for (const L of [.3, .25, .2]) { const j = new T.Group(); j.position.copy(off); par.add(j); add(capG(.095, L), j); th.push(j); par = j; off = new T.Vector3(0, 0, L + .07); } }
-  const gl = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0x9b5cff, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .22 })); gl.scale.setScalar(2); gl.position.z = .6; g.add(gl);
-  g.traverse(o => o.frustumCulled = false); g.visible = false; G.scene.add(g);
+  const gl = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0x9b5cff, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .22 })); gl.scale.setScalar(2); gl.position.z = .6; if (!plain) g.add(gl);
+  g.traverse(o => o.frustumCulled = false); g.visible = false; scn.add(g);
   return { g, side, ts, fingers, th, tb, st: 'idle', t: 0, item: null, pos: new T.Vector3(), q: new T.Quaternion(), c: .15, tc: 0, mid: null, sc: 1, k: 0 };
 }
-function handPose(h, c, tc, mid) {   // c: parmak kıvrımı · tc: başparmak · mid: orta parmak (fiske)
-  h.fingers.forEach((sg, i) => { const ci = i === 1 && mid != null ? mid : c; sg[0].rotation.x = ci; sg[1].rotation.x = ci * 1.25; sg[2].rotation.x = ci * 1.05; sg[0].rotation.y = (i - 1.5) * .07 * (1 - Math.min(1, c)); });
+function handPose(h, c, tc, mid, idx) {   // c: parmak kıvrımı · tc: başparmak · mid: orta parmak (fiske) · idx: işaret parmağı (çimdik)
+  h.fingers.forEach((sg, i) => { const ci = i === 1 && mid != null ? mid : i === 0 && idx != null ? idx : c; sg[0].rotation.x = ci; sg[1].rotation.x = ci * 1.25; sg[2].rotation.x = ci * 1.05; sg[0].rotation.y = (i - 1.5) * .07 * (1 - Math.min(1, c)); });
   h.tb.rotation.set(.3 + tc * .35, h.ts * (.85 - tc * 1.15), h.ts * tc * .25); h.th[1].rotation.x = tc * .8; h.th[2].rotation.x = tc * .7;
 }
 const camYaw = () => { G.camera.getWorldDirection(V4); return Math.atan2(V4.x, V4.z); }, faceCam = () => { const f = camYaw(); G.facing = f; G.charHolder.rotation.y = f; };
@@ -628,7 +632,7 @@ function handsToggle() {
   if (!CO.on) return; HD.on = !HD.on;
   if (!HD.hands.length) HD.hands = [makeHand(1), makeHand(-1)];
   if (HD.on) { for (const h of HD.hands) { idleOf(h, h.pos, h.q); h.g.visible = true; h.st = 'idle'; h.k = 0; burst(V1.copy(h.pos), 60, 6, PURPLE, .7); } snd('in', .6);
-    G.showMsg('✋ ' + adT(G.touchMode ? 'Dev eller! 🤏 tut · 🎯 at · 💢 sık · ⬇️ bırak · 👋 tokat · 👆 fiske · 🛡️ koru · ➕➖ boy' : "Dev eller! G: tut · sol tık: at / tokat · F: fiske · R: sık · B: bırak · ': kişiyi koru · + / −: boy · H: kapat"), 4.5); }
+    G.showMsg('✋ ' + adT(G.touchMode ? 'Dev eller! 🤏 tut · 🎯 at · 💢 sık · 🫳 yere ez · ⬇️ bırak · 👋 tokat · 👆 fiske · 🛡️ koru · ➕➖ boy' : "Dev eller! G: tut · sol tık: at / tokat · F: fiske · R: sık · N: yere ez · B: bırak · ': kişiyi koru · + / −: boy (büyükken çimdikle tutar) · H: kapat"), 4.5); }
   else handsOff();
 }
 function handsOff(quiet) { HD.on = false; for (const h of HD.hands) { if (h.item) releaseItem(h, 0, 0, 0, 0); h.st = 'idle'; if (h.g.visible && !quiet) burst(V1.copy(h.pos), 40, 5, PURPLE, .6); h.g.visible = false; } protOff(true); if (!quiet) snd('out', .4); }
@@ -659,6 +663,12 @@ function placeKey() { faceCam(); const h = HD.hands.find(x => x.item && x.st ===
 function slapKey() { faceCam(); const h = HD.hands.find(x => !x.item && x.st === 'idle' && !(HD.prot && x.side === -1)); if (!h) return; h.st = 'slap'; h.t = 0; h.hit = false; snd('out', .45); }
 function flickKey() { faceCam(); const h = freeHand(); if (!h) return; const tg = pickAim(true); if (!tg) { G.showMsg('👆 ' + adT('Fiske için nişangahla bir şeye bak'), 1.2); return; } h.st = 'flick'; h.t = 0; h.from = h.pos.clone(); h.tg = tg.kind === 'en' ? { kind: 'en', id: tg.o.id, h: tg.o.h, boss: tg.o.boss } : { kind: 'obj', o: tg.o }; if (tg.kind === 'en' && !tg.o.boss) tg.o.id.__frz = Math.max(tg.o.id.__frz || 0, .6); }
 function handsClick() { if (!throwKey()) slapKey(); }
+function pressKey() {   // 🫳 yere ez: tuttuğunu yere bastırıp ezer · el boşsa avucunla yere vurursun
+  faceCam(); const h = HD.hands.find(x => x.item && x.st === 'hold'); if (h) { h.st = 'press'; h.t = 0; h.from = h.pos.clone(); return; }
+  const f = freeHand(); if (!f) return; const P = G.player.position, A = aimPoint(60); V1.subVectors(A, P); if (V1.length() > reachMax()) A.copy(P).addScaledVector(V1.setY(0).normalize(), reachMax()); try { A.y = G.groundAt(A.x, A.z, A.y + 2); } catch (e) {}
+  f.st = 'slam'; f.t = 0; f.dest = A; f.hit = false; snd('out', .5);
+}
+function squashFx(c, rr) { burst(c, 90, 7 + rr, PURPLE, .7); ring(V2.set(c.x, c.y + .15, c.z), rr * 1.3, PURPLE); ring(V2.set(c.x, c.y + .1, c.z), rr * .8, PINK); snd('punch'); snd('burst', .6); G.shake = Math.max(G.shake, Math.min(.8, .25 + rr * .05)); }
 function hHurt(c, rad, dmg, knock, up) { for (const o of hTargets()) { const dx = o.p.x - c.x, dz = o.p.z - c.z, d = Math.hypot(dx, dz); if (d > rad + o.r) continue; try { o.hit(dmg, new T.Vector3(dx, up || .3, dz).normalize(), knock); } catch (e) {} } }
 /* 🛡️ koruma: seçilen kişinin üstünü kapalı (kubbe gibi) el örter, her şeyden korunur */
 const protDome = new T.Group(); { protDome.add(new T.Mesh(new T.SphereGeometry(1.5, 24, 16), new T.MeshBasicMaterial({ color: 0x9b5cff, transparent: true, opacity: .16, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false })), new T.Mesh(new T.IcosahedronGeometry(1.55, 1), new T.MeshBasicMaterial({ color: 0xc58bff, wireframe: true, transparent: true, opacity: .35, blending: T.AdditiveBlending, depthWrite: false }))); protDome.visible = false; protDome.traverse(o => o.frustumCulled = false); G.scene.add(protDome); }
@@ -679,18 +689,30 @@ function handsTick(dt, t) {
   const P = G.player.position, sc = handScale(), TL = hTargets(), byId = new Map(TL.map(o => [o.id, o]));
   for (const h of HD.hands) {
     h.t += dt; idleOf(h, V1, Q1); let tp = V1.clone(), tq = Q1.clone(), c = .15, tc = .1, mid = null, k = 9, sk = sc;
-    if (h.item && !(h.st === 'reach')) { c = .78; tc = .7; tp.addScaledVector(V2.set(Math.sin(camYaw()), 0, Math.cos(camYaw())), .9 * HD.S).y += .6 * HD.S + (h.item.kind === 'obj' ? h.item.hh * .9 : h.item.h * .5); E1.set(.55, camYaw(), -h.side * .2, 'YXZ'); tq.setFromEuler(E1); }   // tutarken avuç aşağı
+    const pinch = h.item && h.item.sz < .9 * HD.S; let idx = null;
+    if (h.item && !(h.st === 'reach')) { c = pinch ? 1.15 : .78; tc = pinch ? 1 : .7; if (pinch) idx = .5; tp.addScaledVector(V2.set(Math.sin(camYaw()), 0, Math.cos(camYaw())), .9 * HD.S).y += .6 * HD.S + (h.item.kind === 'obj' ? h.item.hh * .9 : h.item.h * .5); E1.set(.55, camYaw(), -h.side * .2, 'YXZ'); tq.setFromEuler(E1); }   // tutarken avuç aşağı
     if (h.st === 'reach') { const tgt = h.tg.kind === 'en' ? byId.get(h.tg.id) : null; const tc0 = tgt ? V3.set(tgt.p.x, tgt.p.y + tgt.h * .5, tgt.p.z) : h.tg.kind === 'obj' ? V3.copy(h.tg.o.position).setY(h.tg.o.position.y + h.tg.hh) : null;
       if (!tc0) { h.st = 'idle'; continue; } E1.set(.9, Math.atan2(tc0.x - P.x, tc0.z - P.z), 0, 'YXZ'); tq.setFromEuler(E1); V2.set(0, -.62, .66).applyQuaternion(tq).multiplyScalar(sc); tp.copy(tc0).sub(V2); c = .1 + Math.min(1, h.t / .3) * .2; k = 14;
-      if (h.t > .3 && h.pos.distanceTo(tp) < 1.2 * HD.S + .4) { if (h.tg.kind === 'en') h.item = { kind: 'en', id: h.tg.id, h: h.tg.h }; else { try { G.handTakeObj(h.tg.o); } catch (e) {} h.item = { kind: 'obj', o: h.tg.o, hh: h.tg.hh }; } h.st = 'hold'; h.t = 0; snd('tap'); burst(V2.copy(tc0), 20, 4, PURPLE, .4); }
+      if (h.t > .3 && h.pos.distanceTo(tp) < 1.2 * HD.S + .4) { if (h.tg.kind === 'en') h.item = { kind: 'en', id: h.tg.id, h: h.tg.h, sz: h.tg.h }; else { try { G.handTakeObj(h.tg.o); } catch (e) {} h.item = { kind: 'obj', o: h.tg.o, hh: h.tg.hh, sz: h.tg.hh / (h.tg.o.userData.slot === 'tree' || h.tg.o.userData.slot === 'pine' ? .4 : .5) }; } h.st = 'hold'; h.t = 0; snd('tap'); burst(V2.copy(tc0), 20, 4, PURPLE, .4); }
       if (h.t > 1.5) h.st = 'idle'; }
     else if (h.st === 'throw') { const fw = V2.set(Math.sin(camYaw()), 0, Math.cos(camYaw())); tp.addScaledVector(fw, h.t < .14 ? -1.4 * HD.S : 2.2 * HD.S).y += h.t < .14 ? .8 * HD.S : 0; k = 18;
       if (h.t >= .14 && h.item) { const g0 = gripPt(h, new T.Vector3()), A = aimPoint(90); V3.subVectors(A, g0).normalize().multiplyScalar(30 + 5 * HD.S); releaseItem(h, V3.x, V3.y + 5, V3.z, 45 + 10 * HD.S); snd('burst', .5); G.shake = Math.max(G.shake, .15); }
       c = h.t < .14 ? .8 : .05; if (h.t > .45) h.st = 'idle'; }
-    else if (h.st === 'squeeze') { c = .8 + Math.min(1, h.t / .3) * .7; tc = 1; tp.x += R(-.06, .06) * HD.S; tp.y += R(-.06, .06) * HD.S;
+    else if (h.st === 'squeeze') { if (pinch) { c = 1.2; idx = .5 + Math.min(1, h.t / .3) * .45; tc = 1 + Math.min(1, h.t / .3) * .35; } else { c = .8 + Math.min(1, h.t / .3) * .7; tc = 1; } tp.x += R(-.06, .06) * HD.S; tp.y += R(-.06, .06) * HD.S;
       if (h.t > .38 && h.item) { const it = h.item; h.item = null; const g0 = gripPt(h, new T.Vector3());
         if (it.kind === 'en') { const o = byId.get(it.id); if (o) { o.id.__frz = 0; try { o.hit(99999, new T.Vector3(0, 1, 0), 0); } catch (e) {} } burst(g0, 120, 8, PURPLE, .8); burst(g0, 40, 5, 0xffffff, .5); snd('burst'); G.shake = Math.max(G.shake, .3); }
         else { try { G.handCrushObj(it.o); } catch (e) {} burst(g0, 50, 5, PURPLE, .6); snd('punch'); } }
+      if (h.t > .7) h.st = 'idle'; }
+    else if (h.st === 'press' && h.item) { const it = h.item, o = it.kind === 'en' ? byId.get(it.id) : null, base = o ? V3.copy(o.p) : V3.copy(it.o.position); let gy = base.y; try { gy = G.groundAt(base.x, base.z, base.y + 1); } catch (e) {}
+      const u = Math.min(1, h.t / .35); tp.copy(h.from); tp.y = h.from.y - (base.y - gy + (it.kind === 'en' ? it.h * .35 : it.sz * .35)) * u * u; k = 20; c = pinch ? 1.2 : .9; tc = 1; if (pinch) idx = .9;
+      if (h.t > .35) { h.item = null; const cp = new T.Vector3(base.x, gy, base.z);
+        if (o) { o.id.__frz = 0; setTg(o, base.x, gy, base.z); try { o.hit(99999, new T.Vector3(0, -1, 0), 0); } catch (e) {} } else { try { G.handCrushObj(it.o); } catch (e) {} }
+        squashFx(cp, 1.5 + .4 * HD.S); h.st = 'idle'; } }
+    else if (h.st === 'slam') { const u = Math.min(1, h.t / .3), up = (1 - u * u) * (3 + 1.5 * HD.S); E1.set(Math.PI / 2, camYaw(), 0, 'YXZ'); tq.setFromEuler(E1); V2.set(0, -.3, .6).applyQuaternion(tq).multiplyScalar(sc); tp.copy(h.dest).sub(V2).y += up; c = .02; tc = .1; k = 24;
+      if (!h.hit && u >= 1) { h.hit = true; const rr = 1.5 + 1.4 * HD.S, c0 = h.dest;
+        for (const o of TL) { const d = Math.hypot(o.p.x - c0.x, o.p.z - c0.z); if (d > rr + o.r) continue; try { o.hit(60 + 20 * HD.S, new T.Vector3(o.p.x - c0.x, -.5, o.p.z - c0.z).normalize(), 4); } catch (e) {} }
+        let objs = []; try { objs = G.handObjsIn(c0.x, c0.z, rr).slice(0, 8); } catch (e) {} for (const ob of objs) try { G.handCrushObj(ob); } catch (e) {}
+        squashFx(c0, rr); }
       if (h.t > .7) h.st = 'idle'; }
     else if (h.st === 'place') { const up = h.item ? (h.item.kind === 'obj' ? h.item.hh : h.item.h * .5) + .3 : 1; V2.set(0, -.62, .66).applyQuaternion(tq).multiplyScalar(sc); tp.copy(h.dest).add(V3.set(0, up, 0)).sub(V2); k = 7;
       if (h.t > .45 && h.item) { releaseItem(h, 0, -1, 0, 0); snd('tap', .6); } if (h.t > .8) h.st = 'idle'; }
@@ -713,9 +735,11 @@ function handsTick(dt, t) {
         protDome.position.copy(pp).y += 1; protDome.rotation.y += dt * .5; protDome.children[0].material.opacity = .14 + Math.sin(t * 5) * .04;
         if (HD.prot.k === 'mp') { HD.protMP -= dt; if (HD.protMP <= 0) { HD.protMP = .3; try { G.mpSend({ t: 'cosh', x: +pp.x.toFixed(1), y: +pp.y.toFixed(1), z: +pp.z.toFixed(1), r: 3, to: HD.prot.id }); } catch (e) {} } } } }
     h.pos.lerp(tp, 1 - Math.exp(-k * dt)); h.q.slerp(tq, 1 - Math.exp(-10 * dt)); h.sc += (sk - h.sc) * (1 - Math.exp(-8 * dt));
-    h.c += (c - h.c) * (1 - Math.exp(-14 * dt)); h.tc += (tc - h.tc) * (1 - Math.exp(-14 * dt)); h.mid = mid == null ? null : mid; handPose(h, h.c, h.tc, h.mid);
+    h.c += (c - h.c) * (1 - Math.exp(-14 * dt)); h.tc += (tc - h.tc) * (1 - Math.exp(-14 * dt)); h.mid = mid == null ? null : mid; h.idx = idx == null ? null : (h.idx == null ? idx : h.idx + (idx - h.idx) * (1 - Math.exp(-14 * dt))); handPose(h, h.c, h.tc, h.mid, h.idx);
     h.g.position.copy(h.pos); h.g.quaternion.copy(h.q); h.g.scale.setScalar(h.sc);
-    if (h.item) { const g0 = gripPt(h, V2); if (h.item.kind === 'en') { const o = byId.get(h.item.id); if (!o) h.item = null; else { o.id.__frz = Math.max(o.id.__frz || 0, .3); setTg(o, g0.x, g0.y - o.h * .5, g0.z); } } else h.item.o.position.set(g0.x, g0.y - h.item.hh, g0.z); }
+    if (h.item) { let g0; if (pinch) { h.g.updateMatrixWorld(true); const a = h.fingers[0][2].localToWorld(new T.Vector3(0, 0, .22)), b = h.th[2].localToWorld(new T.Vector3(0, 0, .2)); g0 = a.add(b).multiplyScalar(.5); } else g0 = gripPt(h, V2);   // 🤏 büyük el: iki parmakla çimdik
+      const dn = pinch ? (h.item.kind === 'en' ? h.item.h * .8 : h.item.sz * .55) : (h.item.kind === 'en' ? h.item.h * .5 : h.item.hh);
+      if (h.item.kind === 'en') { const o = byId.get(h.item.id); if (!o) h.item = null; else { o.id.__frz = Math.max(o.id.__frz || 0, .3); setTg(o, g0.x, g0.y - dn, g0.z); } } else h.item.o.position.set(g0.x, g0.y - dn, g0.z); }
     if (Math.random() < .35) { V3.set(R(-.5, .5), R(-.2, .2), R(0, 1.3)).applyQuaternion(h.q).multiplyScalar(h.sc).add(h.pos); emit(V3.x, V3.y, V3.z, R(-.3, .3), R(.2, .8), R(-.3, .3), .6, Math.random() < .6 ? PURPLE : PINK); }
   }
   for (let i = HD.fly.length - 1; i >= 0; i--) { const f = HD.fly[i], o = byId.get(f.id); f.t += dt; if (!o || f.t > 4) { if (o) o.id.__frz = 0; HD.fly.splice(i, 1); continue; }
@@ -727,7 +751,168 @@ function handsTick(dt, t) {
   }
   if (HD.prot && HD.prot.k !== 'me' && !protPos(HD.prot, V3)) protOff();
 }
-function handsKey(k) { if (!HD.on) return; if (k === "'") { protKey(); return; } const S0 = HD.S; HD.S = Math.max(.4, Math.min(4, HD.S * (k === '+' ? 1.25 : .8))); if (HD.S !== S0) { snd('tap', .6); G.showMsg('✋ ' + adT('El boyu') + ' ×' + HD.S.toFixed(1), 1); } }
+function handsKey(k) { if (!HD.on) return; if (k === "'") { protKey(); return; } const S0 = HD.S; HD.S = Math.max(.4, Math.min(20, HD.S * (k === '+' ? 1.3 : 1 / 1.3))); if (HD.S !== S0) { snd('tap', .6); G.showMsg('✋ ' + adT('El boyu') + ' ×' + HD.S.toFixed(1), 1); } }
+
+/* ---------- 🏢 dev ara sahnesi: dev iken bir binaya yaklaş, . (nokta) ile içeri elini sok ----------
+   İçeride yetişkinler yemek yer, ders çalışır; cam kırılır, dev el girer, eşyalar devrilir, herkes kaçışır, el arar ve birini omuzlarından tutup dışarı çıkarır. */
+const APT = { on: false, t: 0, last: 0, sc: null, cam: null, props: [], shards: [], ppl: [], bub: [], hand: null, door: null, glass: [], sky: null, shadow: null, ev: {}, near: null, nearT: 0, bld: null, look: new T.Vector3() };
+document.head.insertAdjacentHTML('beforeend', `<style>body.aptCine > *:not(canvas):not(#aptUI):not(script){display:none !important}
+#aptUI{position:fixed;inset:0;z-index:60;pointer-events:none;display:none}#aptUI .bar{position:absolute;left:0;right:0;height:9vh;background:#000}#aptUI .bt{top:0}#aptUI .bb{bottom:0}
+#aptUI .fd{position:absolute;inset:0;background:#000;opacity:1;transition:opacity .4s}#aptSkip{position:absolute;right:14px;bottom:calc(9vh + 10px);pointer-events:auto;padding:8px 14px;border-radius:18px;border:1px solid #fff8;background:#0008;color:#fff;font:600 14px system-ui}
+#aptUI .bb2{position:absolute;transform:translate(-50%,-100%);background:#fff;color:#222;padding:5px 10px;border-radius:12px;font:700 14px system-ui;white-space:nowrap;box-shadow:0 2px 8px #0006}
+#aptUI .bb2:after{content:'';position:absolute;left:50%;bottom:-7px;margin-left:-6px;border:6px solid transparent;border-top-color:#fff;border-bottom:0}
+#aptBtn{position:fixed;left:50%;bottom:calc(120px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:8;display:none;padding:9px 16px;border-radius:20px;border:2px solid #ffd27a;background:#3a2410e6;color:#fff;font:700 15px system-ui;box-shadow:0 0 14px #ffb84d88}</style>`);
+document.body.insertAdjacentHTML('beforeend', '<div id="aptUI"><div class="bar bt"></div><div class="bar bb"></div><div class="fd"></div><button id="aptSkip">⏭ Geç</button></div><button id="aptBtn">🏢</button>');
+for (const id of ['aptSkip', 'aptBtn']) for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
+$('aptSkip').addEventListener('click', e => { e.stopPropagation(); aptEnd(); }); $('aptBtn').addEventListener('click', e => { e.stopPropagation(); aptTry(); });
+function aptNear() { if (!G.giant || CO.on || G.dead || APT.on) return null; const P = G.player.position, S = G.giantS || 3; try { return G.bldNear(P.x, P.z, 3 + 1.4 * S); } catch (e) { return null; } }
+function aptTry() { const b = aptNear(); if (!b) return false; aptStart(b); return true; }
+function aptSnd(k, v = 1) { const c = ac(); if (!c || c.state !== 'running') return; snd(k, v); }
+const AW = 7.2, AD = 5.6, AH = 3, AWZ = AD / 2;
+function aptBuild() {
+  const S = new T.Scene(); S.background = new T.Color(0x16130f); APT.sc = S; APT.props = []; APT.shards = []; APT.ppl = []; APT.glass = []; APT.ev = {};
+  const M = (c, o = {}) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: .8 }, o));
+  const box = (w, h, d, c, x, y, z, par = S) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), typeof c === 'number' ? M(c) : c); m.position.set(x, y, z); par.add(m); return m; };
+  const cyl = (r1, r2, h, c, x, y, z, par = S, seg = 16) => { const m = new T.Mesh(new T.CylinderGeometry(r1, r2, h, seg), typeof c === 'number' ? M(c) : c); m.position.set(x, y, z); par.add(m); return m; };
+  const piv = (x, y, z) => { const g = new T.Group(); g.position.set(x, y, z); S.add(g); return g; };
+  const prop = (o, clear) => { const p = { o, v: new T.Vector3(), w: new T.Vector3(), on: false, c: clear ?? .03 }; APT.props.push(p); return p; };
+  S.add(new T.HemisphereLight(0xfff1dc, 0x3a2c22, 1.05)); const lamp = new T.PointLight(0xffe2b0, 24, 14, 1.4); lamp.position.set(-.6, 2.7, .4); S.add(lamp); APT.lamp = lamp;
+  const sun = new T.DirectionalLight(0xcfe4ff, 1.1); sun.position.set(-1, 4, 8); S.add(sun); APT.sun = sun;
+  const wall = 0xe9dcc4; box(AW, .1, AD, M(0x9a6b45), 0, -.05, 0); box(AW, .1, AD, 0xf3efe6, 0, AH + .05, 0);
+  box(.1, AH, AD, wall, -AW / 2, AH / 2, 0); box(.1, AH, AD, wall, AW / 2, AH / 2, 0); box(AW, AH, .1, wall, 0, AH / 2, -AD / 2);
+  for (let k = 0; k < 7; k++) box(AW, .02, .04, 0x7e5737, 0, .001, -AD / 2 + .4 + k * .8);   // parke çizgileri
+  const ww = 3.2, wh = 1.7, wy = .85;   // pencere duvarı
+  box((AW - ww) / 2, AH, .12, wall, -(AW + ww) / 4, AH / 2, AWZ); box((AW - ww) / 2, AH, .12, wall, (AW + ww) / 4, AH / 2, AWZ); box(ww, wy, .12, wall, 0, wy / 2, AWZ); box(ww, AH - wy - wh, .12, wall, 0, AH - (AH - wy - wh) / 2, AWZ);
+  for (const [w, h, x, y] of [[ww + .12, .08, 0, wy], [ww + .12, .08, 0, wy + wh], [.08, wh, -ww / 2, wy + wh / 2], [.08, wh, ww / 2, wy + wh / 2]]) box(w, h, .16, 0xffffff, x, y, AWZ);
+  APT.mull = [box(.06, wh, .1, 0xffffff, 0, wy + wh / 2, AWZ), box(ww, .06, .1, 0xffffff, 0, wy + wh / 2, AWZ)];
+  const gm = M(0xbfe3ff, { transparent: true, opacity: .3, roughness: .05, metalness: .1 }); for (const sx of [-1, 1]) for (const sy of [0, 1]) APT.glass.push(box(ww / 2 - .06, wh / 2 - .06, .02, gm, sx * ww / 4, wy + wh / 4 + sy * wh / 2, AWZ));
+  box(.9, .06, .3, 0xffffff, -2.6, wy - .03, AWZ - .15);   // pervaz
+  { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const g = cv.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, '#7fb6e8'); gr.addColorStop(1, '#d9ecf8'); g.fillStyle = gr; g.fillRect(0, 0, 256, 128);
+    g.fillStyle = '#8a97a6'; for (let x = 0; x < 256; x += 18) { const h = 30 + ((x * 37) % 50); g.fillRect(x, 128 - h, 15, h); } g.fillStyle = '#ffe9a8'; for (let x = 2; x < 256; x += 18) for (let y = 70; y < 124; y += 9) if ((x + y) % 3) g.fillRect(x + 2, y, 3, 4);
+    const tx = new T.CanvasTexture(cv); tx.colorSpace = T.SRGBColorSpace; APT.sky = new T.Mesh(new T.PlaneGeometry(26, 13), new T.MeshBasicMaterial({ map: tx })); APT.sky.position.set(0, 2, AWZ + 7); APT.sky.rotation.y = Math.PI; S.add(APT.sky); }
+  APT.shadow = new T.Mesh(new T.PlaneGeometry(30, 16), new T.MeshBasicMaterial({ color: 0x050308, transparent: true, opacity: 0 })); APT.shadow.position.set(-14, 3, AWZ + 5); APT.shadow.rotation.y = Math.PI; S.add(APT.shadow);
+  box(2.8, .02, 1.9, M(0xb5524a), -1, .012, .55);   // halı
+  // 🍽️ yemek masası (devrilir) + sandalyeler + tabaklar
+  const tab = piv(0, 0, .05); APT.table = tab; const tt = new T.Group(); tt.position.set(-1.0, 0, .5); tab.add(tt);
+  box(1.9, .07, 1.0, 0x7b4a2a, 0, .76, 0, tt); box(1.94, .02, 1.04, 0xf7f3ea, 0, .8, 0, tt); for (const [x, z] of [[-.85, -.42], [.85, -.42], [-.85, .42], [.85, .42]]) box(.07, .76, .07, 0x5d3a1e, x, .38, z, tt);
+  const n0 = APT.props.length; for (const [x, z] of [[-1.55, .55], [-.45, .55], [-1, .3]]) { const pl = cyl(.18, .15, .03, 0xffffff, x, .83, z); prop(pl, .015); const fd = cyl(.11, .11, .03, [0xd9822b, 0x8bc34a, 0xffca28][APT.props.length % 3], x, .855, z); prop(fd, .015); }
+  { const pot = cyl(.17, .15, .2, 0xc0392b, -1, .92, .78); prop(pot, .1); for (const x of [-1.35, -.65]) prop(cyl(.04, .035, .14, M(0xdff3ff, { transparent: true, opacity: .55 }), x, .88, .78), .07); }
+  APT.tableItems = APT.props.slice(n0);
+  APT.chairs = []; for (const [x, f] of [[-2.05, 1], [.05, -1]]) { const c = piv(x - f * .22, 0, .55), cg = new T.Group(); cg.position.x = f * .22; c.add(cg); box(.46, .05, .46, 0x8d5b34, 0, .46, 0, cg); box(.05, .55, .46, 0x8d5b34, -f * .21, .76, 0, cg); for (const [lx, lz] of [[-.19, -.19], [.19, -.19], [-.19, .19], [.19, .19]]) box(.04, .46, .04, 0x5d3a1e, lx, .23, lz, cg); APT.chairs.push({ g: c, f }); }
+  // 📚 çalışma masası (sağ duvarda)
+  box(.7, .05, 1.5, 0xd8c3a0, 3.15, .75, 1.0); for (const [x, z] of [[2.85, .3], [3.45, .3], [2.85, 1.7], [3.45, 1.7]]) box(.05, .75, .05, 0x8a6a45, x, .375, z);
+  { const lt = new T.Group(); lt.position.set(3.3, .78, .45); S.add(lt); cyl(.08, .1, .03, 0x333333, 0, 0, 0, lt); cyl(.015, .015, .4, 0x333333, 0, .2, 0, lt); const sh = cyl(.06, .14, .14, 0x2e7d32, 0, .42, 0, lt); const bl = new T.Mesh(new T.SphereGeometry(.05, 10, 8), new T.MeshBasicMaterial({ color: 0xfff4c2 })); bl.position.y = .38; lt.add(bl); APT.dlampProp = prop(lt, .03); const pl = new T.PointLight(0xfff0c8, 5, 4, 1.5); pl.position.set(3.2, 1.2, .5); S.add(pl); APT.dlamp = pl; }
+  for (let k = 0; k < 4; k++) prop(box(.3, .06, .22, [0xc62828, 0x1565c0, 0xf9a825, 0x6a1b9a][k], 3.2, .8 + k * .065, 1.55), .03);
+  { const lp = new T.Group(); lp.position.set(3.05, .78, 1.05); S.add(lp); box(.32, .02, .24, 0x9e9e9e, 0, .01, 0, lp); const scr = box(.32, .22, .015, M(0x222222, { emissive: 0x3d6db5, emissiveIntensity: .6 }), .12, .12, 0, lp); scr.rotation.z = .2; lp.rotation.y = Math.PI / 2; prop(lp, .02); }
+  const st = box(.04, .45, .5, 0xffffff, 3.0, .79, .95); st.rotation.z = -1.5; prop(st, .02);   // defter
+  { const ch = new T.Group(); ch.position.set(2.45, 0, 1.0); S.add(ch); box(.44, .05, .44, 0x37474f, 0, .46, 0, ch); box(.05, .5, .44, 0x37474f, -.2, .74, 0, ch); cyl(.03, .03, .44, 0x222222, 0, .22, 0, ch); prop(ch, 0); APT.dchair = APT.props[APT.props.length - 1]; }
+  // 🌿 saksı, ayaklı lamba, kitaplık, tablo, kapı
+  { const pg = piv(-2.95, 0, 2.2); APT.plant = pg; cyl(.22, .17, .4, 0xb5653a, 0, .2, 0, pg); for (let k = 0; k < 7; k++) { const lf = new T.Mesh(new T.SphereGeometry(.18, 8, 6), M(0x3f8f3a)); lf.position.set(Math.sin(k) * .15, .55 + (k % 3) * .14, Math.cos(k * 1.3) * .15); lf.scale.set(1, 1.6, .6); pg.add(lf); } }
+  { const fl = piv(1.6, 0, 2.3); APT.flamp = fl; cyl(.18, .2, .04, 0x333333, 0, .02, 0, fl); cyl(.02, .02, 1.6, 0x444444, 0, .8, 0, fl); cyl(.15, .26, .3, 0xf5e6c8, 0, 1.65, 0, fl); }
+  { const bs = piv(-2.98, 0, -.5); APT.shelf = bs; const sg = new T.Group(); sg.position.x = -.2; bs.add(sg); box(.4, 2.1, 1.4, 0x6d4c41, 0, 1.05, 0, sg); for (let k = 0; k < 4; k++) box(.38, .03, 1.36, 0x8d6e63, .01, .35 + k * .5, 0, sg);
+    APT.shelfBooks = []; for (let k = 0; k < 4; k++) for (let j = 0; j < 7; j++) { const b = box(.26, .3, .1, [0xc62828, 0x1565c0, 0x2e7d32, 0xf9a825, 0x6a1b9a][(j + k) % 5], -3.2, .52 + k * .5, -1.05 + j * .17); APT.shelfBooks.push(prop(b, .05)); } }
+  { const pf = box(.04, .7, 1.0, 0x5d4037, -3.55, 1.9, 1.3); const pc = box(.02, .58, .86, M(0x81c784), -3.52, 1.9, 1.3); APT.pic = [prop(pf, .03), prop(pc, .02)]; }
+  { const d = piv(-3.58, 0, -2.4); APT.door = d; box(.05, 2.1, .95, 0x7a5236, 0, 1.05, .475, d); const kn = new T.Mesh(new T.SphereGeometry(.04, 8, 6), M(0xd4af37, { metalness: .8 })); kn.position.set(.05, 1.0, .82); d.add(kn); box(.1, 2.2, .1, 0xffffff, -3.55, 1.1, -2.43); box(.1, 2.2, .1, 0xffffff, -3.55, 1.1, -1.43); box(.1, .1, 1.1, 0xffffff, -3.55, 2.15, -1.93); }
+  // 🧍 üç yetişkin: ikisi yemek yiyor, biri ders çalışıyor
+  const mk = (col, x, z, ry, role) => { const r = G.createStickman(col), h = new T.Group(); h.add(r.stick); h.position.set(x, 0, z); h.rotation.y = ry; S.add(h); const p = { r, h, role, home: new T.Vector3(x, 0, z), st: 'sit' }; APT.ppl.push(p); return p; };
+  APT.A = mk(0xef5350, -2.05, .55, Math.PI / 2, 'eat'); APT.B = mk(0x42a5f5, .05, .55, -Math.PI / 2, 'eat'); APT.C = mk(0x66bb6a, 2.45, 1.0, Math.PI / 2, 'study');
+  // ✋ dev el (oyuncunun eli) + pencereden uzanan kol
+  const hm = M(0x2a2a30, { roughness: .65 }), H = makeHand(1, hm, null, S); H.g.visible = true; H.g.scale.setScalar(1.55); const arm = new T.Mesh(new T.CylinderGeometry(.42, .55, 10, 16).rotateX(Math.PI / 2).translate(0, 0, -5.3), hm); H.g.add(arm); APT.hand = H; H.g.position.set(0, 1.8, AWZ + 6);
+  APT.cam = new T.PerspectiveCamera(56, 16 / 9, .05, 80); APT.cam.position.set(2.75, 2.0, -2.35); APT.look.set(-.8, 1.15, 1.4);
+}
+function aptDispose() { if (!APT.sc) return; APT.sc.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.map) m.map.dispose(); m.dispose(); }); } }); APT.sc = null; for (const b of APT.bub) b.el.remove(); APT.bub = []; }
+function aptStart(b) {
+  aptBuild(); APT.bld = b; APT.on = true; APT.t = 0; APT.last = performance.now(); APT.ended = false;
+  try { const K = G.keys; for (const k in K) K[k] = false; } catch (e) {}
+  document.body.classList.add('aptCine'); const U = $('aptUI'); U.style.display = 'block'; U.querySelector('.fd').style.opacity = 1; requestAnimationFrame(() => { U.querySelector('.fd').style.opacity = 0; });
+  ac();
+}
+function aptEnd() {
+  if (!APT.on) return; APT.on = false; aptDispose(); document.body.classList.remove('aptCine'); $('aptUI').style.display = 'none';
+  let ok = false; try { const P = G.player.position; ok = G.aptTakeNpc(new T.Vector3(P.x, P.y + 2, P.z)); } catch (e) { console.warn('apt', e); }
+  G.showMsg(ok ? '🏢 ' + adT('Pencereden birini aldın! Nazikçe bırakmayı unutma') : '😮 ' + adT('Herkes kaçtı!'), 2.6);
+}
+function aptBubble(p, text, dur = 1.8) { const el = document.createElement('div'); el.className = 'bb2'; el.textContent = text; $('aptUI').appendChild(el); APT.bub.push({ el, p, t1: APT.t + dur }); }
+function aptPose(p, t, dt) {   // kişilerin hareketleri
+  const r = p.r, h = p.h, k = 1 - Math.exp(-12 * dt), S2 = (o, ax, v) => { o.rotation[ax] += (v - o.rotation[ax]) * k; };
+  if (p.st === 'sit' || p.st === 'look') { S2(r.legL.hip, 'x', -1.5); S2(r.legR.hip, 'x', -1.5); S2(r.legL.kn, 'x', 1.5); S2(r.legR.kn, 'x', 1.5); h.position.y += (-.35 - h.position.y) * k;
+    if (p.role === 'eat') { const w = Math.max(0, Math.sin(t * 2.4 + p.home.x)); S2(r.armR.sh, 'x', -.6 - w * 1.4); S2(r.armR.el, 'x', -.4 - w * 1.2); S2(r.armL.sh, 'x', -.5); }
+    else { S2(r.armR.sh, 'x', -1.1 + Math.sin(t * 9) * .08); S2(r.armL.sh, 'x', -1.0); S2(r.armR.el, 'x', -.6); }
+    if (r.head) S2(r.head, 'y', p.st === 'look' ? (p === APT.C ? -1.2 : (p.role === 'eat' && p.home.x < -1 ? -1.3 : 1.3)) : 0); return; }
+  if (r.head) S2(r.head, 'y', 0);
+  if (p.st === 'run') { const w = t * 14; S2(r.armL.sh, 'x', -2.8); S2(r.armR.sh, 'x', -2.8); S2(r.armL.sh, 'z', .35 + Math.sin(w) * .3); S2(r.armR.sh, 'z', -.35 - Math.sin(w) * .3); S2(r.legL.hip, 'x', Math.sin(w) * .9); S2(r.legR.hip, 'x', -Math.sin(w) * .9); S2(r.legL.kn, 'x', Math.max(0, -Math.sin(w)) * 1.1); S2(r.legR.kn, 'x', Math.max(0, Math.sin(w)) * 1.1); h.position.y += (Math.abs(Math.sin(w)) * .06 - h.position.y) * k; }
+  else if (p.st === 'cower') { S2(r.armL.sh, 'x', -2.6); S2(r.armR.sh, 'x', -2.6); S2(r.armL.el, 'x', -1.6); S2(r.armR.el, 'x', -1.6); S2(r.legL.hip, 'x', -1.1); S2(r.legR.hip, 'x', -1.1); S2(r.legL.kn, 'x', 2.0); S2(r.legR.kn, 'x', 2.0); h.position.y += (-.55 + Math.sin(t * 30) * .01 - h.position.y) * k; }
+  else if (p.st === 'held') { const w = t * 11; S2(r.armL.sh, 'x', -2.5 + Math.sin(w) * .6); S2(r.armR.sh, 'x', -2.5 - Math.sin(w) * .6); S2(r.armL.el, 'x', -.3); S2(r.armR.el, 'x', -.3); S2(r.legL.hip, 'x', Math.sin(w * .8) * .7); S2(r.legR.hip, 'x', -Math.sin(w * .8) * .7); S2(r.legL.kn, 'x', .5); S2(r.legR.kn, 'x', .5); }
+  else if (p.st === 'stand') { for (const a of [r.armL, r.armR]) { S2(a.sh, 'x', -2.6); S2(a.el, 'x', -.2); } S2(r.armL.sh, 'z', .4); S2(r.armR.sh, 'z', -.4); for (const l of [r.legL, r.legR]) { S2(l.hip, 'x', 0); S2(l.kn, 'x', 0); } h.position.y += (0 - h.position.y) * k; }
+}
+function aptRun(p, to, sp, dt) { const d = V1.subVectors(to, p.h.position).setY(0), L = d.length(); if (L < .08) return true; p.h.rotation.y = Math.atan2(d.x, d.z); p.h.position.addScaledVector(d.normalize(), Math.min(L, sp * dt)); return false; }
+const HK = [[2.9, 0, 2.6, AWZ + 12, .1, 0], [3.3, 0, 1.85, AWZ + 3, .1, 0], [4.1, -.2, 1.6, AWZ - 1.3, .1, 0], [4.5, -1.0, 1.3, 1.1, .05, 0], [5.2, -2.45, 1.05, 1.7, .2, -.5], [5.9, 1.35, 1.15, 1.8, .2, .5], [6.5, -2.7, 1.55, .1, .25, -.6], [7.1, -2.0, 1.15, -1.0, .2, -.3], [7.9, -2.95, 2.3, 1.05, .25, -.5], [8.25, -2.95, 2.15, 1.0, .95, -.5], [9.0, -.6, 2.0, 1.3, .95, 0], [9.8, 0, 1.95, AWZ + 3.4, .95, 0]];
+function aptHandAt(t, out) { if (t <= HK[0][0]) return out.set(HK[0][1], HK[0][2], HK[0][3]).toArray().concat([HK[0][4], HK[0][5]]);
+  for (let i = 0; i < HK.length - 1; i++) { const a = HK[i], b = HK[i + 1]; if (t <= b[0]) { const u = (t - a[0]) / (b[0] - a[0]), e = u * u * (3 - 2 * u); out.set(a[1] + (b[1] - a[1]) * e, a[2] + (b[2] - a[2]) * e, a[3] + (b[3] - a[3]) * e); return [0, 0, 0, a[4] + (b[4] - a[4]) * e, a[5] + (b[5] - a[5]) * e]; } }
+  const z = HK[HK.length - 1]; out.set(z[1], z[2], z[3]); return [0, 0, 0, z[4], z[5]]; }
+function aptFire(prop, vx, vy, vz, sp = 6) { if (prop.on) return; prop.on = true; prop.v.set(vx, vy, vz); prop.w.set(R(-sp, sp), R(-sp, sp), R(-sp, sp)); }
+function aptTick(dt) {
+  const t = APT.t += dt, E = APT.ev, once = k => !E[k] && (E[k] = true), A = APT.A, B = APT.B, C = APT.C;
+  let shake = 0;
+  // ⏱️ olaylar
+  if (t > .7 && once('b1')) aptBubble(A, adT('Çorba nefis olmuş!'));
+  if (t > 1.5 && once('b2')) aptBubble(C, adT('Yarın sınav var…'));
+  for (let i = 0; i < 6; i++) if (t > .9 + i * .55 && once('clk' + i)) aptSnd('clink', .5);
+  if (t > 2.4) { shake = Math.max(shake, .02 + Math.min(1, (t - 2.4)) * .03); if (once('rmb')) { aptSnd('rumble', 1); for (const p of [A, B, C]) p.st = 'look'; } APT.shadow.position.x += (0 - APT.shadow.position.x) * Math.min(1, dt * 2); APT.shadow.material.opacity = Math.min(.88, (t - 2.4) * .9); APT.sun.intensity = Math.max(.15, 1.1 - (t - 2.4)); }
+  if (t > 2.4 && t < 3.4) for (const p of APT.tableItems) if (!p.on) p.o.position.y += Math.sin(t * 60 + p.o.position.x * 9) * .002;
+  if (t > 2.7 && once('b3')) aptBubble(B, adT('Bu ses ne?!'), 1.2);
+  if (t > 3.45 && once('brk')) { aptSnd('shatter', 1.2); aptSnd('scream', 1); shake = .25; for (const g of APT.glass) g.visible = false; for (const m of APT.mull) m.visible = false;
+    const sg = new T.ShapeGeometry(new T.Shape([new T.Vector2(0, 0), new T.Vector2(.16, .03), new T.Vector2(.05, .2)])), sm = new T.MeshStandardMaterial({ color: 0xcfeaff, transparent: true, opacity: .6, roughness: .05, metalness: .3, side: T.DoubleSide });
+    for (let k = 0; k < 70; k++) { const m = new T.Mesh(sg, sm); m.position.set(R(-1.6, 1.6), R(.9, 2.5), AWZ - .05); m.scale.setScalar(R(.4, 1.3)); APT.sc.add(m); APT.shards.push({ o: m, v: new T.Vector3(R(-2, 2), R(-.5, 2.5), -R(2.5, 7)), w: new T.Vector3(R(-9, 9), R(-9, 9), R(-9, 9)), on: true, c: .01 }); }
+    for (const p of [A, B, C]) p.st = 'stand'; aptBubble(A, 'AAAA!', 1.1); aptBubble(C, adT('Bu bir el mi?!'), 1.3); }
+  if (t > 3.7 && once('chairs')) { aptSnd('thud', .7); APT.chairs.forEach(c => c.fall = 0); }
+  for (const c of APT.chairs) if (c.fall != null) { c.fall = Math.min(1, c.fall + dt * 3); c.g.rotation.z = c.f * c.fall * 1.5; }
+  if (t > 3.6) { if (A.st !== 'held') { if (t < 5.4) { A.st = 'run'; if (aptRun(A, V2.set(-3.05, 0, 1.0), 3.6, dt) || t > 5.3) A.st = 'cower'; } else if (A.st !== 'held') A.st = 'cower'; }
+    if (t < 5.6) { if (B.h.visible) { B.st = 'run'; const tgt = t < 4.9 ? V2.set(-3.2, 0, -1.95) : V2.set(-4.6, 0, -1.95); aptRun(B, tgt, 3.4, dt); if (B.h.position.x < -4.0) B.h.visible = false; } }
+    if (t < 4.4) { C.st = 'run'; aptRun(C, V2.set(3.05, 0, 1.25), 2.2, dt); } else if (t < 9.9) C.st = 'cower'; }
+  if (t > 4.3 && once('door')) { APT.doorK = 0; aptSnd('thud', .4); aptBubble(B, adT('Kaçııın!'), 1.2); }
+  if (APT.doorK != null) { APT.doorK = Math.min(1, APT.doorK + dt * 3); APT.door.rotation.y = APT.doorK * 1.5; }
+  if (t > 3.8 && once('dchair')) aptFire(APT.dchair, -1.5, 1.2, -.6, 2);
+  if (t > 4.4 && once('table')) { APT.tabK = 0; aptSnd('thud', 1); shake = .3; for (const p of APT.tableItems) aptFire(p, R(-3, 1), R(2, 4.5), R(-3.5, -1)); aptSnd('shatter', .5); }
+  if (APT.tabK != null) { APT.tabK = Math.min(1, APT.tabK + dt * 3.2); APT.table.rotation.x = -APT.tabK * 1.42; }
+  if (t > 5.25 && once('plant')) { APT.plantK = 0; aptSnd('thud', .6); }
+  if (APT.plantK != null) { APT.plantK = Math.min(1, APT.plantK + dt * 3); APT.plant.rotation.x = -APT.plantK * 1.5; if (APT.plantK > .9 && once('soil')) { const sm = new T.MeshStandardMaterial({ color: 0x5a3e22, roughness: 1 }), sg = new T.BoxGeometry(.07, .05, .07); for (let k = 0; k < 18; k++) { const m = new T.Mesh(sg, sm); m.position.set(-2.95 + R(-.2, .2), .2, 1.85 + R(-.2, .2)); APT.sc.add(m); APT.shards.push({ o: m, v: new T.Vector3(R(-1.2, 1.2), R(.5, 2), R(-1.6, .2)), w: new T.Vector3(R(-5, 5), R(-5, 5), R(-5, 5)), on: true, c: .025 }); } } }
+  if (t > 5.9 && once('flamp')) { APT.flK = 0; aptSnd('thud', .6); }
+  if (APT.flK != null) { APT.flK = Math.min(1, APT.flK + dt * 2.6); APT.flamp.rotation.x = -APT.flK * 1.5; }
+  if (t > 6.0 && once('b4')) aptBubble(C, adT('Şşş… sessiz ol!'), 1.6);
+  if (t > 6.45 && once('shelf')) { APT.shK = 0; aptSnd('thud', 1); shake = .3; for (const b of APT.shelfBooks) aptFire(b, R(.5, 3), R(.5, 2.5), R(-1, 1)); for (const p of APT.pic) aptFire(p, 1, .5, 0, 3); }
+  if (APT.shK != null) { APT.shK = Math.min(1, APT.shK + dt * 2.2); APT.shelf.rotation.z = -APT.shK * 1.45; }
+  if (t > 6.9 && once('lamp')) { aptFire(APT.dlampProp, -1.5, 1.5, .5, 4); APT.dlamp.intensity = 0; aptSnd('thud', .4); }
+  if (t > 7.4 && once('b5')) aptBubble(A, adT('İmdaaat!'), 1.4);
+  if (t > 8.2 && once('grab')) { A.st = 'held'; aptSnd('thud', .5); aptSnd('scream', .9); }
+  if (t > 9.95 && once('peek')) { C.st = 'stand'; aptRun(C, V2.set(2.5, 0, 1.2), 99, 1); C.h.rotation.y = -2.2; aptBubble(C, adT('Gitti mi…?'), 1.6); B.h.visible = true; B.h.position.set(-3.45, 0, -1.95); B.h.rotation.y = Math.PI / 2; B.st = 'stand'; }
+  // ✋ el
+  const H = APT.hand, hp = new T.Vector3(), r = aptHandAt(t, hp), curl = r[3], yaw = r[4];
+  H.g.position.copy(hp); const pitch = t > 7.5 && t < 9.2 ? .95 : t > 4.1 && t < 7.5 ? .25 : .05; E1.set(pitch, Math.PI + yaw, Math.sin(t * 3) * .08, 'YXZ'); H.g.quaternion.setFromEuler(E1); handPose(H, curl, curl > .5 ? .7 : .1, null);
+  if (A.st === 'held') { const gp = V3.set(0, -.5, .7).applyQuaternion(H.g.quaternion).multiplyScalar(H.g.scale.x).add(H.g.position); A.h.position.set(gp.x, gp.y - 1.42, gp.z); A.h.rotation.y = Math.PI; }
+  if (t > 3.4 && t < 4.6) shake = Math.max(shake, .06);
+  // 🧱 eşyalar
+  for (const p of APT.props.concat(APT.shards)) { if (!p.on) continue; p.v.y -= 9.8 * dt; p.o.position.addScaledVector(p.v, dt); p.o.rotation.x += p.w.x * dt; p.o.rotation.y += p.w.y * dt; p.o.rotation.z += p.w.z * dt;
+    if (p.o.position.y < p.c) { p.o.position.y = p.c; p.v.y *= -.25; p.v.x *= .55; p.v.z *= .55; p.w.multiplyScalar(.5); if (p.v.lengthSq() < .02) { p.on = false; if (p.o.rotation) { p.o.rotation.x = Math.round(p.o.rotation.x / (Math.PI / 2)) * Math.PI / 2; p.o.rotation.z = Math.round(p.o.rotation.z / (Math.PI / 2)) * Math.PI / 2; } } }
+    p.o.position.x = Math.max(-AW / 2 + .1, Math.min(AW / 2 - .1, p.o.position.x)); p.o.position.z = Math.max(-AD / 2 + .1, Math.min(AWZ + 3, p.o.position.z)); }
+  for (const p of [A, B, C]) aptPose(p, t, dt);
+  APT.lamp.position.x = -.6 + Math.sin(t * 5) * Math.min(.25, Math.max(0, t - 2.4) * .2);
+  // 🎥 kamera
+  const cam = APT.cam, base = V4.set(2.75, 2.0, -2.35); V2.copy(hp).lerp(V3.set(-.8, 1.15, 1.4), .55); if (t > 9.4) V2.set(0, 1.6, AWZ + 2); APT.look.lerp(V2, 1 - Math.exp(-2.5 * dt));
+  cam.position.copy(base).add(V3.set(R(-1, 1), R(-1, 1), R(-1, 1)).multiplyScalar(shake * .6)); cam.lookAt(APT.look);
+  if (t > 10.5 && once('fade')) $('aptUI').querySelector('.fd').style.opacity = 1;
+  if (t > 11.1) aptEnd();
+}
+function aptBubbles(W, Hh) {
+  for (let i = APT.bub.length - 1; i >= 0; i--) { const b = APT.bub[i]; if (APT.t > b.t1 || !b.p.h.visible) { b.el.remove(); APT.bub.splice(i, 1); continue; }
+    const q = V3.copy(b.p.h.position).add(V4.set(0, 2.0 + (b.p.st === 'cower' ? -.4 : 0), 0)).project(APT.cam); if (q.z > 1) { b.el.style.display = 'none'; continue; } b.el.style.display = 'block'; b.el.style.left = ((q.x + 1) / 2 * W) + 'px'; b.el.style.top = ((1 - q.y) / 2 * Hh) + 'px'; }
+}
+function cineRender(renderer) {
+  const now = performance.now(), dt = Math.min(.05, (now - APT.last) / 1000); APT.last = now; aptTick(dt); if (!APT.on) return;
+  const sz = renderer.getSize(new T.Vector2()); APT.cam.aspect = sz.x / Math.max(1, sz.y); APT.cam.updateProjectionMatrix();
+  renderer.setRenderTarget(null); renderer.render(APT.sc, APT.cam); aptBubbles(innerWidth, innerHeight);
+}
+function aptUiTick(dt) { APT.nearT -= dt; if (APT.nearT <= 0) { APT.nearT = .35; APT.near = aptNear(); } const b = $('aptBtn'), on = !!APT.near && !APT.on && !G.paused; b.style.display = on ? 'block' : 'none'; if (on) { const tx = '🏢 ' + adT(G.touchMode ? 'Binanın içine uzan' : 'Nokta (.) — binanın içine uzan'); if (b.textContent !== tx) b.textContent = tx; } }
 
 /* ---------- 🙌 el kol hareketleri ---------- */
 function pose(r, dt) {
@@ -756,6 +941,7 @@ function late(dt) {
   if (dt) try { ltTick(dt, t); } catch (e) {}
   if (dt) try { icTick(dt, t); } catch (e) {}
   if (dt) try { handsTick(dt, t); } catch (e) { console.warn('hands', e); }
+  try { aptUiTick(dt || .016); } catch (e) {}
   shieldTick(dt, t); skyTick(dt); ui();
 }
 function prompt() { if (G.INV.eq !== 'cosmic' || CO.on || CO.anim || G.giant) return null; return [(G.touchMode ? '👆 ' : 'V — ') + '🔮 ' + adT('Küreyi kullan'), activate]; }
@@ -764,19 +950,19 @@ function key(code) {
   if (icOn()) { if (code === 'KeyX') { blizzard(); return true; } if (code === 'KeyK') { iceShield(); return true; } }   // ❄️ buz tuşları
   if (!CO.on) return false; if (code === 'KeyK') { deactivate(true); return true; } if (code === 'KeyX') { strike(); return true; } if (code === 'KeyC') { shadowsKey(); return true; } if (code === 'KeyZ') { swordKey(); return true; }
   if (code === 'KeyH') { handsToggle(); return true; }
-  if (HD.on) { if (code === 'KeyG') { grabKey(); return true; } if (code === 'KeyF') { flickKey(); return true; } if (code === 'KeyR') { squeezeKey(); return true; } if (code === 'KeyB') { placeKey(); return true; } }   // ✋ dev eller
+  if (HD.on) { if (code === 'KeyN') { pressKey(); return true; } if (code === 'KeyG') { grabKey(); return true; } if (code === 'KeyF') { flickKey(); return true; } if (code === 'KeyR') { squeezeKey(); return true; } if (code === 'KeyB') { placeKey(); return true; } }   // ✋ dev eller
   if (SW.list.length) { const m = /^(?:Digit|Numpad)([0-9])$/.exec(code); if (m) { const n = +m[1]; if (n) setCount(n); else swDismiss(); return true; } }   // 🗡️ 1-9 kaç kılıç · 0 kapat
   return false; }
 function toggle() { if (CO.on) deactivate(true); else activate(); }
 
 /* ---------- 🖥️ telefon: ☄️ düğmesi ---------- */
 document.head.insertAdjacentHTML('beforeend', `<style>#cosPad{position:fixed;right:12px;top:calc(30% + env(safe-area-inset-top));z-index:7;display:none;flex-direction:column;gap:8px;align-items:flex-end}
-#cosPad button{border-radius:50%;border:2px solid rgba(220,180,255,.7);background:radial-gradient(circle,#7b2ff7,#2a0b5c);color:#fff;box-shadow:0 0 14px rgba(176,107,255,.6)}#cosStrike{width:62px;height:62px;font-size:28px}#cosShadow,#cosSword,#cosHands{width:46px;height:46px;font-size:20px}#cosHandPad{position:fixed;right:76px;top:calc(30% + env(safe-area-inset-top));z-index:7;display:none;grid-template-columns:repeat(3,42px);gap:6px;padding:6px;border-radius:14px;background:rgba(30,10,60,.6)}#cosHandPad button{width:42px;height:42px;border-radius:12px;border:1.5px solid rgba(220,180,255,.7);background:radial-gradient(circle,#7b2ff7,#2a0b5c);color:#fff;font-size:19px;padding:0}#cosHandPad button.on{background:radial-gradient(circle,#ff8af0,#7b2ff7)}#cosPad button.cd{opacity:.45}#cosSwRow{display:flex;gap:6px;align-items:center;position:relative}#cosSwNum{display:none;position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%);grid-template-columns:repeat(3,34px);gap:5px;padding:6px;border-radius:14px;background:rgba(30,10,60,.75)}#cosSwNum.open{display:grid}#cosSwNum button{width:34px;height:34px;font-size:15px;font-weight:700;padding:0;border-radius:10px}#cosSwNum button.sel{background:radial-gradient(circle,#ff8af0,#7b2ff7)}#cosSwX,#cosSwM,#cosSwN{display:none;width:36px;height:36px;font-size:14px;font-weight:700;padding:0}#cosPad.sw #cosSwX,#cosPad.sw #cosSwM,#cosPad.sw #cosSwN{display:block}#cosPad button.on{background:radial-gradient(circle,#ff8af0,#7b2ff7)}</style>`);
+#cosPad button{border-radius:50%;border:2px solid rgba(220,180,255,.7);background:radial-gradient(circle,#7b2ff7,#2a0b5c);color:#fff;box-shadow:0 0 14px rgba(176,107,255,.6)}#cosStrike{width:62px;height:62px;font-size:28px}#cosShadow,#cosSword,#cosHands{width:46px;height:46px;font-size:20px}#cosHandPad{position:fixed;right:76px;top:calc(30% + env(safe-area-inset-top));z-index:7;display:none;grid-template-columns:repeat(4,42px);gap:6px;padding:6px;border-radius:14px;background:rgba(30,10,60,.6)}#cosHandPad button{width:42px;height:42px;border-radius:12px;border:1.5px solid rgba(220,180,255,.7);background:radial-gradient(circle,#7b2ff7,#2a0b5c);color:#fff;font-size:19px;padding:0}#cosHandPad button.on{background:radial-gradient(circle,#ff8af0,#7b2ff7)}#cosPad button.cd{opacity:.45}#cosSwRow{display:flex;gap:6px;align-items:center;position:relative}#cosSwNum{display:none;position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%);grid-template-columns:repeat(3,34px);gap:5px;padding:6px;border-radius:14px;background:rgba(30,10,60,.75)}#cosSwNum.open{display:grid}#cosSwNum button{width:34px;height:34px;font-size:15px;font-weight:700;padding:0;border-radius:10px}#cosSwNum button.sel{background:radial-gradient(circle,#ff8af0,#7b2ff7)}#cosSwX,#cosSwM,#cosSwN{display:none;width:36px;height:36px;font-size:14px;font-weight:700;padding:0}#cosPad.sw #cosSwX,#cosPad.sw #cosSwM,#cosPad.sw #cosSwN{display:block}#cosPad button.on{background:radial-gradient(circle,#ff8af0,#7b2ff7)}</style>`);
 document.body.insertAdjacentHTML('beforeend', `<div id="cosPad"><button id="cosStrike">☄️</button><button id="cosShadow">👥</button><button id="cosHands">✋</button><div id="cosSwRow"><button id="cosSwX">✖</button><button id="cosSwM">⭐</button><button id="cosSwN">×</button><button id="cosSword">🗡️</button><div id="cosSwNum">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-n="${n}">${n}</button>`).join('')}</div></div></div>`);
-document.body.insertAdjacentHTML('beforeend', `<div id="cosHandPad">${[['grab', '🤏'], ['throw', '🎯'], ['sq', '💢'], ['place', '⬇️'], ['slap', '👋'], ['flick', '👆'], ['prot', '🛡️'], ['big', '➕'], ['small', '➖']].map(([k, i]) => `<button data-h="${k}">${i}</button>`).join('')}</div>`);
+document.body.insertAdjacentHTML('beforeend', `<div id="cosHandPad">${[['grab', '🤏'], ['throw', '🎯'], ['sq', '💢'], ['press', '🫳'], ['place', '⬇️'], ['slap', '👋'], ['flick', '👆'], ['prot', '🛡️'], ['big', '➕'], ['small', '➖']].map(([k, i]) => `<button data-h="${k}">${i}</button>`).join('')}</div>`);
 for (const id of ['cosStrike', 'cosShadow', 'cosSword', 'cosSwX', 'cosSwM', 'cosSwN', 'cosHands', 'cosHandPad']) for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
 $('cosStrike').addEventListener('click', e => { e.stopPropagation(); strike(); }); $('cosHands').addEventListener('click', e => { e.stopPropagation(); handsToggle(); });
-$('cosHandPad').addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-h]'); if (!b) return; const k = b.dataset.h; ({ grab: grabKey, throw: throwKey, sq: squeezeKey, place: placeKey, slap: slapKey, flick: flickKey, prot: protKey, big: () => handsKey('+'), small: () => handsKey('-') })[k](); }); $('cosShadow').addEventListener('click', e => { e.stopPropagation(); shadowsKey(); });
+$('cosHandPad').addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-h]'); if (!b) return; const k = b.dataset.h; ({ press: pressKey, grab: grabKey, throw: throwKey, sq: squeezeKey, place: placeKey, slap: slapKey, flick: flickKey, prot: protKey, big: () => handsKey('+'), small: () => handsKey('-') })[k](); }); $('cosShadow').addEventListener('click', e => { e.stopPropagation(); shadowsKey(); });
 $('cosSword').addEventListener('pointerdown', e => { e.stopPropagation(); swordKey(); });
 $('cosSwX').addEventListener('click', e => { e.stopPropagation(); swDismiss(); }); $('cosSwM').addEventListener('click', e => { e.stopPropagation(); mergeKey(); }); $('cosSwN').addEventListener('click', e => { e.stopPropagation(); $('cosSwNum').classList.toggle('open'); });   // ×N: rakam paneli aç/kapat
 for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $('cosSwNum').addEventListener(ev, e => e.stopPropagation(), { passive: true });
@@ -788,5 +974,5 @@ $('ltStorm').addEventListener('click', e => { e.stopPropagation(); if (icOn()) b
 function ui() { const ls = $('ltStorm'), ice = icOn(), lv = (ltOn() || ice) && G.touchMode && !G.paused; ls.style.display = lv ? 'block' : 'none'; if (lv) { ls.classList.toggle('cd', (ice ? IC.cd : LT.cd) > 0); const lb = ice ? '🌨️' : '⛈️'; if (ls.textContent !== lb) ls.textContent = lb; } const p = $('cosPad'), hp = $('cosHandPad'); p.style.display = CO.on && G.touchMode && !G.paused ? 'flex' : 'none'; hp.style.display = CO.on && HD.on && G.touchMode && !G.paused ? 'grid' : 'none'; if (!CO.on) return; $('cosStrike').classList.toggle('cd', CO.cd > 0); $('cosShadow').classList.toggle('on', SH.list.some(s => !s.dead && !s.recall)); $('cosHands').classList.toggle('on', HD.on); if (HD.on) hp.querySelector('[data-h="prot"]').classList.toggle('on', !!HD.prot);
   const sw = SW.list.length > 0; p.classList.toggle('sw', sw); $('cosSword').classList.toggle('on', sw); $('cosSwM').classList.toggle('on', SW.giant); const nt = '×' + SW.n; if ($('cosSwN').textContent !== nt) { $('cosSwN').textContent = nt; for (const b of $('cosSwNum').children) b.classList.toggle('sel', +b.dataset.n === SW.n); } if (!sw) $('cosSwNum').classList.remove('open'); }
 
-window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey, mergeKey, setCount, swDismiss, swOn: () => CO.on && SW.list.length > 0, handsOn: () => CO.on && HD.on, handsKey, handsToggle, HD, aim: aimPoint, camK, lasing: () => !!CO.lasOn || LT.zap || IC.beam, icePunch, iceShield, iceShieldOn: () => IC.shield > 0, blizzard, IC, boltPunch, boltLight, boltLightOn: () => LT.light && G.INV.eq === 'bolt', storm, LT };
+window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey, mergeKey, setCount, swDismiss, swOn: () => CO.on && SW.list.length > 0, handsOn: () => CO.on && HD.on, handsKey, handsToggle, HD, aim: aimPoint, cineOn: () => APT.on, cineSkip: () => aptEnd(), cineRender, aptTry, APT, cineStep: (dt, n) => { for (let i = 0; i < (n || 1) && APT.on; i++) aptTick(dt); }, camK, lasing: () => !!CO.lasOn || LT.zap || IC.beam, icePunch, iceShield, iceShieldOn: () => IC.shield > 0, blizzard, IC, boltPunch, boltLight, boltLightOn: () => LT.light && G.INV.eq === 'bolt', storm, LT };
 })(window.__sftG);
