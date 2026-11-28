@@ -161,7 +161,7 @@ function animTick(dt) {
     for (let k = 0; k < 4; k++) { const a = R(0, 6.28), r = R(1, 2); emit(o.position.x + Math.cos(a) * r, o.position.y + R(-.8, .8), o.position.z + Math.sin(a) * r, -Math.cos(a) * r * 2, R(-.5, .5), -Math.sin(a) * r * 2, .5, Math.random() < .5 ? PURPLE : PINK); }
     if (t >= 1.3) { G.scene.remove(o); CO.anim = null; CO.on = true; snd('burst'); CO.hpBase = G.HPMAX; G.HPMAX = CO.hpBase * 2; G.hp = Math.min(G.HPMAX, G.hp * 2);   // ❤️ küre içindeyken can iki katı G.shake = Math.max(G.shake, .4); burst(chest, 120, 9, PURPLE, 1.1); ring(chest, 6, PURPLE);
       document.body.classList.toggle('cosmicOn', true);
-      G.showMsg('🔮 ' + adT(G.touchMode ? 'Kozmik mod! Can iki katı · 🔴 lazer · ☄️ gökten saldırı · 👥 6 gölge · 🗡️ kılıç · 🔮 kapat' : 'Kozmik mod! Can iki katı · sağ tık lazer · art arda vur: 60 kol · X gökten saldırı · C 6 gölge · Z kılıç · K kapat'), 4.5); } }
+      G.showMsg('🔮 ' + adT(G.touchMode ? 'Kozmik mod! Can iki katı · 🔴 lazer · ☄️ gökten saldırı · 👥 6 gölge · 🗡️ kılıç · ✋ dev eller · 🔮 kapat' : 'Kozmik mod! Can iki katı · sağ tık lazer · art arda vur: 60 kol · X gökten saldırı · C 6 gölge · Z kılıç · H dev eller · K kapat'), 4.5); } }
   else { if (t < .8) { const up = V2.copy(chest).add(V3.set(0, 1.4 * t / .8, 0)); o.position.copy(up); o.scale.setScalar(Math.min(1, t / .5) * 1.3); } else { o.position.y += dt * (12 + (t - .8) * 40); emit(o.position.x, o.position.y - .3, o.position.z, R(-.5, .5), -3, R(-.5, .5), .8, Math.random() < .5 ? PURPLE : PINK); }
     if (t > .1 && t < .8) emit(chest.x, chest.y, chest.z, R(-2, 2), R(1, 4), R(-2, 2), .6, PURPLE);
     if (t > 2.6) { G.scene.remove(o); CO.anim = null; } }
@@ -171,7 +171,7 @@ function ring(p, R0, col) { const m = new T.Mesh(new T.TorusGeometry(1, .08, 8, 
 function ringsTick(dt) { for (let i = rings.length - 1; i >= 0; i--) { const r = rings[i]; r.t += dt; const k = r.t / .7; r.m.scale.setScalar(.5 + k * r.R0); r.m.material.opacity = Math.max(0, .9 * (1 - k)); if (k >= 1) { G.scene.remove(r.m); r.m.geometry.dispose(); r.m.material.dispose(); rings.splice(i, 1); } } }
 
 /* ---------- 👊 yumruk: tek vuruş uzağa fırlatır, art arda → 60 kol ---------- */
-function punch(dir) {
+function punch(dir) { if (HD.on) { handsClick(); return; }
   const now = G.elapsed; CO.punches = CO.punches.filter(t => now - t < 1.1); CO.punches.push(now);
   if (CO.punches.length >= 3) { if (CO.rush <= 0) CO.rushN = 10; CO.rush = 1.6; }
   const P = G.player.position, c = V1.set(P.x + dir.x * 1.8, P.y + 1.2, P.z + dir.z * 1.8), hs = hand(-1, V2);
@@ -321,7 +321,7 @@ function idlePos(s, out) {
   return out.set(P.x - cf * rx - sf * bk, P.y + 1.45 + k * .42 + Math.sin(t * 2 + s.i) * .08, P.z + sf * rx - cf * bk);
 }
 function idleQuat(s, pos, q) { const P = G.player.position; V2.set(pos.x - P.x, 0, pos.z - P.z); const L = V2.length() || 1; V2.multiplyScalar((s.big ? .3 : .3 + (s.i >> 1) * .14) / L); V2.y = 1; if (s.big) { V2.x += Math.sin(G.facing) * .45; V2.z += Math.cos(G.facing) * .45; } return q.setFromUnitVectors(UP, V2.normalize()); }
-let camAdd = 0; function camK(dt) { camAdd += ((SW.giant && CO.on ? 5.5 : 0) - camAdd) * Math.min(1, (dt || .016) * 3); return camAdd; }   // dev kılıç varken kamera biraz geri çekilir
+let camAdd = 0; function camK(dt) { camAdd += ((SW.giant && CO.on ? 5.5 : 0) + (HD.on && CO.on ? 3.5 + 1.8 * HD.S : 0) - camAdd) * Math.min(1, (dt || .016) * 3); return camAdd; }   // dev kılıç varken kamera biraz geri çekilir
 function newSword(i, from, big) { const s = { g: swordMesh(big ? 2 : 0), i, big: !!big, mode: 'idle', t: 0, hit: false, hold: 0, born: 0 }; s.g.scale.setScalar(.01); if (from) s.g.position.copy(from); else idlePos(s, s.g.position); idleQuat(s, s.g.position, s.g.quaternion); G.scene.add(s.g); return s; }
 function dropSword(s) { burst(s.g.position, s.big ? 120 : 24, s.big ? 9 : 4, PURPLE, .6); G.scene.remove(s.g); }
 function swHelp(n) { return G.touchMode ? `Kozmik kılıç ×${n}! 🗡️ tek: savur · art arda: kare kare · ×N: rakamla kaç kılıç · ⭐ dev kılıç · ✖ kapat` : `Kozmik kılıç ×${n}! Z: savur · art arda Z: kare kare · 1-9: kaç kılıç · nokta (.): birleşip dev kılıç · 0: kapat`; }
@@ -591,6 +591,144 @@ function icTick(dt, t) {
 document.head.insertAdjacentHTML('beforeend', '<style>#icFrost{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;background:radial-gradient(ellipse at center,rgba(220,245,255,0) 50%,rgba(200,238,255,.5) 85%,rgba(235,250,255,.85) 100%)}</style>');
 document.body.insertAdjacentHTML('beforeend', '<div id="icFrost"></div>');
 
+/* ---------- ✋ kozmik dev eller (H): mor gölge iki dev el · G tut (iki ele ayrı) · sol tık: elindekini at / boşsa tokat · F fiske · R sık · B bırak · ' seçtiğin kişiyi kapalı elle koru · + / − boy
+   Yalnızca düşmanlara ve eşyalara (ağaç, kaya, sandık, lamba, araba…) dokunur: insanlar ve hayvanlar listede yok. */
+const HD = { on: false, S: 1, hands: [], prot: null, protMP: 0, fly: [] };
+const handMat = new T.MeshBasicMaterial({ color: 0x6a34d6, transparent: true, opacity: .84, toneMapped: false }), handRim = new T.MeshBasicMaterial({ color: 0xc58bff, transparent: true, opacity: .26, blending: T.AdditiveBlending, depthWrite: false, side: T.BackSide, toneMapped: false });
+const capG = (r, L) => new T.CapsuleGeometry(r, L, 3, 8).rotateX(Math.PI / 2).translate(0, 0, L / 2 + r * .4);
+function makeHand(side) {
+  const ts = -side, g = new T.Group(), add = (geo, par) => { const m = new T.Mesh(geo, handMat), rr = new T.Mesh(geo, handRim); rr.scale.setScalar(1.16); m.add(rr); par.add(m); return m; };
+  const palm = add(new T.SphereGeometry(.5, 16, 12), g); palm.position.z = .6; palm.scale.set(1, .34, 1.1);
+  g.add(new T.Mesh(new T.CylinderGeometry(.24, .42, 1.2, 12, 1, true).rotateX(Math.PI / 2).translate(0, 0, -.4), new T.MeshBasicMaterial({ color: 0x8a4dff, transparent: true, opacity: .32, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, toneMapped: false })));
+  const fingers = [];
+  for (const [x, z, k] of [[ts * .34, 1.0, .92], [ts * .12, 1.07, 1], [-ts * .11, 1.04, .95], [-ts * .32, .96, .78]]) { let par = g, off = new T.Vector3(x, 0, z); const segs = [];
+    for (const L0 of [.36, .27, .22]) { const L = L0 * k, j = new T.Group(); j.position.copy(off); par.add(j); add(capG(.085, L), j); segs.push(j); par = j; off = new T.Vector3(0, 0, L + .07); } fingers.push(segs); }
+  const tb = new T.Group(); tb.position.set(ts * .42, -.04, .3); g.add(tb); const th = []; { let par = tb, off = new T.Vector3(); for (const L of [.3, .25, .2]) { const j = new T.Group(); j.position.copy(off); par.add(j); add(capG(.095, L), j); th.push(j); par = j; off = new T.Vector3(0, 0, L + .07); } }
+  const gl = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0x9b5cff, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: .22 })); gl.scale.setScalar(2); gl.position.z = .6; g.add(gl);
+  g.traverse(o => o.frustumCulled = false); g.visible = false; G.scene.add(g);
+  return { g, side, ts, fingers, th, tb, st: 'idle', t: 0, item: null, pos: new T.Vector3(), q: new T.Quaternion(), c: .15, tc: 0, mid: null, sc: 1, k: 0 };
+}
+function handPose(h, c, tc, mid) {   // c: parmak kıvrımı · tc: başparmak · mid: orta parmak (fiske)
+  h.fingers.forEach((sg, i) => { const ci = i === 1 && mid != null ? mid : c; sg[0].rotation.x = ci; sg[1].rotation.x = ci * 1.25; sg[2].rotation.x = ci * 1.05; sg[0].rotation.y = (i - 1.5) * .07 * (1 - Math.min(1, c)); });
+  h.tb.rotation.set(.3 + tc * .35, h.ts * (.85 - tc * 1.15), h.ts * tc * .25); h.th[1].rotation.x = tc * .8; h.th[2].rotation.x = tc * .7;
+}
+const camYaw = () => { G.camera.getWorldDirection(V4); return Math.atan2(V4.x, V4.z); }, faceCam = () => { const f = camYaw(); G.facing = f; G.charHolder.rotation.y = f; };
+const handScale = () => 2.2 * HD.S, reachMax = () => 20 + 8 * HD.S;
+function hTargets() { return targets().filter(o => !o.hum); }   // insanlar (BR botları) hariç
+function hById(id) { return hTargets().find(o => o.id === id); }
+function setTg(o, x, y, z) { if (o.set) o.set(x, y, z); else o.p.set(x, y, z); }
+function gripPt(h, out) { return out.set(0, -.62, .66).applyQuaternion(h.q).multiplyScalar(h.sc).add(h.pos); }
+function idleOf(h, pos, q) {
+  const P = G.player.position, f = camYaw(), S = HD.S, sf = Math.sin(f), cf = Math.cos(f), sd = h.side, lat = 1.4 + 1.0 * S, fw = 1.6 + .6 * S, t = G.elapsed;
+  pos.set(P.x - cf * lat * sd + sf * fw, P.y + 1.3 + .7 * S + Math.sin(t * 1.7 + sd) * .12 * S, P.z + sf * lat * sd + cf * fw);
+  E1.set(-1.15, f + sd * .18, -sd * .3, 'YXZ'); q.setFromEuler(E1);   // parmaklar yukarı, avuç ileri: arkadan elin sırtı görünür
+}
+const E1 = new T.Euler();
+function handsToggle() {
+  if (!CO.on) return; HD.on = !HD.on;
+  if (!HD.hands.length) HD.hands = [makeHand(1), makeHand(-1)];
+  if (HD.on) { for (const h of HD.hands) { idleOf(h, h.pos, h.q); h.g.visible = true; h.st = 'idle'; h.k = 0; burst(V1.copy(h.pos), 60, 6, PURPLE, .7); } snd('in', .6);
+    G.showMsg('✋ ' + adT(G.touchMode ? 'Dev eller! 🤏 tut · 🎯 at · 💢 sık · ⬇️ bırak · 👋 tokat · 👆 fiske · 🛡️ koru · ➕➖ boy' : "Dev eller! G: tut · sol tık: at / tokat · F: fiske · R: sık · B: bırak · ': kişiyi koru · + / −: boy · H: kapat"), 4.5); }
+  else handsOff();
+}
+function handsOff(quiet) { HD.on = false; for (const h of HD.hands) { if (h.item) releaseItem(h, 0, 0, 0, 0); h.st = 'idle'; if (h.g.visible && !quiet) burst(V1.copy(h.pos), 40, 5, PURPLE, .6); h.g.visible = false; } protOff(true); if (!quiet) snd('out', .4); }
+function releaseItem(h, vx, vy, vz, dmg) {   // eldekini bırak / fırlat
+  const it = h.item; h.item = null; if (!it) return;
+  if (it.kind === 'obj') { try { G.handThrowObj(it.o, vx, vy, vz, dmg > 0); } catch (e) {} return; }
+  HD.fly.push({ id: it.id, v: new T.Vector3(vx, vy, vz), dmg, t: 0 });
+}
+function pickAim(wantObj) {   // nişangah ışınına en yakın düşman ya da eşya (ışının neye çarptığından bağımsız)
+  const P = G.player.position, cam = G.camera, C = cam.getWorldPosition(new T.Vector3()), D = cam.getWorldDirection(new T.Vector3()), rg = reachMax(), tol = 1.3 + .5 * HD.S, Q = new T.Vector3();
+  const rayD = (x, y, z) => { Q.set(x, y, z).sub(C); const t = Q.dot(D); if (t < 0) return 1e9; return Q.addScaledVector(D, -t).length() + t * .015; };
+  let best = null, bd = 1e9;
+  for (const o of hTargets()) { if (Math.hypot(o.p.x - P.x, o.p.z - P.z) > rg) continue; const d = Math.min(rayD(o.p.x, o.p.y + o.h * .5, o.p.z), rayD(o.p.x, o.p.y + o.h * .15, o.p.z)) - o.r; if (d < tol && d < bd) { bd = d; best = { kind: 'en', o }; } }
+  if (wantObj && !best) { let L = []; try { L = G.handObjsIn(P.x, P.z, rg); } catch (e) {} for (const o of L) { const s = o.scale.y || 1, d = Math.min(rayD(o.position.x, o.position.y + .6 * s, o.position.z), rayD(o.position.x, o.position.y + 2 * s, o.position.z), rayD(o.position.x, o.position.y + 4 * s, o.position.z)); if (d < tol && d < bd) { bd = d; best = { kind: 'obj', o }; } } }
+  return best;
+}
+function freeHand() { return HD.hands.find(h => !h.item && h.st === 'idle' && !(HD.prot && h.side === -1)); }
+function grabKey() { faceCam();
+  const h = freeHand(); if (!h) { G.showMsg('✋ ' + adT('İki elin de dolu'), 1); return; }
+  const tg = pickAim(true); if (!tg) { G.showMsg('✋ ' + adT('Nişangahla bir düşmana ya da ağaç, kaya gibi bir şeye bak'), 1.4); return; }
+  if (tg.kind === 'en') { if (tg.o.boss || tg.o.h > 3.6 * HD.S) { G.showMsg('✋ ' + adT('Çok büyük — elleri büyüt (+)'), 1.4); return; } h.st = 'reach'; h.t = 0; h.tg = { kind: 'en', id: tg.o.id, h: tg.o.h }; tg.o.id.__frz = Math.max(tg.o.id.__frz || 0, .8); }
+  else { const box = new T.Box3().setFromObject(tg.o), hh = Math.max(.4, (box.max.y - box.min.y) * (tg.o.userData.slot === 'tree' || tg.o.userData.slot === 'pine' ? .4 : .5)); h.st = 'reach'; h.t = 0; h.tg = { kind: 'obj', o: tg.o, hh }; }
+  h.from = h.pos.clone(); snd('tap', .6);
+}
+function throwKey() { faceCam(); const h = HD.hands.find(x => x.item && x.st === 'hold'); if (!h) return false; h.st = 'throw'; h.t = 0; return true; }
+function squeezeKey() { let n = 0; for (const h of HD.hands) if (h.item && h.st === 'hold') { h.st = 'squeeze'; h.t = 0; n++; } if (!n) G.showMsg('✋ ' + adT('Sıkmak için önce G ile bir şey tut'), 1.2); }
+function placeKey() { faceCam(); const h = HD.hands.find(x => x.item && x.st === 'hold'); if (!h) return; const P = G.player.position, A = aimPoint(40); V1.subVectors(A, P); if (V1.length() > reachMax()) A.copy(P).addScaledVector(V1.normalize(), reachMax()); h.st = 'place'; h.t = 0; h.from = h.pos.clone(); h.dest = A; }
+function slapKey() { faceCam(); const h = HD.hands.find(x => !x.item && x.st === 'idle' && !(HD.prot && x.side === -1)); if (!h) return; h.st = 'slap'; h.t = 0; h.hit = false; snd('out', .45); }
+function flickKey() { faceCam(); const h = freeHand(); if (!h) return; const tg = pickAim(true); if (!tg) { G.showMsg('👆 ' + adT('Fiske için nişangahla bir şeye bak'), 1.2); return; } h.st = 'flick'; h.t = 0; h.from = h.pos.clone(); h.tg = tg.kind === 'en' ? { kind: 'en', id: tg.o.id, h: tg.o.h, boss: tg.o.boss } : { kind: 'obj', o: tg.o }; if (tg.kind === 'en' && !tg.o.boss) tg.o.id.__frz = Math.max(tg.o.id.__frz || 0, .6); }
+function handsClick() { if (!throwKey()) slapKey(); }
+function hHurt(c, rad, dmg, knock, up) { for (const o of hTargets()) { const dx = o.p.x - c.x, dz = o.p.z - c.z, d = Math.hypot(dx, dz); if (d > rad + o.r) continue; try { o.hit(dmg, new T.Vector3(dx, up || .3, dz).normalize(), knock); } catch (e) {} } }
+/* 🛡️ koruma: seçilen kişinin üstünü kapalı (kubbe gibi) el örter, her şeyden korunur */
+const protDome = new T.Group(); { protDome.add(new T.Mesh(new T.SphereGeometry(1.5, 24, 16), new T.MeshBasicMaterial({ color: 0x9b5cff, transparent: true, opacity: .16, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false })), new T.Mesh(new T.IcosahedronGeometry(1.55, 1), new T.MeshBasicMaterial({ color: 0xc58bff, wireframe: true, transparent: true, opacity: .35, blending: T.AdditiveBlending, depthWrite: false }))); protDome.visible = false; protDome.traverse(o => o.frustumCulled = false); G.scene.add(protDome); }
+function protPos(pr, out) { if (pr.k === 'me') return out.copy(G.player.position); if (pr.k === 'mp') { const pl = G.MP.players[pr.id]; return pl && pl.av ? out.copy(pl.av.holder.position) : null; } return pr.n && pr.n.holder && pr.n.holder.visible ? out.copy(pr.n.holder.position) : null; }
+function protKey() {
+  const P = G.player.position, A = aimPoint(60); let best = null, bd = 3.5;
+  try { const M = G.MP; if (M.on) for (const id in M.players) { const pl = M.players[id]; if (id === M.me.id || !pl.av) continue; const q = pl.av.holder.position, d = Math.hypot(q.x - A.x, q.z - A.z); if (d < bd) { bd = d; best = { k: 'mp', id, name: pl.name }; } } } catch (e) {}
+  try { for (const n of G.npcs || []) { if (!n.holder || !n.holder.visible || n.state === 'held') continue; const q = n.holder.position; if (Math.hypot(q.x - P.x, q.z - P.z) > 40) continue; const d = Math.hypot(q.x - A.x, q.z - A.z); if (d < bd) { bd = d; best = { k: 'npc', n, name: n.name || adT('köylü') }; } } } catch (e) {}
+  const same = HD.prot && best && ((best.k === 'mp' && HD.prot.id === best.id) || (best.k === 'npc' && HD.prot.n === best.n));
+  if (HD.prot && (same || (!best && HD.prot.k === 'me'))) { protOff(); return; }
+  if (!best) best = { k: 'me', name: adT('kendini') };
+  const lh = HD.hands[1]; if (lh.item) releaseItem(lh, 0, -1, 0, 0); lh.st = 'idle';
+  HD.prot = best; protDome.visible = true; snd('shield', .8); G.showMsg('🛡️ ' + (best.k === 'me' ? adT('Kendini kapalı elle koruyorsun') : `${best.name} ${adT('korunuyor')}`) + adT(" · tekrar ': bırak"), 2);
+}
+function protOff(quiet) { if (!HD.prot) return; HD.prot = null; protDome.visible = false; if (!quiet) { snd('out', .3); G.showMsg('🛡️ ' + adT('Koruma bitti'), 1); } }
+function handsTick(dt, t) {
+  if (!HD.hands.length) return; if (HD.on && !CO.on) handsOff(true); if (!HD.on) return;
+  const P = G.player.position, sc = handScale(), TL = hTargets(), byId = new Map(TL.map(o => [o.id, o]));
+  for (const h of HD.hands) {
+    h.t += dt; idleOf(h, V1, Q1); let tp = V1.clone(), tq = Q1.clone(), c = .15, tc = .1, mid = null, k = 9, sk = sc;
+    if (h.item && !(h.st === 'reach')) { c = .78; tc = .7; tp.addScaledVector(V2.set(Math.sin(camYaw()), 0, Math.cos(camYaw())), .9 * HD.S).y += .6 * HD.S + (h.item.kind === 'obj' ? h.item.hh * .9 : h.item.h * .5); E1.set(.55, camYaw(), -h.side * .2, 'YXZ'); tq.setFromEuler(E1); }   // tutarken avuç aşağı
+    if (h.st === 'reach') { const tgt = h.tg.kind === 'en' ? byId.get(h.tg.id) : null; const tc0 = tgt ? V3.set(tgt.p.x, tgt.p.y + tgt.h * .5, tgt.p.z) : h.tg.kind === 'obj' ? V3.copy(h.tg.o.position).setY(h.tg.o.position.y + h.tg.hh) : null;
+      if (!tc0) { h.st = 'idle'; continue; } E1.set(.9, Math.atan2(tc0.x - P.x, tc0.z - P.z), 0, 'YXZ'); tq.setFromEuler(E1); V2.set(0, -.62, .66).applyQuaternion(tq).multiplyScalar(sc); tp.copy(tc0).sub(V2); c = .1 + Math.min(1, h.t / .3) * .2; k = 14;
+      if (h.t > .3 && h.pos.distanceTo(tp) < 1.2 * HD.S + .4) { if (h.tg.kind === 'en') h.item = { kind: 'en', id: h.tg.id, h: h.tg.h }; else { try { G.handTakeObj(h.tg.o); } catch (e) {} h.item = { kind: 'obj', o: h.tg.o, hh: h.tg.hh }; } h.st = 'hold'; h.t = 0; snd('tap'); burst(V2.copy(tc0), 20, 4, PURPLE, .4); }
+      if (h.t > 1.5) h.st = 'idle'; }
+    else if (h.st === 'throw') { const fw = V2.set(Math.sin(camYaw()), 0, Math.cos(camYaw())); tp.addScaledVector(fw, h.t < .14 ? -1.4 * HD.S : 2.2 * HD.S).y += h.t < .14 ? .8 * HD.S : 0; k = 18;
+      if (h.t >= .14 && h.item) { const g0 = gripPt(h, new T.Vector3()), A = aimPoint(90); V3.subVectors(A, g0).normalize().multiplyScalar(30 + 5 * HD.S); releaseItem(h, V3.x, V3.y + 5, V3.z, 45 + 10 * HD.S); snd('burst', .5); G.shake = Math.max(G.shake, .15); }
+      c = h.t < .14 ? .8 : .05; if (h.t > .45) h.st = 'idle'; }
+    else if (h.st === 'squeeze') { c = .8 + Math.min(1, h.t / .3) * .7; tc = 1; tp.x += R(-.06, .06) * HD.S; tp.y += R(-.06, .06) * HD.S;
+      if (h.t > .38 && h.item) { const it = h.item; h.item = null; const g0 = gripPt(h, new T.Vector3());
+        if (it.kind === 'en') { const o = byId.get(it.id); if (o) { o.id.__frz = 0; try { o.hit(99999, new T.Vector3(0, 1, 0), 0); } catch (e) {} } burst(g0, 120, 8, PURPLE, .8); burst(g0, 40, 5, 0xffffff, .5); snd('burst'); G.shake = Math.max(G.shake, .3); }
+        else { try { G.handCrushObj(it.o); } catch (e) {} burst(g0, 50, 5, PURPLE, .6); snd('punch'); } }
+      if (h.t > .7) h.st = 'idle'; }
+    else if (h.st === 'place') { const up = h.item ? (h.item.kind === 'obj' ? h.item.hh : h.item.h * .5) + .3 : 1; V2.set(0, -.62, .66).applyQuaternion(tq).multiplyScalar(sc); tp.copy(h.dest).add(V3.set(0, up, 0)).sub(V2); k = 7;
+      if (h.t > .45 && h.item) { releaseItem(h, 0, -1, 0, 0); snd('tap', .6); } if (h.t > .8) h.st = 'idle'; }
+    else if (h.st === 'slap') { const sd = h.side, u = Math.min(1, h.t / .38), e = u * u * (3 - 2 * u), a = camYaw() + sd * (1.5 - e * 3), rad = 2.2 + 1.3 * HD.S;
+      tp.set(P.x + Math.sin(a) * rad, P.y + 1 + .5 * HD.S, P.z + Math.cos(a) * rad); E1.set(0, a - sd * 1.57, sd * 1.5, 'YXZ'); tq.setFromEuler(E1); c = .02; k = 22;
+      if (!h.hit && u > .5) { h.hit = true; const Rr = 3 + 2.6 * HD.S, f = camYaw(); let n = 0;
+        for (const o of TL) { const dx = o.p.x - P.x, dz = o.p.z - P.z, d = Math.hypot(dx, dz); if (d > Rr + o.r || (Math.abs(G.wrapAng(Math.atan2(dx, dz) - f)) > 1.4 && d > 1.5)) continue; try { o.hit(30 + 10 * HD.S, new T.Vector3(dx - sd * Math.cos(f) * d * .5, .6, dz + sd * Math.sin(f) * d * .5).normalize(), 18 + 4 * HD.S); } catch (e2) {} n++; }
+        let objs = []; try { objs = G.handObjsIn(P.x, P.z, Rr).filter(o => Math.abs(G.wrapAng(Math.atan2(o.position.x - P.x, o.position.z - P.z) - f)) < 1.4).slice(0, 4); } catch (e2) {}
+        for (const o of objs) { const dx = o.position.x - P.x, dz = o.position.z - P.z, L = Math.hypot(dx, dz) || 1; try { G.handTakeObj(o); G.handThrowObj(o, dx / L * (22 + 4 * HD.S), 7, dz / L * (22 + 4 * HD.S), true); } catch (e2) {} n++; }
+        snd('punch', n ? 1 : .5); if (n) G.shake = Math.max(G.shake, .35); ring(V2.set(P.x, P.y + 1, P.z), Rr, PURPLE); }
+      if (h.t > .55) h.st = 'idle'; }
+    else if (h.st === 'flick') { const tg = h.tg, o = tg.kind === 'en' ? byId.get(tg.id) : null, cpos = o ? V3.set(o.p.x, o.p.y + o.h * .5, o.p.z) : tg.kind === 'obj' ? V3.copy(tg.o.position).setY(tg.o.position.y + 1) : null;
+      if (!cpos) { h.st = 'idle'; continue; } const fa = Math.atan2(cpos.x - P.x, cpos.z - P.z); E1.set(0, fa, 0, 'YXZ'); tq.setFromEuler(E1); tp.copy(cpos).addScaledVector(V2.set(Math.sin(fa), 0, Math.cos(fa)), -1.35 * sc).y += .1 * sc; k = 16; c = .1; tc = .8; mid = h.t < .32 ? 1.3 : -.2;
+      if (h.t >= .32 && !h.done) { h.done = true; const dir = new T.Vector3(Math.sin(fa), 0, Math.cos(fa));
+        if (o) { if (!tg.boss) o.id.__frz = 0; try { o.hit(20, dir.clone().setY(.4).normalize(), tg.boss ? 6 : 0); } catch (e) {} if (!tg.boss) HD.fly.push({ id: tg.id, v: dir.clone().multiplyScalar(36 + 4 * HD.S).setY(12), dmg: 40, t: 0 }); }
+        else { try { G.handTakeObj(tg.o); G.handThrowObj(tg.o, dir.x * (38 + 4 * HD.S), 12, dir.z * (38 + 4 * HD.S), true); } catch (e) {} }
+        burst(cpos, 40, 6, PURPLE, .5); snd('punch'); G.shake = Math.max(G.shake, .2); }
+      if (h.t > .6) { h.st = 'idle'; h.done = false; } }
+    else if (h.side === -1 && HD.prot) { const pp = protPos(HD.prot, V3); if (!pp) protOff(); else { sk = sc * 1.35; E1.set(.15, camYaw(), 0, 'YXZ'); tq.setFromEuler(E1); V2.set(0, -.62, .66).applyQuaternion(tq).multiplyScalar(sk); tp.copy(pp).add(V4.set(0, 2.2 + .3 * HD.S, 0)).sub(V2); c = .95; tc = .6; k = 10;
+        protDome.position.copy(pp).y += 1; protDome.rotation.y += dt * .5; protDome.children[0].material.opacity = .14 + Math.sin(t * 5) * .04;
+        if (HD.prot.k === 'mp') { HD.protMP -= dt; if (HD.protMP <= 0) { HD.protMP = .3; try { G.mpSend({ t: 'cosh', x: +pp.x.toFixed(1), y: +pp.y.toFixed(1), z: +pp.z.toFixed(1), r: 3, to: HD.prot.id }); } catch (e) {} } } } }
+    h.pos.lerp(tp, 1 - Math.exp(-k * dt)); h.q.slerp(tq, 1 - Math.exp(-10 * dt)); h.sc += (sk - h.sc) * (1 - Math.exp(-8 * dt));
+    h.c += (c - h.c) * (1 - Math.exp(-14 * dt)); h.tc += (tc - h.tc) * (1 - Math.exp(-14 * dt)); h.mid = mid == null ? null : mid; handPose(h, h.c, h.tc, h.mid);
+    h.g.position.copy(h.pos); h.g.quaternion.copy(h.q); h.g.scale.setScalar(h.sc);
+    if (h.item) { const g0 = gripPt(h, V2); if (h.item.kind === 'en') { const o = byId.get(h.item.id); if (!o) h.item = null; else { o.id.__frz = Math.max(o.id.__frz || 0, .3); setTg(o, g0.x, g0.y - o.h * .5, g0.z); } } else h.item.o.position.set(g0.x, g0.y - h.item.hh, g0.z); }
+    if (Math.random() < .35) { V3.set(R(-.5, .5), R(-.2, .2), R(0, 1.3)).applyQuaternion(h.q).multiplyScalar(h.sc).add(h.pos); emit(V3.x, V3.y, V3.z, R(-.3, .3), R(.2, .8), R(-.3, .3), .6, Math.random() < .6 ? PURPLE : PINK); }
+  }
+  for (let i = HD.fly.length - 1; i >= 0; i--) { const f = HD.fly[i], o = byId.get(f.id); f.t += dt; if (!o || f.t > 4) { if (o) o.id.__frz = 0; HD.fly.splice(i, 1); continue; }
+    f.v.y -= 20 * dt; const nx = o.p.x + f.v.x * dt, ny = o.p.y + f.v.y * dt, nz = o.p.z + f.v.z * dt; let gy = ny - 1; try { gy = G.groundAt(nx, nz, o.p.y + .5); } catch (e) {}
+    o.id.__frz = Math.max(o.id.__frz || 0, .3);
+    if (ny > gy || f.v.y > 0) { setTg(o, nx, ny, nz); if (Math.random() < .5) emit(nx, ny + o.h * .5, nz, 0, .5, 0, .5, PURPLE); continue; }
+    setTg(o, nx, gy, nz); o.id.__frz = 0; HD.fly.splice(i, 1);
+    if (f.dmg > 0) { const dir = new T.Vector3(f.v.x, .3, f.v.z).normalize(); try { o.hit(f.dmg, dir, 6); } catch (e) {} hHurt(V3.set(nx, gy, nz), 2.5 + .5 * HD.S, Math.round(f.dmg * .5), 6, .5); burst(V3.set(nx, gy + .5, nz), 50, 6, PURPLE, .6); ring(V3.set(nx, gy + .2, nz), 3 + HD.S, PURPLE); snd('punch'); G.shake = Math.max(G.shake, .25); }
+  }
+  if (HD.prot && HD.prot.k !== 'me' && !protPos(HD.prot, V3)) protOff();
+}
+function handsKey(k) { if (!HD.on) return; if (k === "'") { protKey(); return; } const S0 = HD.S; HD.S = Math.max(.4, Math.min(4, HD.S * (k === '+' ? 1.25 : .8))); if (HD.S !== S0) { snd('tap', .6); G.showMsg('✋ ' + adT('El boyu') + ' ×' + HD.S.toFixed(1), 1); } }
+
 /* ---------- 🙌 el kol hareketleri ---------- */
 function pose(r, dt) {
   if (r && ((ltOn() && (LT.zap || LT.cast > 0)) || (icOn() && (IC.beam || IC.cast > 0)))) { const cast = LT.cast > 0 || IC.cast > 0; const k = 1 - Math.exp(-14 * dt), S = (o, ax, v) => { o.rotation[ax] += (v - o.rotation[ax]) * k; };   // ⚡ şimşek: sağ kol ileri / iki kol göğe
@@ -607,7 +745,7 @@ function pose(r, dt) {
 
 /* ---------- 🌐 çok oyunculu: arkadaşın kalkanı seni de korur ---------- */
 function net(m) { if (m.t !== 'cosh') return; const P = G.player.position; CO.friendP = new T.Vector3(m.x, m.y + 1, m.z); CO.friendT = G.elapsed + .6; if (Math.hypot(P.x - m.x, P.y - m.y, P.z - m.z) < (m.r || 8)) CO.allyT = G.elapsed + .7; }
-function blocks() { return (CO.on && G.shielding) || CO.allyT > G.elapsed || IC.shield > 0; }
+function blocks() { return (CO.on && G.shielding) || CO.allyT > G.elapsed || IC.shield > 0 || (HD.on && HD.prot && HD.prot.k === 'me'); }
 
 /* ---------- ⏱️ her kare (gökyüzü güncellemesinden sonra) ---------- */
 function late(dt) {
@@ -617,6 +755,7 @@ function late(dt) {
   if (dt) { animTick(dt); rushTick(dt, t); laserTick(dt, t); strikesTick(dt, t); shadowsTick(dt, t); swordTick(dt, t); fxTick(dt, t); ringsTick(dt); partsTick(dt); }
   if (dt) try { ltTick(dt, t); } catch (e) {}
   if (dt) try { icTick(dt, t); } catch (e) {}
+  if (dt) try { handsTick(dt, t); } catch (e) { console.warn('hands', e); }
   shieldTick(dt, t); skyTick(dt); ui();
 }
 function prompt() { if (G.INV.eq !== 'cosmic' || CO.on || CO.anim || G.giant) return null; return [(G.touchMode ? '👆 ' : 'V — ') + '🔮 ' + adT('Küreyi kullan'), activate]; }
@@ -624,16 +763,20 @@ function key(code) {
   if (ltOn()) { if (code === 'KeyX') { storm(); return true; } if (code === 'KeyK') { boltLight(); return true; } }   // ⚡ şimşek tuşları
   if (icOn()) { if (code === 'KeyX') { blizzard(); return true; } if (code === 'KeyK') { iceShield(); return true; } }   // ❄️ buz tuşları
   if (!CO.on) return false; if (code === 'KeyK') { deactivate(true); return true; } if (code === 'KeyX') { strike(); return true; } if (code === 'KeyC') { shadowsKey(); return true; } if (code === 'KeyZ') { swordKey(); return true; }
+  if (code === 'KeyH') { handsToggle(); return true; }
+  if (HD.on) { if (code === 'KeyG') { grabKey(); return true; } if (code === 'KeyF') { flickKey(); return true; } if (code === 'KeyR') { squeezeKey(); return true; } if (code === 'KeyB') { placeKey(); return true; } }   // ✋ dev eller
   if (SW.list.length) { const m = /^(?:Digit|Numpad)([0-9])$/.exec(code); if (m) { const n = +m[1]; if (n) setCount(n); else swDismiss(); return true; } }   // 🗡️ 1-9 kaç kılıç · 0 kapat
   return false; }
 function toggle() { if (CO.on) deactivate(true); else activate(); }
 
 /* ---------- 🖥️ telefon: ☄️ düğmesi ---------- */
 document.head.insertAdjacentHTML('beforeend', `<style>#cosPad{position:fixed;right:12px;top:calc(30% + env(safe-area-inset-top));z-index:7;display:none;flex-direction:column;gap:8px;align-items:flex-end}
-#cosPad button{border-radius:50%;border:2px solid rgba(220,180,255,.7);background:radial-gradient(circle,#7b2ff7,#2a0b5c);color:#fff;box-shadow:0 0 14px rgba(176,107,255,.6)}#cosStrike{width:62px;height:62px;font-size:28px}#cosShadow,#cosSword{width:46px;height:46px;font-size:20px}#cosPad button.cd{opacity:.45}#cosSwRow{display:flex;gap:6px;align-items:center;position:relative}#cosSwNum{display:none;position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%);grid-template-columns:repeat(3,34px);gap:5px;padding:6px;border-radius:14px;background:rgba(30,10,60,.75)}#cosSwNum.open{display:grid}#cosSwNum button{width:34px;height:34px;font-size:15px;font-weight:700;padding:0;border-radius:10px}#cosSwNum button.sel{background:radial-gradient(circle,#ff8af0,#7b2ff7)}#cosSwX,#cosSwM,#cosSwN{display:none;width:36px;height:36px;font-size:14px;font-weight:700;padding:0}#cosPad.sw #cosSwX,#cosPad.sw #cosSwM,#cosPad.sw #cosSwN{display:block}#cosPad button.on{background:radial-gradient(circle,#ff8af0,#7b2ff7)}</style>`);
-document.body.insertAdjacentHTML('beforeend', `<div id="cosPad"><button id="cosStrike">☄️</button><button id="cosShadow">👥</button><div id="cosSwRow"><button id="cosSwX">✖</button><button id="cosSwM">⭐</button><button id="cosSwN">×</button><button id="cosSword">🗡️</button><div id="cosSwNum">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-n="${n}">${n}</button>`).join('')}</div></div></div>`);
-for (const id of ['cosStrike', 'cosShadow', 'cosSword', 'cosSwX', 'cosSwM', 'cosSwN']) for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
-$('cosStrike').addEventListener('click', e => { e.stopPropagation(); strike(); }); $('cosShadow').addEventListener('click', e => { e.stopPropagation(); shadowsKey(); });
+#cosPad button{border-radius:50%;border:2px solid rgba(220,180,255,.7);background:radial-gradient(circle,#7b2ff7,#2a0b5c);color:#fff;box-shadow:0 0 14px rgba(176,107,255,.6)}#cosStrike{width:62px;height:62px;font-size:28px}#cosShadow,#cosSword,#cosHands{width:46px;height:46px;font-size:20px}#cosHandPad{position:fixed;right:76px;top:calc(30% + env(safe-area-inset-top));z-index:7;display:none;grid-template-columns:repeat(3,42px);gap:6px;padding:6px;border-radius:14px;background:rgba(30,10,60,.6)}#cosHandPad button{width:42px;height:42px;border-radius:12px;border:1.5px solid rgba(220,180,255,.7);background:radial-gradient(circle,#7b2ff7,#2a0b5c);color:#fff;font-size:19px;padding:0}#cosHandPad button.on{background:radial-gradient(circle,#ff8af0,#7b2ff7)}#cosPad button.cd{opacity:.45}#cosSwRow{display:flex;gap:6px;align-items:center;position:relative}#cosSwNum{display:none;position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%);grid-template-columns:repeat(3,34px);gap:5px;padding:6px;border-radius:14px;background:rgba(30,10,60,.75)}#cosSwNum.open{display:grid}#cosSwNum button{width:34px;height:34px;font-size:15px;font-weight:700;padding:0;border-radius:10px}#cosSwNum button.sel{background:radial-gradient(circle,#ff8af0,#7b2ff7)}#cosSwX,#cosSwM,#cosSwN{display:none;width:36px;height:36px;font-size:14px;font-weight:700;padding:0}#cosPad.sw #cosSwX,#cosPad.sw #cosSwM,#cosPad.sw #cosSwN{display:block}#cosPad button.on{background:radial-gradient(circle,#ff8af0,#7b2ff7)}</style>`);
+document.body.insertAdjacentHTML('beforeend', `<div id="cosPad"><button id="cosStrike">☄️</button><button id="cosShadow">👥</button><button id="cosHands">✋</button><div id="cosSwRow"><button id="cosSwX">✖</button><button id="cosSwM">⭐</button><button id="cosSwN">×</button><button id="cosSword">🗡️</button><div id="cosSwNum">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-n="${n}">${n}</button>`).join('')}</div></div></div>`);
+document.body.insertAdjacentHTML('beforeend', `<div id="cosHandPad">${[['grab', '🤏'], ['throw', '🎯'], ['sq', '💢'], ['place', '⬇️'], ['slap', '👋'], ['flick', '👆'], ['prot', '🛡️'], ['big', '➕'], ['small', '➖']].map(([k, i]) => `<button data-h="${k}">${i}</button>`).join('')}</div>`);
+for (const id of ['cosStrike', 'cosShadow', 'cosSword', 'cosSwX', 'cosSwM', 'cosSwN', 'cosHands', 'cosHandPad']) for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $(id).addEventListener(ev, e => e.stopPropagation(), { passive: true });
+$('cosStrike').addEventListener('click', e => { e.stopPropagation(); strike(); }); $('cosHands').addEventListener('click', e => { e.stopPropagation(); handsToggle(); });
+$('cosHandPad').addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-h]'); if (!b) return; const k = b.dataset.h; ({ grab: grabKey, throw: throwKey, sq: squeezeKey, place: placeKey, slap: slapKey, flick: flickKey, prot: protKey, big: () => handsKey('+'), small: () => handsKey('-') })[k](); }); $('cosShadow').addEventListener('click', e => { e.stopPropagation(); shadowsKey(); });
 $('cosSword').addEventListener('pointerdown', e => { e.stopPropagation(); swordKey(); });
 $('cosSwX').addEventListener('click', e => { e.stopPropagation(); swDismiss(); }); $('cosSwM').addEventListener('click', e => { e.stopPropagation(); mergeKey(); }); $('cosSwN').addEventListener('click', e => { e.stopPropagation(); $('cosSwNum').classList.toggle('open'); });   // ×N: rakam paneli aç/kapat
 for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $('cosSwNum').addEventListener(ev, e => e.stopPropagation(), { passive: true });
@@ -642,7 +785,8 @@ document.head.insertAdjacentHTML('beforeend', `<style>#ltStorm{position:fixed;ri
 document.body.insertAdjacentHTML('beforeend', '<button id="ltStorm">⛈️</button>');
 for (const ev of ['pointerdown', 'mousedown', 'touchstart']) $('ltStorm').addEventListener(ev, e => e.stopPropagation(), { passive: true });
 $('ltStorm').addEventListener('click', e => { e.stopPropagation(); if (icOn()) blizzard(); else storm(); });
-function ui() { const ls = $('ltStorm'), ice = icOn(), lv = (ltOn() || ice) && G.touchMode && !G.paused; ls.style.display = lv ? 'block' : 'none'; if (lv) { ls.classList.toggle('cd', (ice ? IC.cd : LT.cd) > 0); const lb = ice ? '🌨️' : '⛈️'; if (ls.textContent !== lb) ls.textContent = lb; } const p = $('cosPad'); p.style.display = CO.on && G.touchMode && !G.paused ? 'flex' : 'none'; if (!CO.on) return; $('cosStrike').classList.toggle('cd', CO.cd > 0); $('cosShadow').classList.toggle('on', SH.list.some(s => !s.dead && !s.recall)); const sw = SW.list.length > 0; p.classList.toggle('sw', sw); $('cosSword').classList.toggle('on', sw); $('cosSwM').classList.toggle('on', SW.giant); const nt = '×' + SW.n; if ($('cosSwN').textContent !== nt) { $('cosSwN').textContent = nt; for (const b of $('cosSwNum').children) b.classList.toggle('sel', +b.dataset.n === SW.n); } if (!sw) $('cosSwNum').classList.remove('open'); }
+function ui() { const ls = $('ltStorm'), ice = icOn(), lv = (ltOn() || ice) && G.touchMode && !G.paused; ls.style.display = lv ? 'block' : 'none'; if (lv) { ls.classList.toggle('cd', (ice ? IC.cd : LT.cd) > 0); const lb = ice ? '🌨️' : '⛈️'; if (ls.textContent !== lb) ls.textContent = lb; } const p = $('cosPad'), hp = $('cosHandPad'); p.style.display = CO.on && G.touchMode && !G.paused ? 'flex' : 'none'; hp.style.display = CO.on && HD.on && G.touchMode && !G.paused ? 'grid' : 'none'; if (!CO.on) return; $('cosStrike').classList.toggle('cd', CO.cd > 0); $('cosShadow').classList.toggle('on', SH.list.some(s => !s.dead && !s.recall)); $('cosHands').classList.toggle('on', HD.on); if (HD.on) hp.querySelector('[data-h="prot"]').classList.toggle('on', !!HD.prot);
+  const sw = SW.list.length > 0; p.classList.toggle('sw', sw); $('cosSword').classList.toggle('on', sw); $('cosSwM').classList.toggle('on', SW.giant); const nt = '×' + SW.n; if ($('cosSwN').textContent !== nt) { $('cosSwN').textContent = nt; for (const b of $('cosSwNum').children) b.classList.toggle('sel', +b.dataset.n === SW.n); } if (!sw) $('cosSwNum').classList.remove('open'); }
 
-window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey, mergeKey, setCount, swDismiss, swOn: () => CO.on && SW.list.length > 0, camK, lasing: () => !!CO.lasOn || LT.zap || IC.beam, icePunch, iceShield, iceShieldOn: () => IC.shield > 0, blizzard, IC, boltPunch, boltLight, boltLightOn: () => LT.light && G.INV.eq === 'bolt', storm, LT };
+window.__cos = { late, prompt, key, punch, strike, activate, deactivate, toggle, net, blocks, pose, on, CO, SH, SW, shadowsKey, swordKey, mergeKey, setCount, swDismiss, swOn: () => CO.on && SW.list.length > 0, handsOn: () => CO.on && HD.on, handsKey, handsToggle, HD, aim: aimPoint, camK, lasing: () => !!CO.lasOn || LT.zap || IC.beam, icePunch, iceShield, iceShieldOn: () => IC.shield > 0, blizzard, IC, boltPunch, boltLight, boltLightOn: () => LT.light && G.INV.eq === 'bolt', storm, LT };
 })(window.__sftG);

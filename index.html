@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.37</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.38</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -3955,7 +3955,7 @@ ITEMS.splice(ITEMS.findIndex(i => i.id === 'torch'), 0,
 ITEMS.push({ id: 'skate', name: 'Kaykay', icon: '🛹', kind: 'toggle', desc: 'Bin / in: çok hızlı kayarsın' },
   { id: 'guitar', name: 'Gitar', icon: '🎸', kind: 'play', desc: 'Çal: her basışta yeni akor' },
   { id: 'apple', name: 'Elma', icon: '🍎', kind: 'eat', desc: 'Ye: canın dolar' });
-ITEMS.splice(1, 0, { id: 'cosmic', name: 'Kozmik küre', icon: '🔮', kind: 'cosmic', desc: 'V: küre içine girer, can iki katı · mor lazer, 60 kol, X gökten saldırı, C 6 mor gölge, Z kılıç (1-9 kaç kılıç, nokta dev kılıç, 0 kapat) · K: küreyi çıkar' });   // 🔮 en başta
+ITEMS.splice(1, 0, { id: 'cosmic', name: 'Kozmik küre', icon: '🔮', kind: 'cosmic', desc: 'V: küre içine girer, can iki katı · mor lazer, 60 kol, X gökten saldırı, C 6 mor gölge, Z kılıç (1-9 kaç kılıç, nokta dev kılıç, 0 kapat), H dev eller · K: küreyi çıkar' });   // 🔮 en başta
 ITEMS.splice(2, 0, { id: 'bolt', name: 'Şimşek', icon: '⚡', kind: 'bolt', desc: 'Vur: vurduğuna şimşek çakar · sağ tık: elinden şimşek (nişan kamerası, yakındakilere sıçrar) · X: yakındaki tüm düşmanlara şimşek · K: elde büyük ışık' });   // ⚡
 ITEMS.splice(3, 0, { id: 'ice', name: 'Buz', icon: '❄️', kind: 'ice', desc: 'Vur: dondurur, donmuşa vur: kırar · sağ tık: buz ışını (nişan kamerası) · X: kar fırtınası · K: buz kalkanı · koşarken buz yolu, daha hızlı' });   // ❄️
 for (const it of ITEMS) ITEM_BY[it.id] = it;
@@ -8960,6 +8960,7 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.code === 'Space' || e.code === 'Tab') e.preventDefault();
   if (e.repeat) return;
+  if ((e.key === "'" || e.key === '+' || e.key === '-') && window.__cos && __cos.handsOn() && started && !paused && !photoMode && !INV.open && !ADM.open) { __cos.handsKey(e.key); return; }   // ✋ ' koru · + / − el boyu
   if ((e.key === '.' || e.code === 'NumpadDecimal') && window.__cos && __cos.swOn() && started && !paused && !photoMode && !INV.open && !ADM.open) { __cos.mergeKey(); return; }   // 🗡️ nokta: kılıçlar birleşip dev kılıç olur
   if (e.key === '.' && !HR.on && e.code !== 'Period' && e.code !== 'NumpadDecimal' && !giant && started && !paused && !photoMode && !INV.open && !ADM.open) { if (!vehKey('Period')) roboVolt(); return; }   // Türkçe klavyede nokta tuşu
   if (e.key === "'" && !HR.on && !giant && started && !paused && !photoMode && !INV.open && !ADM.open) { if (!vehKey('Quote')) roboTitan(); return; }   // kesme işareti: Titan
@@ -10151,8 +10152,8 @@ function exitHouse() {
 function cosTargets() {   // 🔮 kozmik mod: her bölgeden vurulabilir düşmanlar (köylüler hariç)
   const L = [];
   if (inArena) for (const m of monsters) if (monAlive(m)) L.push({ id: m, p: m.holder.position, h: 2.2, r: .9, hit: (d, dir, k) => { damageMonster(m, d, dir); if (k && m.vel) m.vel.addScaledVector(dir, k); } });
-  if (inRoyale) for (const b of BR.bots) if (b.alive && b.holder.visible) L.push({ id: b, p: b.pos, h: 1.9, r: .5, hit: (d, dir, k) => { brHurtBot(b, Math.round(d), 'player'); if (k && b.vel) b.vel.addScaledVector(dir, k); } });
-  try { if (bossAlive()) L.push({ id: BOSS, p: new THREE.Vector3(BOSS.x, BOSS.y, BOSS.z), h: BOSS.H, r: BOSS.R, hit: d => bossDamage(d, new THREE.Vector3(BOSS.x, BOSS.y + BOSS.H * .5, BOSS.z)) }); } catch (e) {}
+  if (inRoyale) for (const b of BR.bots) if (b.alive && b.holder.visible) L.push({ id: b, hum: true, p: b.pos, h: 1.9, r: .5, hit: (d, dir, k) => { brHurtBot(b, Math.round(d), 'player'); if (k && b.vel) b.vel.addScaledVector(dir, k); } });
+  try { if (bossAlive()) L.push({ id: BOSS, boss: true, p: new THREE.Vector3(BOSS.x, BOSS.y, BOSS.z), h: BOSS.H, r: BOSS.R, hit: d => bossDamage(d, new THREE.Vector3(BOSS.x, BOSS.y + BOSS.H * .5, BOSS.z)) }); } catch (e) {}
   try { if (inDungeon && window.__dg && __dg.targets) L.push(...__dg.targets()); } catch (e) {}
   try { if (inSpace && window.__spc && __spc.targets) L.push(...__spc.targets()); } catch (e) {}
   return L;
@@ -10379,6 +10380,17 @@ function updateCarried() {
   o.position.set(handW.x, handW.y - drop, handW.z);
   if (carried.type !== 'obj') { carried.ref.holder.rotation.y = facing + Math.PI; carried.ref.facing = facing + Math.PI; }
 }
+// ✋ kozmik dev eller: sökülebilir eşyalar (ağaç, çam, çalı, kaya, sandık, lamba, şehirde araba/parça) · insanlar ve hayvanlar bu listede yok
+function handObjsIn(x, z, r) { const L = []; const c = h => { const d = Math.hypot(h.position.x - x, h.position.z - z); if (d < r) L.push([h, d]); };
+  if (!inArena && !inHouse && !inMall && !inCloset) { for (const sl of GRAB_SLOTS) for (const h of slotHolders[sl] || []) if (!h.userData.flying && h.parent && h.visible !== false) c(h);
+    if (inCity) { for (const k of CITY.cars) if (k.g.visible && !k.g.userData.flying) c(k.g); for (const h of CITY.chunks) if (h.parent && !h.userData.flying) c(h); } }
+  return L.sort((a, b) => a[1] - b[1]).map(a => a[0]); }
+function handTakeObj(o) { unsquash(o); if (o.userData.obs) o.userData.obs.pass = true; o.userData.flying = true;
+  if (isTreeObj(o)) { o.rotation.order = 'YXZ'; for (let i = 0; i < 26; i++) spawnDust(o.position.x, 0, o.position.z, 1.2, 2.2, 0, 0, 0x6b4f2a); shake = Math.max(shake, .25); play('uproot'); } }
+function handThrowObj(o, vx, vy, vz, strong) { flyers.push({ type: 'obj', ref: o, vel: new THREE.Vector3(vx, 0, vz), vy, strong: !!strong }); if (strong) play('uproot', { throw: true }); }
+function handCrushObj(o) { const gb = terrH(o.position.x, o.position.z); o.position.y = gb; if (isTreeObj(o)) { o.rotation.x = 0; o.rotation.z = 0; } else pendUpright(o);
+  const obs = o.userData.obs; if (obs) { obs.x = o.position.x; obs.z = o.position.z; obs.pass = false; obsRebase(obs, gb); } o.userData.flying = false; try { updateObsHeight(o); } catch (e) {}
+  squashObj(o, null, false, obs); for (let k = 0; k < 18; k++) spawnDust(o.position.x, 0, o.position.z, 1, 2, 0, 0, isTreeObj(o) ? 0x6b4f2a : groundDust()); shake = Math.max(shake, .2); }
 function updateFlyers(dt) {
   for (let i = flyers.length - 1; i >= 0; i--) {
     const f = flyers[i], o = carriedObj(f);
@@ -31243,7 +31255,8 @@ window.__sftG = (() => { const G = {}, d = (k, g, st) => Object.defineProperty(G
   d('speckleTexture', () => speckleTexture); d('started', () => started, v => { started = v; }); d('staticPH', () => staticPH); d('teleportTo', () => teleportTo);
   d('teleporting', () => teleporting, v => { teleporting = v; }); d('touchMode', () => touchMode, v => { touchMode = v; }); d('tryLock', () => tryLock); d('vel', () => vel);
   d('vy', () => vy, v => { vy = v; }); d('mergeGeometries', () => mergeGeometries);
-  d('INV', () => INV); d('equip', () => equip); d('HAND', () => HAND); d('roboRay', () => roboRay); d('laserHeld', () => laserHeld); d('shielding', () => shielding); d('slideObj', () => slide); d('boostMode', () => boostMode); d('flyingNow', () => flyingNow); d('cosTargets', () => cosTargets);   // 🔮
+  d('INV', () => INV); d('equip', () => equip); d('HAND', () => HAND); d('roboRay', () => roboRay); d('laserHeld', () => laserHeld); d('shielding', () => shielding); d('slideObj', () => slide); d('boostMode', () => boostMode); d('flyingNow', () => flyingNow); d('groundAt', () => groundAt); d('npcs', () => npcs); d('handObjsIn', () => handObjsIn); d('handTakeObj', () => handTakeObj); d('handThrowObj', () => handThrowObj); d('handCrushObj', () => handCrushObj);   // ✋
+  d('cosTargets', () => cosTargets);   // 🔮
   d('wrapAng', () => wrapAng); d('yaw', () => yaw, v => { yaw = v; });
   return G; })();
 { const s = document.createElement('script'), ms = document.getElementById('sftMakerSrc'); s.src = ms ? URL.createObjectURL(new Blob([ms.textContent], { type: 'text/javascript' })) : 'maker.js'; s.onerror = () => console.warn('🗺️ maker.js yüklenemedi'); document.head.appendChild(s); }
