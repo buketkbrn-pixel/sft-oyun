@@ -347,7 +347,7 @@
   <div class="bbar"><i></i></div>
   <div class="btip" id="bootTip">Dünya hazırlanıyor…</div>
   <canvas id="dinoCv" width="600" height="150"></canvas>
-  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.40</div>
+  <div class="dtip">🦖 Yüklenirken oyna: zıplamak için ekrana dokun (bilgisayarda boşluk) · sürüm 16.41</div>
 </div></div>
 <script>
 window.SFT_DINO = function (cv) {   // 🦖 2D dinozor koşusu (yükleme ekranında)
@@ -30297,6 +30297,7 @@ function miaSpawnHelper(x, z, kind) {   // sağlıkçı / polis memuru
 function miaKill(n) { try { if (n.mdl) npcModelSet(n, 'stick'); scene.remove(n.holder); const i = npcs.indexOf(n); if (i >= 0) npcs.splice(i, 1); } catch (e) {} }
 function miaHurt(n, why) { n.state = 'down'; n.downT = .5; n.hurt = why; n.vel.set(0, 0, 0); try { hrEmo(n.holder, why === 'faint' ? '😵' : '🤕', 1.4, 2); } catch (e) {} }
 function miaEvent(kindF) {
+  if (!ANK.ppl || !ANK.cars) return null;   // şehir modunda Miami kişileri yok
   const A = ankA(), focus = MIA2.follow && MIA2.follow.holder.parent ? MIA2.follow.holder.position : player.position, ks = ['crash', 'faint', 'snatch', 'crash', 'faint'];
   const k = kindF || ks[(Math.random() * ks.length) | 0], inc = { k, t: 0, x: 0, z: 0, vic: null, done: false, id: Math.random().toString(36).slice(2, 6) };
   const peds = ANK.ppl.filter(n => npcSolid(n) && !n.hurt && !n.miaHelper && !n.parkLoop && Math.hypot(n.holder.position.x - focus.x, n.holder.position.z - focus.z) < 70);
@@ -30907,7 +30908,7 @@ const MIA_EV_W = [['crash', 2], ['faint', 2], ['snatch', 2], ['quarrel', 3], ['k
 function miaEventAny(kind) {
   const night = typeof DAY !== 'undefined' && DAY.N > .5; if (kind) return MIA_EVS[kind] ? MIA_EVS[kind]() : miaEvent(kind);
   const city = lifeOn() === 'city', L = MIA_EV_W.filter(e => (!e[2] || night) && !(city && /^(crash|faint|snatch|race)$/.test(e[0]))), tot = L.reduce((s, e) => s + e[1], 0); let r = Math.random() * tot;
-  for (const e of L) { r -= e[1]; if (r <= 0) { const k = e[0]; return MIA_EVS[k] ? (MIA_EVS[k]() || miaEvent()) : miaEvent(k); } } return null;
+  for (const e of L) { r -= e[1]; if (r <= 0) { const k = e[0]; return MIA_EVS[k] ? (MIA_EVS[k]() || (city ? null : miaEvent())) : (city ? null : miaEvent(k)); } } return null;
 }
 function miaShowsTick(dt) { for (let i = MIA3.shows.length - 1; i >= 0; i--) { const s = MIA3.shows[i]; s.t += dt; try { if (s.u) s.u(dt); } catch (e) { sftErr(e); s.t = 1e9; } if (s.t >= s.dur) { try { if (s.end) s.end(); } catch (e) {} for (const a of s.actors || []) miaKill(a); MIA3.shows.splice(i, 1); } } }
 // ---------- toplanabilir eşyalar (hazine, uzaylı parçası, altın flamingo) ----------
